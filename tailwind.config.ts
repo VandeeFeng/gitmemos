@@ -52,6 +52,46 @@ const config = {
           foreground: "hsl(var(--card-foreground))",
         },
       },
+      typography: {
+        DEFAULT: {
+          css: {
+            'code::before': {
+              content: '""'
+            },
+            'code::after': {
+              content: '""'
+            },
+            'code': {
+              backgroundColor: '#eaeef2',
+              padding: '0.2em 0.4em',
+              margin: '0 0.2em',
+              borderRadius: '6px',
+              fontSize: '0.9em',
+              fontWeight: '400',
+            },
+            'blockquote p': {
+              fontWeight: '400',
+              color: '#57606a',
+            },
+            'a': {
+              textDecoration: 'none',
+              '&:hover': {
+                textDecoration: 'underline',
+              },
+            },
+          }
+        },
+        invert: {
+          css: {
+            'code': {
+              backgroundColor: '#2d333b',
+            },
+            'blockquote p': {
+              color: '#768390',
+            },
+          }
+        }
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",

@@ -15,7 +15,7 @@ export const markdownComponents: Components = {
                 <Link
                   key={i}
                   href={`/issue/${issueNumber}`}
-                  className="text-[#0969da] dark:text-[#2f81f7] hover:underline"
+                  className="text-[rgb(88,137,223)] hover:underline"
                 >
                   {part}
                 </Link>
@@ -35,7 +35,7 @@ export const markdownComponents: Components = {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-[#0969da] dark:text-[#2f81f7] hover:underline"
+        className="text-[rgb(88,137,223)] hover:underline"
         {...props}
       >
         {children}

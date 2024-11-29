@@ -67,11 +67,24 @@ export default function Home() {
     }
   };
 
-  if (!mounted) return null;
+  if (!mounted) return (
+    <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500">
+      <div className="container mx-auto p-4 max-w-4xl opacity-0">
+        <header className="flex items-center justify-between py-4 mb-8">
+          <div className="flex items-center gap-4">
+            <div className="text-2xl font-bold">GitMemo</div>
+          </div>
+        </header>
+        <main className="mt-8">
+          <div className="bg-white dark:bg-[#22272e]"></div>
+        </main>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500">
-      <div className="container mx-auto p-4 max-w-4xl">
+      <div className={`container mx-auto p-4 max-w-4xl ${mounted ? 'animate-content-show' : 'opacity-0'}`}>
         {showSuccess && (
           <div className="fixed top-4 right-4 bg-[#2da44e]/10 dark:bg-[#2da44e]/20 border border-[#2da44e]/20 dark:border-[#2da44e]/30 text-[#1a7f37] dark:text-[#3fb950] px-4 py-2 rounded-lg shadow-sm flex items-center gap-2 animate-fade-in">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

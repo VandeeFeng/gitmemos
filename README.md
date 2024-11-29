@@ -23,6 +23,7 @@
 - 🎨 支持亮色/暗色主题
 - ✨ Markdown 编辑和实时预览
 - 🏷️ 标签管理和筛选
+- 🔗 反链
 
 ## 快速开始
 
@@ -51,3 +52,9 @@
 1. 访问 [GitHub Token 设置页面](https://github.com/settings/tokens)
 2. 生成新的 token，找到仓库，勾选 `issue` 读写权限
 3. 将 token 添加到 `.env.local` 文件中
+
+## TODO
+- [ ] 搜索功能
+- [ ] 数据库
+- [ ] 登录功能
+- [ ] 日历

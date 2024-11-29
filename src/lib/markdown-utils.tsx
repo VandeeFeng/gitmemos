@@ -22,7 +22,7 @@ function extractDimensions(alt: string): [string, ImageDimensions] {
 }
 
 // 从 HTML img 标签中提取属性
-function parseImgTag(imgTag: string): { src: string; alt: string; width?: number | string; height?: number | string } {
+function parseImgTag(imgTag: string): { src: string; alt: string; width?: string; height?: string } {
   const srcMatch = imgTag.match(/src=["'](.*?)["']/);
   const altMatch = imgTag.match(/alt=["'](.*?)["']/);
   const widthMatch = imgTag.match(/width=["']?([\d.]+%?|\d*\.\d+%?)["']?/);
@@ -37,12 +37,13 @@ function parseImgTag(imgTag: string): { src: string; alt: string; width?: number
 }
 
 // 处理尺寸值，保持百分比格式或转换为数字
-function processDimensionValue(value: string | undefined): string {
-  if (!value) return '';
+function processDimensionValue(value: number | string | undefined): string {
+  if (value === undefined) return '';
+  if (typeof value === 'number') return String(value);
   if (value.endsWith('%')) {
     return `"${value}"`;  // 百分比值需要用引号包裹
   }
-  return value;  // 数字值不需要引号
+  return value;  // 数字字符串值不需要引号
 }
 
 // 处理 Markdown 中的图片，将其包装在 Lightbox 组件中
@@ -65,8 +66,8 @@ export function wrapImagesWithLightbox(content: string): string {
   const markdownImageRegex = /!\[(.*?)\]\((.*?)\)/g;
   processedContent = processedContent.replace(markdownImageRegex, (match, alt, src) => {
     const [cleanAlt, dimensions] = extractDimensions(alt);
-    const width = dimensions.width ? `width={${processDimensionValue(String(dimensions.width))}}` : '';
-    const height = dimensions.height ? `height={${processDimensionValue(String(dimensions.height))}}` : '';
+    const width = dimensions.width ? `width={${processDimensionValue(dimensions.width)}}` : '';
+    const height = dimensions.height ? `height={${processDimensionValue(dimensions.height)}}` : '';
     
     return `<Lightbox src="${src}" alt="${cleanAlt}" ${width} ${height} className="rounded-lg" />`;
   });

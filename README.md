@@ -2,7 +2,7 @@
 
 GIt Memo 是一个基于 GitHub Issues 的笔记应用，它提供了一个简洁优雅的界面来管理和编写你的笔记。通过利用 GitHub Issues 的强大功能，你可以轻松地组织、标记和搜索你的笔记内容。
 
-配合仓库的 main 分支，提供一个简单的页面。
+配合 [VandeeFeng/gitmemo](https://github.com/VandeeFeng/gitmemo)，提供一个简单的页面。
 
 ## 特性
 
@@ -40,8 +40,8 @@ GIt Memo 是一个基于 GitHub Issues 的笔记应用，它提供了一个简�
 
 1. 克隆仓库：
    ```bash
-   git clone --branch mp --single-branch git@github.com:VandeeFeng/gitmemo.git
-   cd gitmemo
+   git clone git@github.com:VandeeFeng/gitmemos.git
+   cd gitmemos
    ```
 
 2. 安装依赖：

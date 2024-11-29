@@ -74,10 +74,13 @@ export default function IssuePage({ params }: { params: Promise<{ number: string
         <div className="mb-6">
           <Button
             onClick={() => router.push('/')}
-            variant="ghost"
-            className="text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] -ml-2"
+            variant="link"
+            className="text-[#57606a] dark:text-[#768390] hover:text-[#0969da] dark:hover:text-[#2f81f7] -ml-2 group hover:no-underline"
           >
-            ← Back to Issues
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5 transition-transform group-hover:-translate-x-0.5">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            Back to Issues
           </Button>
         </div>
         

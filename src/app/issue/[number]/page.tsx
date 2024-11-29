@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { markdownComponents } from '@/components/markdown-components';
 import { Issue } from '@/types/github';
+import { Backlinks } from '@/components/backlinks';
 
 export default function IssuePage({ params }: { params: Promise<{ number: string }> }) {
   const resolvedParams = use(params);
@@ -83,33 +84,39 @@ export default function IssuePage({ params }: { params: Promise<{ number: string
         <div className="bg-white dark:bg-[#2d333b] border border-gray-200 dark:border-[#373e47] rounded-lg shadow-sm">
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h1 className="text-2xl font-bold text-[#24292f] dark:text-[#adbac7]">
-                {issue.title}
-              </h1>
-              <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
-                  issue.state === 'open' 
-                    ? 'bg-[#dafbe1] text-[#1a7f37] dark:bg-[#1a7f37]/20 dark:text-[#3fb950]' 
-                    : 'bg-[#faf2f8] text-[#8250df] dark:bg-[#8250df]/20 dark:text-[#a371f7]'
-                }`}>
-                  <span className="relative flex w-2 h-2 mr-1.5">
-                    <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                      issue.state === 'open' 
-                        ? 'bg-[#1a7f37] dark:bg-[#3fb950]' 
-                        : 'bg-[#8250df] dark:bg-[#a371f7]'
-                    }`}></span>
-                    <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                      issue.state === 'open' 
-                        ? 'bg-[#1a7f37] dark:bg-[#3fb950]' 
-                        : 'bg-[#8250df] dark:bg-[#a371f7]'
-                    }`}></span>
+              <div className="space-y-1 flex-1 min-w-0 pr-4">
+                <h1 className="text-2xl font-bold text-[#24292f] dark:text-[#adbac7]">
+                  {issue.title}
+                </h1>
+                <div className="flex items-center gap-2 text-xs text-[#57606a] dark:text-[#768390]">
+                  <span>#{issue.number}</span>
+                  <span>·</span>
+                  <span>
+                    <time dateTime={issue.created_at} className="whitespace-nowrap">
+                      {new Date(issue.created_at).toLocaleDateString()}
+                    </time>
                   </span>
-                  {issue.state}
-                </span>
-                <span className="text-sm text-[#57606a] dark:text-[#768390]">
-                  #{issue.number}
-                </span>
+                </div>
               </div>
+              <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
+                issue.state === 'open' 
+                  ? 'bg-[#dafbe1] text-[#1a7f37] dark:bg-[#1a7f37]/20 dark:text-[#3fb950]' 
+                  : 'bg-[#faf2f8] text-[#8250df] dark:bg-[#8250df]/20 dark:text-[#a371f7]'
+              }`}>
+                <span className="relative flex w-2 h-2 mr-1.5">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                    issue.state === 'open' 
+                      ? 'bg-[#1a7f37] dark:bg-[#3fb950]' 
+                      : 'bg-[#8250df] dark:bg-[#a371f7]'
+                  }`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                    issue.state === 'open' 
+                      ? 'bg-[#1a7f37] dark:bg-[#3fb950]' 
+                      : 'bg-[#8250df] dark:bg-[#a371f7]'
+                  }`}></span>
+                </span>
+                {issue.state}
+              </span>
             </div>
 
             {issue.labels.length > 0 && (
@@ -141,6 +148,8 @@ export default function IssuePage({ params }: { params: Promise<{ number: string
                 {issue.body || ''}
               </ReactMarkdown>
             </div>
+
+            <Backlinks currentIssueNumber={issue.number} />
           </div>
         </div>
       </div>

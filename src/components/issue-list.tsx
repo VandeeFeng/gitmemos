@@ -10,6 +10,7 @@ import rehypeSanitize from 'rehype-sanitize'
 import { markdownComponents } from './markdown-components';
 import Link from 'next/link';
 import { Issue } from '@/types/github';
+import { Backlinks } from './backlinks';
 
 export function IssueList({ 
   onSelect,
@@ -120,8 +121,17 @@ export function IssueList({
                         {issue.title}
                       </Link>
                     </h3>
+                    <div className="flex items-center gap-2 text-xs text-[#57606a] dark:text-[#768390]">
+                      <span>#{issue.number}</span>
+                      <span>·</span>
+                      <span>
+                        <time dateTime={issue.created_at} className="whitespace-nowrap">
+                          {new Date(issue.created_at).toLocaleDateString()}
+                        </time>
+                      </span>
+                    </div>
                     {issue.labels.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-wrap gap-1.5 mt-1">
                         {issue.labels.map((label) => (
                           <span
                             key={label.id}
@@ -146,15 +156,6 @@ export function IssueList({
                         ))}
                       </div>
                     )}
-                    <div className="flex items-center gap-2 text-xs text-[#57606a] dark:text-[#768390]">
-                      <span>#{issue.number}</span>
-                      <span>·</span>
-                      <span>
-                        <time dateTime={issue.created_at} className="whitespace-nowrap">
-                          {new Date(issue.created_at).toLocaleDateString()}
-                        </time>
-                      </span>
-                    </div>
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
                     <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
@@ -233,6 +234,8 @@ export function IssueList({
                       </button>
                     )}
                   </div>
+
+                  <Backlinks currentIssueNumber={issue.number} />
                 </div>
               </div>
             </div>

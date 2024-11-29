@@ -10,6 +10,12 @@
 
 如果想显示其他仓库，现在只是提供了一个 简单的 GitHub Config 来配置仓库和 API，数据保存在 LocalStorage。会优先获取环境变量的账号数据，其次是 config 。具体的登录功能没有继续往下了。
 
+<img src="assets/GitMemo1.png" alt="1" width="80%" />
+
+
+
+<img src="assets/GitMemo2.png" alt="2" width="80%" />
+
 ## 技术栈
 
 - Next.js 13+ (App Router)

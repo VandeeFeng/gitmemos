@@ -1,5 +1,4 @@
 import React from 'react';
-import { Lightbox } from '@/components/lightbox';
 
 interface ImageDimensions {
   width?: number;

@@ -50,18 +50,13 @@ export function Lightbox({ src, alt = '', className = '', width, height }: Light
       const newX = e.clientX - dragStart.current.x;
       const newY = e.clientY - dragStart.current.y;
       
-      // 限制拖动范围
-      const img = imageRef.current;
-      if (img) {
-        const bounds = img.getBoundingClientRect();
-        const maxX = window.innerWidth * 0.2;
-        const maxY = window.innerHeight * 0.2;
-        
-        setPosition({
-          x: Math.max(Math.min(newX, maxX), -maxX),
-          y: Math.max(Math.min(newY, maxY), -maxY)
-        });
-      }
+      const maxX = window.innerWidth * 0.2;
+      const maxY = window.innerHeight * 0.2;
+      
+      setPosition({
+        x: Math.max(Math.min(newX, maxX), -maxX),
+        y: Math.max(Math.min(newY, maxY), -maxY)
+      });
     }
   }, [isDragging]);
 

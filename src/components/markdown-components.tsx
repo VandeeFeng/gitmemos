@@ -85,7 +85,7 @@ export const markdownComponents: Components = {
       {children}
     </li>
   ),
-  img: ({ src, alt, ...props }) => {
+  img: ({ src, alt }) => {
     if (!src) return null;
     
     // 从 alt 文本中提取尺寸信息

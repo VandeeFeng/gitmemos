@@ -55,7 +55,7 @@ export const markdownComponents: Components = {
         <img
           src={src}
           alt={alt || ''}
-          className="rounded-lg cursor-zoom-in hover:opacity-90 transition-opacity max-h-[70vh] object-contain mx-auto"
+          className="rounded-lg cursor-zoom-in hover:opacity-90 transition-opacity max-h-[400px] max-w-full object-contain mx-auto"
           onClick={() => setIsLightboxOpen(true)}
           {...props}
         />

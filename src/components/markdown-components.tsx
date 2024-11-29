@@ -1,5 +1,6 @@
 import type { Components } from 'react-markdown';
 import Link from 'next/link';
+import { Lightbox } from './lightbox';
 
 export const markdownComponents: Components = {
   p: ({ children, ...props }) => {
@@ -41,7 +42,6 @@ export const markdownComponents: Components = {
       </a>
     );
   },
- 
   pre: ({ children, ...props }) => (
     <div className="relative my-4">
       <pre
@@ -85,12 +85,29 @@ export const markdownComponents: Components = {
       {children}
     </li>
   ),
-  img: ({ src, alt, ...props }) => (
-    <img
-      src={src}
-      alt={alt}
-      className="max-h-[400px] rounded-lg mx-auto object-contain"
-      {...props}
-    />
-  ),
+  img: ({ src, alt, ...props }) => {
+    if (!src) return null;
+    
+    // 从 alt 文本中提取尺寸信息
+    const match = alt?.match(/^(.+?)\s*=(\d+)(?:x(\d+))?$/);
+    let width, height, cleanAlt;
+    
+    if (match) {
+      [, cleanAlt, width, height] = match;
+      width = parseInt(width);
+      height = height ? parseInt(height) : undefined;
+    } else {
+      cleanAlt = alt;
+    }
+    
+    return (
+      <Lightbox
+        src={src}
+        alt={cleanAlt || ''}
+        width={width}
+        height={height}
+        className="max-h-[400px] rounded-lg mx-auto object-contain"
+      />
+    );
+  },
 }; 

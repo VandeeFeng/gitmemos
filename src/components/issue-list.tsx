@@ -131,7 +131,7 @@ export function IssueList({
                       </span>
                     </div>
                     {issue.labels.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-1">
+                      <div className="flex flex-wrap gap-1.5 mt-2">
                         {issue.labels.map((label) => (
                           <span
                             key={label.id}

@@ -70,7 +70,7 @@ export default function IssuePage({ params }: { params: Promise<{ number: string
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#22272e] p-4">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-4xl mx-auto animate-content-show">
         <div className="mb-6">
           <Button
             onClick={() => router.push('/')}

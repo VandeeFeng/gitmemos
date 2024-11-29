@@ -1,9 +1,5 @@
-'use client';
-
 import type { Components } from 'react-markdown';
 import Link from 'next/link';
-import { useState } from 'react';
-import { Lightbox } from './lightbox';
 
 export const markdownComponents: Components = {
   p: ({ children, ...props }) => {
@@ -45,28 +41,7 @@ export const markdownComponents: Components = {
       </a>
     );
   },
-  img: ({ src, alt, ...props }) => {
-    const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-
-    if (!src) return null;
-
-    return (
-      <>
-        <img
-          src={src}
-          alt={alt || ''}
-          className="rounded-lg cursor-zoom-in hover:opacity-90 transition-opacity max-h-[400px] max-w-full object-contain mx-auto"
-          onClick={() => setIsLightboxOpen(true)}
-          {...props}
-        />
-        <Lightbox
-          isOpen={isLightboxOpen}
-          imageUrl={src}
-          onClose={() => setIsLightboxOpen(false)}
-        />
-      </>
-    );
-  },
+ 
   pre: ({ children, ...props }) => (
     <div className="relative my-4">
       <pre
@@ -109,5 +84,13 @@ export const markdownComponents: Components = {
     <li className="my-1 text-[#24292f] dark:text-[#adbac7]" {...props}>
       {children}
     </li>
+  ),
+  img: ({ src, alt, ...props }) => (
+    <img
+      src={src}
+      alt={alt}
+      className="max-h-[400px] rounded-lg mx-auto object-contain"
+      {...props}
+    />
   ),
 }; 

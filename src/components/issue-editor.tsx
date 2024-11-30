@@ -31,6 +31,7 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
   });
   const [creatingLabel, setCreatingLabel] = useState(false);
   const labelDropdownRef = useRef<HTMLDivElement>(null);
+  const { theme } = useTheme();
 
   useEffect(() => {
     const fetchLabels = async () => {
@@ -126,7 +127,7 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
           variant="outline"
           size="sm"
           onClick={() => setShowLabelDropdown(!showLabelDropdown)}
-          className="border-default"
+          className="border-default hover:bg-bg-secondary dark:hover:bg-bg-tertiary transition-colors"
         >
           Labels
         </Button>
@@ -191,7 +192,7 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
                           setShowNewLabelForm(false);
                           setNewLabel({ name: '', color: LABEL_COLORS[0].color, description: '' });
                         }}
-                        className="text-xs py-1 px-2"
+                        className="text-xs py-1 px-2 border-default hover:bg-bg-secondary dark:hover:bg-bg-tertiary transition-colors"
                         disabled={creatingLabel}
                       >
                         Cancel
@@ -209,12 +210,44 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
                   </div>
                 </div>
               ) : (
-                <button
-                  className="w-full px-3 py-2 text-left text-sm text-secondary hover:bg-bg-secondary dark:hover:bg-bg-tertiary border-b border-default"
-                  onClick={() => setShowNewLabelForm(true)}
-                >
-                  Create new label
-                </button>
+                <>
+                  <div className="max-h-48 overflow-y-auto">
+                    {availableLabels.map((label) => (
+                      <button
+                        key={label.name}
+                        onClick={() => {
+                          const isSelected = selectedLabels.includes(label.name);
+                          setSelectedLabels(prev =>
+                            isSelected
+                              ? prev.filter(name => name !== label.name)
+                              : [...prev, label.name]
+                          );
+                          if (isSelected) {
+                            setShowLabelDropdown(false);
+                          }
+                        }}
+                        className="w-full px-3 py-2 text-left text-sm hover:bg-bg-secondary dark:hover:bg-bg-tertiary flex items-center justify-between"
+                      >
+                        <div className="flex items-center">
+                          <span
+                            className="w-3 h-3 rounded-full mr-2"
+                            style={{ backgroundColor: `#${label.color}` }}
+                          />
+                          <span>{label.name}</span>
+                        </div>
+                        {selectedLabels.includes(label.name) && (
+                          <span className="text-success">✓</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    className="w-full px-3 py-2 text-left text-sm text-secondary hover:bg-bg-secondary dark:hover:bg-bg-tertiary border-t border-default"
+                    onClick={() => setShowNewLabelForm(true)}
+                  >
+                    Create new label
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -228,10 +261,15 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
         height={400}
         visibleDragbar={false}
         className="!border !border-default !rounded-lg"
+        data-color-mode={theme === 'dark' ? 'dark' : 'light'}
       />
 
       <div className="flex justify-end space-x-3">
-        <Button variant="outline" onClick={onCancel} className="border-default">
+        <Button 
+          variant="outline" 
+          onClick={onCancel} 
+          className="border-default hover:bg-bg-secondary dark:hover:bg-bg-tertiary transition-colors"
+        >
           Cancel
         </Button>
         <Button variant="success" onClick={handleSave} disabled={saving}>

@@ -31,7 +31,25 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
   });
   const [creatingLabel, setCreatingLabel] = useState(false);
   const labelDropdownRef = useRef<HTMLDivElement>(null);
+  const labelButtonRef = useRef<HTMLButtonElement>(null);
   const { theme } = useTheme();
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (labelButtonRef.current?.contains(event.target as Node)) {
+        return;
+      }
+      if (labelDropdownRef.current && !labelDropdownRef.current.contains(event.target as Node)) {
+        setShowLabelDropdown(false);
+        setShowNewLabelForm(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchLabels = async () => {
@@ -43,20 +61,6 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
       }
     };
     fetchLabels();
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (labelDropdownRef.current && !labelDropdownRef.current.contains(event.target as Node)) {
-        setShowLabelDropdown(false);
-        setShowNewLabelForm(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
   }, []);
 
   const handleSave = async () => {
@@ -128,12 +132,13 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
           size="sm"
           onClick={() => setShowLabelDropdown(!showLabelDropdown)}
           className="border-default hover:bg-bg-secondary dark:hover:bg-bg-tertiary transition-colors"
+          ref={labelButtonRef}
         >
           Labels
         </Button>
 
         {showLabelDropdown && (
-          <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-default bg-bg-primary dark:bg-bg-secondary shadow-card dark:shadow-card-dark">
+          <div ref={labelDropdownRef} className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-default bg-bg-primary dark:bg-bg-secondary shadow-card dark:shadow-card-dark">
             <div className="max-h-96 overflow-y-auto">
               {showNewLabelForm ? (
                 <div className="p-3 border-b border-default">

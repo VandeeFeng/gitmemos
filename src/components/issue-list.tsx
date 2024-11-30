@@ -17,11 +17,13 @@ import { useTheme } from 'next-themes';
 export function IssueList({ 
   onSelect,
   selectedLabel,
-  onLabelClick
+  onLabelClick,
+  searchQuery = ''
 }: { 
   onSelect: (issue: Issue) => void;
   selectedLabel: string | null;
   onLabelClick: (label: string) => void;
+  searchQuery?: string;
 }) {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,7 +73,21 @@ export function IssueList({
     }));
   };
 
-  const filteredIssues = issues.filter(issue => !selectedLabel || issue.labels.some(label => label.name === selectedLabel));
+  const filteredIssues = issues.filter(issue => {
+    const matchesLabel = !selectedLabel || issue.labels.some(label => label.name === selectedLabel);
+    
+    if (!searchQuery) return matchesLabel;
+
+    const searchLower = searchQuery.toLowerCase();
+    const titleMatch = issue.title.toLowerCase().includes(searchLower);
+    const bodyMatch = (issue.body || '').toLowerCase().includes(searchLower);
+    const labelsMatch = issue.labels.some(label => 
+      label.name.toLowerCase().includes(searchLower) ||
+      (label.description || '').toLowerCase().includes(searchLower)
+    );
+
+    return matchesLabel && (titleMatch || bodyMatch || labelsMatch);
+  });
 
   if (loading) {
     return (
@@ -95,7 +111,14 @@ export function IssueList({
         </div>
       ) : filteredIssues.length === 0 ? (
         <div className="text-center py-8">
-          <div className="text-text-secondary">No issues found</div>
+          <div className="text-text-secondary">
+            {searchQuery 
+              ? 'No issues found matching your search'
+              : selectedLabel
+                ? 'No issues found with this label'
+                : 'No issues found'
+            }
+          </div>
         </div>
       ) : (
         <>

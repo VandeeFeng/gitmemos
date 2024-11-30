@@ -79,20 +79,20 @@ export default function IssuePage({ params }: { params: Promise<{ number: string
   return (
     <div className="min-h-screen bg-white dark:bg-[#22272e] p-4">
       <div className="max-w-4xl mx-auto animate-content-show">
-        <div className="mb-6">
+        <div className="mb-12">
           <Button
             onClick={() => router.push('/')}
             variant="link"
-            className="text-[#57606a] dark:text-[#768390] hover:text-[#0969da] dark:hover:text-[#2f81f7] -ml-2 group hover:no-underline"
+            className="text-[#57606a] dark:text-[#768390] hover:text-[#0969da] dark:hover:text-[#2f81f7] group hover:no-underline text-lg py-2 pl-0"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1.5 transition-transform group-hover:-translate-x-0.5">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 transition-transform group-hover:-translate-x-0.5">
               <path d="M19 12H5M12 19l-7-7 7-7" />
             </svg>
             Back to Issues
           </Button>
         </div>
         
-        <div className="bg-white dark:bg-[#2d333b] border border-gray-200 dark:border-[#373e47] rounded-lg shadow-sm">
+        <div className="bg-white dark:bg-[#2d333b] border border-gray-200 dark:border-[#373e47] rounded-lg shadow-sm mt-4">
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="space-y-1 flex-1 min-w-0 pr-4">

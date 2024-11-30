@@ -294,6 +294,7 @@ export default function Home() {
                   onLabelClick={(label) => {
                     setSelectedLabel(label === selectedLabel ? null : label);
                   }}
+                  searchQuery={searchQuery}
                 />
               </div>
             )}

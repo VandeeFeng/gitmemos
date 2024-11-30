@@ -1,14 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { Button } from "@/components/ui/button";
 import { Octokit } from 'octokit';
 import { getGitHubConfig } from '@/lib/github';
-
-interface Label {
-  id: number;
-  name: string;
-  color: string;
-  description: string | null;
-}
+import { Label } from '@/types/github';
 
 interface LabelFilterProps {
   selectedLabel: string | null;

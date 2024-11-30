@@ -6,7 +6,7 @@ import { Button } from './ui/button';
 import { createIssue, updateIssue, getLabels, createLabel, getGitHubConfig } from '@/lib/github';
 import { useTheme } from 'next-themes';
 import { Label, EditableIssue } from '@/types/github';
-import { LABEL_COLORS, getLabelStyles } from '@/lib/colors';
+import { LABEL_COLORS } from '@/lib/colors';
 
 interface IssueEditorProps {
   issue?: EditableIssue;
@@ -18,32 +18,25 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
   const [title, setTitle] = useState(issue?.title || '');
   const [content, setContent] = useState(issue?.body || '');
   const [saving, setSaving] = useState(false);
-  const [labels, setLabels] = useState<Label[]>([]);
+  const [availableLabels, setAvailableLabels] = useState<Label[]>([]);
   const [selectedLabels, setSelectedLabels] = useState<string[]>(
     issue?.labels?.map(label => label.name) || []
   );
   const [showLabelDropdown, setShowLabelDropdown] = useState(false);
   const [showNewLabelForm, setShowNewLabelForm] = useState(false);
-  const [isConfigured, setIsConfigured] = useState(false);
   const [newLabel, setNewLabel] = useState({
     name: '',
     color: LABEL_COLORS[0].color,
     description: ''
   });
   const [creatingLabel, setCreatingLabel] = useState(false);
-  const { theme } = useTheme();
   const labelDropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const config = getGitHubConfig(false);
-    setIsConfigured(Boolean(config.token && config.owner && config.repo));
-  }, []);
 
   useEffect(() => {
     const fetchLabels = async () => {
       try {
         const labelsData = await getLabels();
-        setLabels(labelsData);
+        setAvailableLabels(labelsData);
       } catch (error) {
         console.error('Error fetching labels:', error);
       }
@@ -93,18 +86,6 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
     }
   };
 
-  const toggleLabel = (labelName: string) => {
-    const isRemoving = selectedLabels.includes(labelName);
-    setSelectedLabels(prev => 
-      isRemoving
-        ? prev.filter(name => name !== labelName)
-        : [...prev, labelName]
-    );
-    if (isRemoving) {
-      setShowLabelDropdown(false);
-    }
-  };
-
   const handleCreateLabel = async () => {
     if (!newLabel.name.trim()) {
       alert('Please enter a label name');
@@ -118,7 +99,7 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
         newLabel.color,
         newLabel.description || undefined
       );
-      setLabels(prev => [...prev, createdLabel]);
+      setAvailableLabels(prev => [...prev, createdLabel]);
       setSelectedLabels(prev => [...prev, createdLabel.name]);
       setShowNewLabelForm(false);
       setNewLabel({ name: '', color: LABEL_COLORS[0].color, description: '' });

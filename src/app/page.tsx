@@ -86,7 +86,7 @@ export default function Home() {
     <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500">
       <div className={`container mx-auto p-4 max-w-4xl ${mounted ? 'animate-content-show' : 'opacity-0'}`}>
         {showSuccess && (
-          <div className="fixed top-4 right-4 bg-[#2da44e]/10 dark:bg-[#2da44e]/20 border border-[#2da44e]/20 dark:border-[#2da44e]/30 text-[#1a7f37] dark:text-[#3fb950] px-4 py-2 rounded-lg shadow-sm flex items-center gap-2 animate-fade-in">
+          <div className="fixed top-4 right-4 bg-success/10 dark:bg-success/20 border border-success/20 dark:border-success/30 text-success dark:text-success px-4 py-2 rounded-lg shadow-sm flex items-center gap-2 animate-fade-in">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 6L9 17l-5-5"></path>
             </svg>
@@ -122,7 +122,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              className="text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] transition-colors"
+              className="text-text-secondary hover:text-text-primary transition-colors"
             >
               {theme === "dark" ? (
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -145,7 +145,7 @@ export default function Home() {
           </div>
           <Button 
             onClick={handleNewIssue}
-            className="bg-[#2da44e] hover:bg-[#2c974b] text-white border-0 shadow-none transition-colors"
+            className="bg-success hover:bg-success/90 text-white border-0 shadow-none transition-colors"
           >
             <span className="flex items-center gap-2">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -162,42 +162,42 @@ export default function Home() {
             showConfig ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'
           }`}
         >
-          <div className="bg-white dark:bg-[#2d333b] border border-gray-200 dark:border-[#373e47] rounded-lg shadow-sm p-6 mb-8">
+          <div className="bg-bg-primary dark:bg-bg-secondary border border-border-primary rounded-lg shadow-sm p-6 mb-8">
             <form onSubmit={handleConfigSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-text-primary mb-1">
                     Owner
                   </label>
                   <input
                     type="text"
                     value={githubConfig.owner}
                     onChange={(e) => setGithubConfig({...githubConfig, owner: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#444c56] rounded-lg bg-white/50 dark:bg-[#22272e]/50"
+                    className="w-full px-3 py-2 border border-border-primary rounded-lg bg-bg-primary/50 dark:bg-bg-tertiary/50"
                     placeholder="GitHub username or organization"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-text-primary mb-1">
                     Repository
                   </label>
                   <input
                     type="text"
                     value={githubConfig.repo}
                     onChange={(e) => setGithubConfig({...githubConfig, repo: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#444c56] rounded-lg bg-white/50 dark:bg-[#22272e]/50"
+                    className="w-full px-3 py-2 border border-border-primary rounded-lg bg-bg-primary/50 dark:bg-bg-tertiary/50"
                     placeholder="Repository name"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-text-primary mb-1">
                     Token
                   </label>
                   <input
                     type="password"
                     value={githubConfig.token}
                     onChange={(e) => setGithubConfig({...githubConfig, token: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-[#444c56] rounded-lg bg-white/50 dark:bg-[#22272e]/50"
+                    className="w-full px-3 py-2 border border-border-primary rounded-lg bg-bg-primary/50 dark:bg-bg-tertiary/50"
                     placeholder="GitHub personal access token"
                   />
                 </div>

@@ -11,6 +11,8 @@ import { markdownComponents } from './markdown-components';
 import Link from 'next/link';
 import { Issue } from '@/types/github';
 import { Backlinks } from './backlinks';
+import { getLabelStyles, STATUS_COLORS } from '@/lib/colors';
+import { useTheme } from 'next-themes';
 
 export function IssueList({ 
   onSelect,
@@ -27,6 +29,7 @@ export function IssueList({
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const { theme } = useTheme();
 
   useEffect(() => {
     async function fetchIssues() {
@@ -85,43 +88,34 @@ export function IssueList({
   }
 
   return (
-    <div className="space-y-6">
-      {issues.length === 0 ? (
-        <div className="text-center p-8 border border-gray-200 dark:border-[#373e47] rounded-lg max-w-4xl mx-auto">
-          <div className="text-[#57606a] dark:text-[#768390] mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mx-auto">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="12" y1="18" x2="12" y2="12"></line>
-              <line x1="9" y1="15" x2="15" y2="15"></line>
-            </svg>
-          </div>
-          <h3 className="text-lg font-semibold text-[#24292f] dark:text-[#adbac7]">
-            {selectedLabel ? `No issues with label "${selectedLabel}"` : 'No issues yet'}
-          </h3>
-          <p className="mt-1 text-sm text-[#57606a] dark:text-[#768390]">
-            {selectedLabel ? 'Try selecting a different label' : 'Get started by creating your first issue'}
-          </p>
+    <div className="space-y-4">
+      {loading ? (
+        <div className="flex justify-center py-8">
+          <div className="w-8 h-8 border-4 border-secondary/50 border-t-secondary rounded-full animate-spin"></div>
+        </div>
+      ) : filteredIssues.length === 0 ? (
+        <div className="text-center py-8">
+          <div className="text-text-secondary">No issues found</div>
         </div>
       ) : (
         <>
           {filteredIssues.map((issue) => (
             <div
               key={issue.number}
-              className="group border border-gray-200 dark:border-[#373e47] rounded-lg shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05),0_1px_2px_-2px_rgba(0,0,0,0.05)] dark:shadow-[0_2px_8px_-3px_rgba(0,0,0,0.3),0_1px_2px_-2px_rgba(0,0,0,0.3)] hover:shadow-[0_4px_12px_-3px_rgba(0,0,0,0.1),0_2px_3px_-2px_rgba(0,0,0,0.05)] dark:hover:shadow-[0_4px_12px_-3px_rgba(0,0,0,0.4),0_2px_3px_-2px_rgba(0,0,0,0.3)] transition-shadow max-w-4xl mx-auto"
+              className="group border border-default rounded-lg shadow-card dark:shadow-card-dark hover:shadow-card-hover dark:hover:shadow-card-dark-hover transition-shadow max-w-4xl mx-auto"
             >
               <div className="px-6 py-4">
                 <div className="flex items-start justify-between">
                   <div className="space-y-1 flex-1 min-w-0 pr-4">
-                    <h3 className="font-semibold text-[#24292f] dark:text-[#adbac7] truncate">
+                    <h3 className="font-semibold text-text-primary truncate">
                       <Link
                         href={`/issue/${issue.number}`}
-                        className="hover:text-[#0969da] dark:hover:text-[#2f81f7] transition-colors"
+                        className="hover:text-secondary dark:hover:text-secondary transition-colors"
                       >
                         {issue.title}
                       </Link>
                     </h3>
-                    <div className="flex items-center gap-2 text-xs text-[#57606a] dark:text-[#768390]">
+                    <div className="flex items-center gap-2 text-xs text-text-secondary">
                       <span>#{issue.number}</span>
                       <span>·</span>
                       <span>
@@ -137,14 +131,10 @@ export function IssueList({
                             key={label.id}
                             className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full cursor-pointer transition-all ${
                               selectedLabel === label.name 
-                                ? 'outline outline-2 outline-offset-1 outline-[#0969da] dark:outline-[#2f81f7]' 
+                                ? 'outline outline-2 outline-offset-1 outline-secondary dark:outline-secondary' 
                                 : 'hover:opacity-80'
                             }`}
-                            style={{
-                              backgroundColor: `#${label.color}20`,
-                              color: `#${label.color}`,
-                              border: `1px solid #${label.color}40`
-                            }}
+                            style={getLabelStyles(label.color)}
                             title={label.description || undefined}
                             onClick={(e) => {
                               e.stopPropagation();
@@ -158,29 +148,32 @@ export function IssueList({
                     )}
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
-                      issue.state === 'open' 
-                        ? 'bg-[#dafbe1] text-[#1a7f37] dark:bg-[#1a7f37]/20 dark:text-[#3fb950]' 
-                        : 'bg-[#faf2f8] text-[#8250df] dark:bg-[#8250df]/20 dark:text-[#a371f7]'
-                    }`}>
+                    <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full"
+                      style={issue.state === 'open' 
+                        ? STATUS_COLORS.open[theme === 'dark' ? 'dark' : 'light'].style
+                        : STATUS_COLORS.closed[theme === 'dark' ? 'dark' : 'light'].style
+                      }
+                    >
                       <span className="relative flex w-2 h-2 mr-1.5">
-                        <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                          issue.state === 'open' 
-                            ? 'bg-[#1a7f37] dark:bg-[#3fb950]' 
-                            : 'bg-[#8250df] dark:bg-[#a371f7]'
-                        }`}></span>
-                        <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                          issue.state === 'open' 
-                            ? 'bg-[#1a7f37] dark:bg-[#3fb950]' 
-                            : 'bg-[#8250df] dark:bg-[#a371f7]'
-                        }`}></span>
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                          style={issue.state === 'open'
+                            ? STATUS_COLORS.open[theme === 'dark' ? 'dark' : 'light'].dotStyle
+                            : STATUS_COLORS.closed[theme === 'dark' ? 'dark' : 'light'].dotStyle
+                          }
+                        ></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2"
+                          style={issue.state === 'open'
+                            ? STATUS_COLORS.open[theme === 'dark' ? 'dark' : 'light'].dotStyle
+                            : STATUS_COLORS.closed[theme === 'dark' ? 'dark' : 'light'].dotStyle
+                          }
+                        ></span>
                       </span>
                       {issue.state}
                     </span>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] hover:bg-[#f6f8fa] dark:hover:bg-[#2d333b] -mr-1.5"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-text-secondary hover:text-text-primary hover:bg-bg-secondary dark:hover:bg-bg-tertiary -mr-1.5"
                       onClick={(e) => {
                         e.stopPropagation();
                         onSelect(issue);
@@ -195,7 +188,7 @@ export function IssueList({
                   </div>
                 </div>
               </div>
-              <div className="border-t border-gray-200 dark:border-[#373e47]">
+              <div className="border-t border-default">
                 <div className="px-6 py-3">
                   <div 
                     className="prose dark:prose-invert max-w-none relative"
@@ -210,19 +203,19 @@ export function IssueList({
                             : 'max-h-[10000px]'
                         }`}
                       >
-                        <div className="prose dark:prose-invert max-w-none prose-pre:bg-[#f6f8fa] dark:prose-pre:bg-[#2d333b] prose-pre:p-4 prose-pre:rounded-lg prose-pre:my-4 prose-code:text-[#24292f] dark:prose-code:text-[#adbac7] prose-code:before:content-none prose-code:after:content-none prose-p:leading-relaxed">
+                        <div className="prose dark:prose-invert max-w-none prose-pre:bg-bg-secondary dark:prose-pre:bg-bg-tertiary prose-pre:p-4 prose-pre:rounded-lg prose-pre:my-4 prose-code:text-text-primary dark:prose-code:text-text-primary prose-code:before:content-none prose-code:after:content-none prose-p:leading-relaxed">
                           <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
                             rehypePlugins={[rehypeRaw, rehypeSanitize]}
                             components={markdownComponents}
-                            className="text-[#24292f] dark:text-[#adbac7]"
+                            className="text-text-primary"
                           >
                             {issue.body || ''}
                           </ReactMarkdown>
                         </div>
                       </div>
                       {!expandedIssues[issue.number] && (issue.body?.length ?? 0) > 300 && (
-                        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white dark:from-[#22272e] to-transparent opacity-100 transition-all duration-500" />
+                        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-bg-primary dark:from-bg-primary to-transparent opacity-100 transition-all duration-500" />
                       )}
                     </div>
                     {(issue.body?.length ?? 0) > 300 && (
@@ -246,7 +239,7 @@ export function IssueList({
                 variant="outline"
                 onClick={loadMore}
                 disabled={loadingMore}
-                className="text-[#57606a] dark:text-[#768390] border-gray-200 dark:border-[#373e47] hover:bg-[#f6f8fa] dark:hover:bg-[#2d333b] hover:text-[#24292f] dark:hover:text-[#adbac7] shadow-[0_1px_3px_rgba(0,0,0,0.05)] dark:shadow-[0_1px_3px_rgba(0,0,0,0.3)] px-4"
+                className="text-text-secondary border-default hover:bg-bg-secondary dark:hover:bg-bg-tertiary hover:text-text-primary shadow-card dark:shadow-card-dark px-4"
               >
                 {loadingMore ? (
                   <span className="flex items-center gap-2">

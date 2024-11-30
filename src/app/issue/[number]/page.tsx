@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react';
 import { getIssue } from '@/lib/github';
+import { STATUS_COLORS, getLabelStyles } from '@/lib/colors';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -11,12 +12,19 @@ import { Button } from '@/components/ui/button';
 import { markdownComponents } from '@/components/markdown-components';
 import { Issue } from '@/types/github';
 import { Backlinks } from '@/components/backlinks';
+import { useTheme } from 'next-themes';
 
 export default function IssuePage({ params }: { params: Promise<{ number: string }> }) {
   const resolvedParams = use(params);
   const [issue, setIssue] = useState<Issue | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+  const { theme } = useTheme();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     async function fetchIssue() {
@@ -101,24 +109,27 @@ export default function IssuePage({ params }: { params: Promise<{ number: string
                   </span>
                 </div>
               </div>
-              <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
-                issue.state === 'open' 
-                  ? 'bg-[#dafbe1] text-[#1a7f37] dark:bg-[#1a7f37]/20 dark:text-[#3fb950]' 
-                  : 'bg-[#faf2f8] text-[#8250df] dark:bg-[#8250df]/20 dark:text-[#a371f7]'
-              }`}>
+              <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full"
+                style={mounted && issue?.state === 'open' 
+                  ? STATUS_COLORS.open[theme === 'dark' ? 'dark' : 'light'].style
+                  : STATUS_COLORS.closed[theme === 'dark' ? 'dark' : 'light'].style
+                }
+              >
                 <span className="relative flex w-2 h-2 mr-1.5">
-                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                    issue.state === 'open' 
-                      ? 'bg-[#1a7f37] dark:bg-[#3fb950]' 
-                      : 'bg-[#8250df] dark:bg-[#a371f7]'
-                  }`}></span>
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                    issue.state === 'open' 
-                      ? 'bg-[#1a7f37] dark:bg-[#3fb950]' 
-                      : 'bg-[#8250df] dark:bg-[#a371f7]'
-                  }`}></span>
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                    style={mounted && issue?.state === 'open'
+                      ? STATUS_COLORS.open[theme === 'dark' ? 'dark' : 'light'].dotStyle
+                      : STATUS_COLORS.closed[theme === 'dark' ? 'dark' : 'light'].dotStyle
+                    }
+                  ></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2"
+                    style={mounted && issue?.state === 'open'
+                      ? STATUS_COLORS.open[theme === 'dark' ? 'dark' : 'light'].dotStyle
+                      : STATUS_COLORS.closed[theme === 'dark' ? 'dark' : 'light'].dotStyle
+                    }
+                  ></span>
                 </span>
-                {issue.state}
+                {issue?.state}
               </span>
             </div>
 
@@ -128,11 +139,7 @@ export default function IssuePage({ params }: { params: Promise<{ number: string
                   <span
                     key={label.id}
                     className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full"
-                    style={{
-                      backgroundColor: `#${label.color}20`,
-                      color: `#${label.color}`,
-                      border: `1px solid #${label.color}40`
-                    }}
+                    style={getLabelStyles(label.color)}
                     title={label.description || undefined}
                   >
                     {label.name}
@@ -141,12 +148,12 @@ export default function IssuePage({ params }: { params: Promise<{ number: string
               </div>
             )}
 
-            <div className="prose dark:prose-invert max-w-none prose-pre:bg-[#f6f8fa] dark:prose-pre:bg-[#2d333b] prose-pre:p-4 prose-pre:rounded-lg prose-pre:my-4 prose-code:text-[#24292f] dark:prose-code:text-[#adbac7] prose-code:before:content-none prose-code:after:content-none prose-p:leading-relaxed">
+            <div className="prose dark:prose-invert max-w-none prose-pre:bg-bg-secondary dark:prose-pre:bg-bg-tertiary prose-pre:p-4 prose-pre:rounded-lg prose-pre:my-4 prose-code:text-text-primary dark:prose-code:text-text-primary prose-code:before:content-none prose-code:after:content-none prose-p:leading-relaxed">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeRaw, rehypeSanitize]}
                 components={markdownComponents}
-                className="text-[#24292f] dark:text-[#d1d5db]"
+                className="text-text-primary"
               >
                 {issue.body || ''}
               </ReactMarkdown>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Button } from './ui/button';
 
 interface LightboxProps {
   src: string;
@@ -125,7 +126,7 @@ export function Lightbox({ src, alt = '', className = '', width, height }: Light
           >
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-8 h-8 border-4 border-gray-300 border-t-white rounded-full animate-spin"></div>
+                <div className="w-8 h-8 border-4 border-secondary/50 border-t-secondary rounded-full animate-spin"></div>
               </div>
             )}
             <img
@@ -144,8 +145,9 @@ export function Lightbox({ src, alt = '', className = '', width, height }: Light
               draggable={false}
             />
             <div className="fixed top-4 right-4 flex gap-2">
-              <button
-                className="p-2 rounded-lg bg-black/50 text-white hover:bg-black/70 transition-colors"
+              <Button
+                variant="icon"
+                className="bg-black/50 text-white hover:bg-black/70 w-10 h-10 p-0"
                 onClick={toggleZoom}
                 title={scale === 1 ? "Zoom in" : "Zoom out"}
               >
@@ -163,9 +165,10 @@ export function Lightbox({ src, alt = '', className = '', width, height }: Light
                     <line x1="8" y1="11" x2="14" y2="11"></line>
                   </svg>
                 )}
-              </button>
-              <button
-                className="p-2 rounded-lg bg-black/50 text-white hover:bg-black/70 transition-colors"
+              </Button>
+              <Button
+                variant="icon"
+                className="bg-black/50 text-white hover:bg-black/70 w-10 h-10 p-0"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleClose();
@@ -176,7 +179,7 @@ export function Lightbox({ src, alt = '', className = '', width, height }: Light
                   <line x1="18" y1="6" x2="6" y2="18"></line>
                   <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
-              </button>
+              </Button>
             </div>
           </div>
         </div>

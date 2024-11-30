@@ -18,79 +18,91 @@ const config = {
     },
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
-        },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
+        border: "rgb(var(--color-border-primary) / <alpha-value>)",
+        input: "rgb(var(--color-border-primary) / <alpha-value>)",
+        ring: "rgb(var(--color-border-primary) / <alpha-value>)",
+        background: "rgb(var(--color-bg-primary) / <alpha-value>)",
+        foreground: "rgb(var(--color-text-primary) / <alpha-value>)",
+        
+        primary: "rgb(var(--color-primary) / <alpha-value>)",
+        secondary: "rgb(var(--color-secondary) / <alpha-value>)",
+        accent: "rgb(var(--color-accent) / <alpha-value>)",
+        success: "rgb(var(--color-success) / <alpha-value>)",
+        warning: "rgb(var(--color-warning) / <alpha-value>)",
+        error: "rgb(var(--color-error) / <alpha-value>)",
+        
+        "bg-primary": "rgb(var(--color-bg-primary) / <alpha-value>)",
+        "bg-secondary": "rgb(var(--color-bg-secondary) / <alpha-value>)",
+        "bg-tertiary": "rgb(var(--color-bg-tertiary) / <alpha-value>)",
+        
+        "text-primary": "rgb(var(--color-text-primary) / <alpha-value>)",
+        "text-secondary": "rgb(var(--color-text-secondary) / <alpha-value>)",
+        "text-tertiary": "rgb(var(--color-text-tertiary) / <alpha-value>)",
+        
+        "border-primary": "rgb(var(--color-border-primary) / <alpha-value>)",
+        "border-secondary": "rgb(var(--color-border-secondary) / <alpha-value>)",
+        "border-default": "rgb(var(--color-border-primary) / <alpha-value>)",
       },
       typography: {
         DEFAULT: {
           css: {
-            'code::before': {
-              content: '""'
-            },
-            'code::after': {
-              content: '""'
-            },
-            'code': {
+            'code::before': { content: '""' },
+            'code::after': { content: '""' },
+            code: {
               backgroundColor: '#eaeef2',
-              padding: '0.2em 0.4em',
-              margin: '0 0.2em',
-              borderRadius: '6px',
-              fontSize: '0.9em',
-              fontWeight: '400',
+              padding: '0.25rem 0.375rem',
+              borderRadius: '0.375rem',
+              fontSize: '0.875rem',
+              color: '#24292f',
             },
-            'blockquote p': {
-              fontWeight: '400',
+            pre: {
+              backgroundColor: '#f6f8fa',
+              code: {
+                backgroundColor: 'transparent',
+                padding: 0,
+                color: 'inherit',
+              },
+            },
+            blockquote: {
               color: '#57606a',
+              borderLeftColor: '#d0d7de',
+              fontWeight: '400',
             },
-            'a': {
+            a: {
+              color: 'rgb(var(--color-secondary))',
               textDecoration: 'none',
               '&:hover': {
                 textDecoration: 'underline',
               },
             },
-          }
+          },
         },
         invert: {
           css: {
-            'code': {
+            code: {
               backgroundColor: '#2d333b',
+              color: '#adbac7',
             },
-            'blockquote p': {
+            pre: {
+              backgroundColor: '#2d333b',
+              code: {
+                backgroundColor: 'transparent',
+                color: 'inherit',
+              },
+            },
+            blockquote: {
               color: '#768390',
+              borderLeftColor: '#373e47',
+              fontWeight: '400',
             },
-          }
-        }
+          },
+        },
+      },
+      boxShadow: {
+        "card": "0 2px 8px -3px rgba(0,0,0,0.05), 0 1px 2px -2px rgba(0,0,0,0.05)",
+        "card-hover": "0 4px 12px -3px rgba(0,0,0,0.1), 0 2px 3px -2px rgba(0,0,0,0.05)",
+        "card-dark": "0 2px 8px -3px rgba(0,0,0,0.3), 0 1px 2px -2px rgba(0,0,0,0.3)",
+        "card-dark-hover": "0 4px 12px -3px rgba(0,0,0,0.4), 0 2px 3px -2px rgba(0,0,0,0.3)",
       },
       borderRadius: {
         lg: "var(--radius)",

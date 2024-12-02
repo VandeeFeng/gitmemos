@@ -22,44 +22,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                function getThemePreference() {
-                  if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
-                    return localStorage.getItem('theme');
-                  }
-                  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                }
-
-                function setTheme(theme) {
-                  document.documentElement.style.backgroundColor = 
-                    theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
-                      ? '#22272e'
-                      : '#ffffff';
-                      
-                  if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                    document.documentElement.classList.add('dark');
-                  } else {
-                    document.documentElement.classList.remove('dark');
-                  }
-                }
-
-                // Apply theme immediately to prevent flash
-                const theme = getThemePreference();
-                setTheme(theme);
-
-                // Handle system theme changes
-                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
-                  if (getThemePreference() === 'system') {
-                    setTheme('system');
-                  }
-                });
-              })();
-            `,
-          }}
-        />
         <style>{`
           :root {
             color-scheme: light;
@@ -69,21 +31,17 @@ export default function RootLayout({
           }
           html {
             transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            will-change: background-color;
           }
           body {
             background-color: inherit;
             transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            will-change: background-color;
           }
-          /* Prevent flash during page load */
           html.dark body {
             background-color: #22272e;
           }
           html body {
             background-color: #ffffff;
           }
-          /* 添加全局过渡效果 */
           *, *::before, *::after {
             transition: background-color 0.3s ease,
                         border-color 0.1s ease,
@@ -101,12 +59,32 @@ export default function RootLayout({
           attribute="class"
           defaultTheme="system"
           enableSystem
+          disableTransitionOnChange
         >
           <div className="min-h-screen bg-background">
             {children}
             <RootFooter />
           </div>
         </ThemeProvider>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                let theme = localStorage.getItem('theme')
+                if (!theme) {
+                  theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+                }
+                if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                  document.documentElement.classList.add('dark')
+                  document.documentElement.style.backgroundColor = '#22272e'
+                } else {
+                  document.documentElement.classList.remove('dark')
+                  document.documentElement.style.backgroundColor = '#ffffff'
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
       </body>
     </html>
   )

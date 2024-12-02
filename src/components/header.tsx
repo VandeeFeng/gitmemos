@@ -73,7 +73,7 @@ export function Header({
             )}
             {onLabelSelect && (
               <LabelFilter
-                selectedLabel={selectedLabel}
+                selectedLabel={selectedLabel || null}
                 onLabelSelect={onLabelSelect}
               />
             )}

@@ -172,7 +172,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
             onDateClick={handleDateClick}
           />
         </div>
-        <div className="flex-1 relative">
+        <div className="flex-1 relative overflow-y-scroll">
           <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#444c56] -ml-3"></div>
           {hasIssues ? (
             <div className="space-y-6">

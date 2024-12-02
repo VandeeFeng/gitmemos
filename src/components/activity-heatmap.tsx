@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Issue } from '@/types/github';
-import { FormattedDate } from './formatted-date';
+
+// 格式化日期，确保服务端和客户端渲染结果一致
+function formatDate(date: string | Date) {
+  const dateObj = date instanceof Date ? date : new Date(date);
+  return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
+}
 
 interface ActivityHeatmapProps {
   issues: Issue[];
@@ -111,7 +116,7 @@ export function ActivityHeatmap({ issues, year, month, onMonthChange, onDateClic
         <div
           key={dateKey}
           className={`w-3 h-3 rounded-sm ${bgColor} cursor-pointer transition-all hover:scale-110 hover:brightness-125`}
-          title={`${dateKey}: ${count} issues`}
+          title={`${formatDate(dateKey)}: ${count} issues`}
           onClick={() => onDateClick?.(dateKey)}
         />
       );

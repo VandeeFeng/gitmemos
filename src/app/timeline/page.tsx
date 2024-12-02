@@ -47,7 +47,7 @@ export default function TimelinePage() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500">
+    <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500 overflow-y-scroll">
       <Header 
         selectedLabel={selectedLabel}
         onLabelSelect={(label) => setSelectedLabel(label === selectedLabel ? null : label)}

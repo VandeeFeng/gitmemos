@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { IssueList } from '@/components/issue-list';
-import { IssueEditor } from '@/components/issue-editor';
 import { useTheme } from "next-themes";
 import { setGitHubConfig, getGitHubConfig, getIssues } from '@/lib/github';
 import { LabelFilter } from '@/components/label-filter';
@@ -11,6 +10,7 @@ import { SearchBar } from '@/components/search-bar';
 import Link from 'next/link';
 import { Issue, GitHubConfig, EditableIssue } from '@/types/github';
 import { Header } from '@/components/header';
+import { useRouter } from 'next/navigation';
 
 // 将 Issue 转换为 EditableIssue
 const toEditableIssue = (issue: Issue): EditableIssue => ({
@@ -21,7 +21,6 @@ const toEditableIssue = (issue: Issue): EditableIssue => ({
 export default function Home() {
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [issues, setIssues] = useState<Issue[]>([]);
   const { theme, setTheme } = useTheme();
@@ -34,28 +33,12 @@ export default function Home() {
     token: '',
     issuesPerPage: 10
   });
+  const router = useRouter();
 
-  // Add URL parameter handling
-  useEffect(() => {
-    if (mounted) {
-      const urlParams = new URLSearchParams(window.location.search);
-      const editIssueNumber = urlParams.get('edit');
-      if (editIssueNumber) {
-        const issue = issues.find(issue => issue.number === parseInt(editIssueNumber));
-        if (issue) {
-          setSelectedIssue(issue);
-          setIsEditing(true);
-        }
-      }
-    }
-  }, [mounted, issues]);
-
-  // 将所有的客户端操作移到 mounted 之后
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // 分离配置加载逻辑
   useEffect(() => {
     if (mounted) {
       const uiConfig = getGitHubConfig(false);
@@ -65,7 +48,6 @@ export default function Home() {
     }
   }, [mounted]);
 
-  // 分离 issues 加载逻辑
   useEffect(() => {
     async function fetchIssues() {
       try {
@@ -79,16 +61,6 @@ export default function Home() {
       fetchIssues();
     }
   }, [mounted]);
-
-  const handleNewIssue = () => {
-    setSelectedIssue(null);
-    setIsEditing(true);
-  };
-
-  const handleEditComplete = () => {
-    setIsEditing(false);
-    setSelectedIssue(null);
-  };
 
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,7 +87,6 @@ export default function Home() {
     setSearchQuery(query);
   };
 
-  // 避免闪烁，使用一致的初始渲染
   if (!mounted) {
     return (
       <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500">
@@ -138,7 +109,6 @@ export default function Home() {
           </div>
         )}
         <Header 
-          onNewIssue={handleNewIssue}
           onSearch={handleSearch}
           issues={issues}
           selectedLabel={selectedLabel}
@@ -226,20 +196,11 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-            ) : isEditing ? (
-              <div className="animate-fade-in">
-                <IssueEditor
-                  issue={selectedIssue ? toEditableIssue(selectedIssue) : undefined}
-                  onSave={handleEditComplete}
-                  onCancel={() => setIsEditing(false)}
-                />
-              </div>
             ) : (
               <div className="animate-fade-in">
                 <IssueList
                   onSelect={(issue) => {
-                    setSelectedIssue(issue);
-                    setIsEditing(true);
+                    router.push(`/editor?edit=${issue.number}`);
                   }}
                   selectedLabel={selectedLabel}
                   onLabelClick={(label) => {

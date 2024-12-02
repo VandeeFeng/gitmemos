@@ -94,11 +94,11 @@ export function Header({
           {showSearchAndNew && (
             <div className="flex items-center gap-4 mt-4 md:mt-0">
               {onSearch && <SearchBar onSearch={onSearch} issues={issues} />}
-              {onNewIssue ? (
-                <Button 
-                  onClick={onNewIssue}
-                  className="bg-success hover:bg-success/90 text-white border-0 shadow-none transition-colors whitespace-nowrap"
-                >
+              <Button 
+                asChild
+                className="bg-success hover:bg-success/90 text-white border-0 shadow-none transition-colors whitespace-nowrap"
+              >
+                <Link href="/editor">
                   <span className="flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -106,23 +106,8 @@ export function Header({
                     </svg>
                     New Issue
                   </span>
-                </Button>
-              ) : (
-                <Button 
-                  asChild
-                  className="bg-success hover:bg-success/90 text-white border-0 shadow-none transition-colors whitespace-nowrap"
-                >
-                  <Link href="/?new=true">
-                    <span className="flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                      </svg>
-                      New Issue
-                    </span>
-                  </Link>
-                </Button>
-              )}
+                </Link>
+              </Button>
             </div>
           )}
         </div>

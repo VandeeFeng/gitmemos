@@ -7,10 +7,11 @@ import { usePathname } from 'next/navigation';
 import { SearchBar } from './search-bar';
 import { Button } from './ui/button';
 import { LabelFilter } from './label-filter';
+import { Issue } from '@/types/github';
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
-  issues?: any[];
+  issues?: Issue[];
   selectedLabel?: string | null;
   onLabelSelect?: (label: string) => void;
   showSearchAndNew?: boolean;

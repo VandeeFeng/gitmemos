@@ -21,12 +21,6 @@ interface DayActivity {
   count: number;
 }
 
-// 格式化月份名称，确保服务端和客户端渲染结果一致
-function formatMonthName(month: number) {
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return months[month];
-}
-
 // 获取指定月份的天数
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
@@ -132,6 +126,25 @@ export function ActivityHeatmap({ issues, year, month, onMonthChange, onDateClic
 
   return (
     <div className="w-36">
+      <div className="flex items-center justify-between mb-2">
+        <button
+          onClick={handlePrevMonth}
+          className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+          aria-label="Previous month"
+        >
+          ←
+        </button>
+        <span className="text-sm text-gray-600 dark:text-gray-400">
+          {new Date(year, month).toLocaleString('default', { month: 'short' })} {year}
+        </span>
+        <button
+          onClick={handleNextMonth}
+          className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
+          aria-label="Next month"
+        >
+          →
+        </button>
+      </div>
       <div className="grid grid-cols-7 gap-[3px]">
         {generateMonthGrid()}
       </div>

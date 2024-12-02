@@ -21,55 +21,33 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            (function() {
-              function getInitialTheme() {
-                const persistedTheme = window.localStorage.getItem('theme');
-                const hasPersistedPreference = typeof persistedTheme === 'string';
-                if (hasPersistedPreference) {
-                  return persistedTheme;
-                }
-                const mql = window.matchMedia('(prefers-color-scheme: dark)');
-                const hasMediaQueryPreference = typeof mql.matches === 'boolean';
-                if (hasMediaQueryPreference) {
-                  return mql.matches ? 'dark' : 'light';
-                }
-                return 'dark';
-              }
-              const theme = getInitialTheme();
-              document.documentElement.style.setProperty('--initial-color-mode', theme);
-              document.documentElement.classList.add(theme);
-              document.documentElement.style.colorScheme = theme;
-            })()
-          `,
-        }}
-      />
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                let isDark = false;
+                const theme = localStorage.getItem('theme')
+                if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                  isDark = true;
+                }
+                document.documentElement.classList.toggle('dark', isDark);
+                document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+              } catch (e) {}
+            `,
+          }}
+        />
         <style>{`
           :root {
-            --initial-color-mode: light;
-          }
-          :root[class='dark'] {
-            --bg-color: #09090b;
-            color-scheme: dark;
-          }
-          :root[class='light'] {
-            --bg-color: #ffffff;
             color-scheme: light;
+            --bg-color: #ffffff;
           }
-          html {
+          :root.dark {
+            color-scheme: dark;
+            --bg-color: #09090b;
+          }
+          html, body {
             background-color: var(--bg-color);
-          }
-          body {
-            background-color: var(--bg-color);
-          }
-          html.dark {
-            background-color: #09090b;
-          }
-          html.light {
-            background-color: #ffffff;
           }
         `}</style>
         <link

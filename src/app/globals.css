@@ -2,6 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 初始背景色设置 */
+:root {
+  background-color: #ffffff;
+}
+
+:root[class~="dark"] {
+  background-color: rgb(34 39 46);
+}
+
 /* 统一主题切换效果 */
 :root {
   --theme-transition-duration: 400ms;

@@ -7,12 +7,10 @@ import { Issue } from '@/types/github';
 import { IssueCard } from './issue-card';
 
 export function IssueList({ 
-  onSelect,
   selectedLabel,
   onLabelClick,
   searchQuery = ''
 }: { 
-  onSelect: (issue: Issue) => void;
   selectedLabel: string | null;
   onLabelClick: (label: string) => void;
   searchQuery?: string;

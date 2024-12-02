@@ -10,7 +10,7 @@ import { Header } from '@/components/header';
 export default function TimelinePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [mounted, setMounted] = useState(false);
-  const { theme } = useTheme();
+  const { } = useTheme();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
 

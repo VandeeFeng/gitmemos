@@ -14,9 +14,10 @@ import { Backlinks } from './backlinks';
 interface TimelineProps {
   searchQuery: string;
   selectedLabel: string | null;
+  onLabelClick: (label: string) => void;
 }
 
-export function Timeline({ searchQuery, selectedLabel }: TimelineProps) {
+export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineProps) {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedIssues, setExpandedIssues] = useState<{[key: number]: boolean}>({});
@@ -208,15 +209,19 @@ export function Timeline({ searchQuery, selectedLabel }: TimelineProps) {
                                             {issue.labels.map(label => (
                                               <span
                                                 key={label.id}
-                                                className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${
+                                                className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full cursor-pointer transition-all ${
                                                   selectedLabel === label.name 
                                                     ? 'outline outline-2 outline-offset-1 outline-[#0969da] dark:outline-[#2f81f7]' 
-                                                    : ''
+                                                    : 'hover:opacity-80'
                                                 }`}
                                                 style={{
                                                   backgroundColor: `#${label.color}20`,
                                                   color: `#${label.color}`,
                                                   border: `1px solid #${label.color}40`
+                                                }}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  onLabelClick(label.name === selectedLabel ? '' : label.name);
                                                 }}
                                               >
                                                 {label.name}

@@ -131,6 +131,7 @@ export async function getIssues(page: number = 1, labels?: string) {
     auth: config.token
   });
   
+  // 使用固定的每页数量，保持一致性
   const { data } = await octokit.rest.issues.listForRepo({
     owner: config.owner,
     repo: config.repo,

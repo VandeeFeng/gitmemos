@@ -116,7 +116,11 @@ export default function TimelinePage() {
       <main className="pt-32 md:pt-40">
         <div className="container mx-auto px-4 max-w-4xl">
           <div>
-            <Timeline searchQuery={searchQuery} selectedLabel={selectedLabel} />
+            <Timeline 
+              searchQuery={searchQuery} 
+              selectedLabel={selectedLabel} 
+              onLabelClick={(label) => setSelectedLabel(label === selectedLabel ? null : label)}
+            />
           </div>
         </div>
       </main>

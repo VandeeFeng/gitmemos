@@ -13,9 +13,24 @@ export default function TimelinePage() {
   const { } = useTheme();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [systemTheme, setSystemTheme] = useState<'dark' | 'light'>('light');
 
   useEffect(() => {
+    // 检测系统主题
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setSystemTheme(darkModeMediaQuery.matches ? 'dark' : 'light');
+    
+    // 监听系统主题变化
+    const handleThemeChange = (e: MediaQueryListEvent) => {
+      setSystemTheme(e.matches ? 'dark' : 'light');
+    };
+    darkModeMediaQuery.addEventListener('change', handleThemeChange);
+    
     setMounted(true);
+    
+    return () => {
+      darkModeMediaQuery.removeEventListener('change', handleThemeChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -27,10 +42,8 @@ export default function TimelinePage() {
         console.error('Error fetching issues:', error);
       }
     }
-    if (mounted) {
-      fetchIssues();
-    }
-  }, [mounted]);
+    fetchIssues();
+  }, []);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -38,7 +51,7 @@ export default function TimelinePage() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500">
+      <div className={`min-h-screen ${systemTheme === 'dark' ? 'bg-[#22272e]' : 'bg-white'} transition-colors duration-500`}>
         <div className="container mx-auto p-4 max-w-4xl">
           <Header />
         </div>

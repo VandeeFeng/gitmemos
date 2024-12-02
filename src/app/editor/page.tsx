@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Header } from '@/components/header';
 import { IssueEditor } from '@/components/issue-editor';
 import { Issue } from '@/types/github';
 import { getIssue } from '@/lib/github';
 
-export default function EditorPage() {
+function EditorContent() {
   const [mounted, setMounted] = useState(false);
   const [issue, setIssue] = useState<Issue | null>(null);
   const [loading, setLoading] = useState(false);
@@ -73,5 +73,22 @@ export default function EditorPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function EditorPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500">
+        <Header />
+        <main className="container mx-auto px-4 max-w-4xl pt-32 md:pt-40">
+          <div className="flex justify-center">
+            <div className="w-8 h-8 border-4 border-secondary/50 border-t-secondary rounded-full animate-spin"></div>
+          </div>
+        </main>
+      </div>
+    }>
+      <EditorContent />
+    </Suspense>
   );
 } 

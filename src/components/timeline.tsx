@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { getIssues } from '@/lib/github';
 import { Issue } from '@/types/github';
 import { Button } from './ui/button';
@@ -37,25 +37,28 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [{ year, month }, setYearMonth] = useState(() => getCurrentYearMonth());
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // 添加日期点击处理函数
   const handleDateClick = (dateKey: string) => {
-    // 找到对应日期的元素
-    const dateElement = document.querySelector(`[data-date="${dateKey}"]`);
-    if (dateElement) {
-      // 增加偏移量到 120px，考虑顶栏高度和额外间距
-      const headerOffset = 120;
-      // 获取元素的位置
-      const elementPosition = dateElement.getBoundingClientRect().top;
-      // 获取当前滚动位置
-      const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+    if (typeof window === 'undefined') return;
+    
+    // 使用 requestAnimationFrame 确保在 DOM 更新后执行
+    requestAnimationFrame(() => {
+      const scrollContainer = scrollContainerRef.current;
+      const dateElement = document.querySelector(`[data-date="${dateKey}"]`);
       
-      // 平滑滚动到该元素
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: "smooth"
-      });
-    }
+      if (dateElement && scrollContainer) {
+        const containerRect = scrollContainer.getBoundingClientRect();
+        const elementRect = dateElement.getBoundingClientRect();
+        const relativeTop = elementRect.top - containerRect.top + scrollContainer.scrollTop;
+        
+        scrollContainer.scrollTo({
+          top: relativeTop - 20,
+          behavior: "smooth"
+        });
+      }
+    });
   };
 
   useEffect(() => {
@@ -165,7 +168,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
       {/* Main Layout Container */}
       <div className="flex flex-col sm:flex-row gap-6 sm:gap-0 h-full">
         {/* Left Sidebar Container (Calendar + Heatmap) */}
-        <div className="sm:sticky sm:w-[180px] sm:top-0 sm:pr-2 flex-shrink-0">
+        <div ref={scrollContainerRef} className="sm:sticky sm:w-[180px] sm:top-0 sm:pr-2 flex-shrink-0">
           <div className="flex sm:flex sm:flex-col sm:items-center gap-4 sm:gap-0 justify-between">
             {/* Calendar Container */}
             <div className="flex-1 sm:flex-none sm:w-36">
@@ -219,7 +222,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
         </div>
 
         {/* Right Content Container */}
-        <div className="flex-1 sm:ml-[10px] overflow-y-auto pr-4 pb-16">
+        <div ref={scrollContainerRef} className="flex-1 sm:ml-[10px] overflow-y-auto pr-4 pb-16">
           {/* Timeline Container */}
           <div className="relative pl-6">
             {/* Timeline Line */}

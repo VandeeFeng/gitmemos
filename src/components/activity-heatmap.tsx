@@ -79,10 +79,18 @@ export function ActivityHeatmap({ issues, year, month, onDateClick }: ActivityHe
       days.push(
         <div
           key={dateKey}
-          className={`w-3 h-3 rounded-sm ${bgColor} cursor-pointer transition-all hover:scale-110 hover:brightness-125`}
-          title={`${count} issues`}
+          className={`w-3 h-3 rounded-sm ${bgColor} cursor-pointer transition-all hover:scale-110 hover:brightness-125 group relative`}
           onClick={() => onDateClick?.(dateKey)}
         >
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block">
+            <div className="relative bg-[#24292f] dark:bg-[#2d333b] text-white px-2 py-1 rounded text-xs whitespace-nowrap">
+              <FormattedDate date={dateKey} className="font-medium" />
+              <span className="ml-1 text-[#768390]">
+                {count} {count === 1 ? 'issue' : 'issues'}
+              </span>
+              <div className="absolute left-1/2 -translate-x-1/2 top-full border-4 border-transparent border-t-[#24292f] dark:border-t-[#2d333b]" />
+            </div>
+          </div>
           <span className="sr-only">
             <FormattedDate date={dateKey} />: {count} issues
           </span>

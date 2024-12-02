@@ -2,35 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
-/* 初始背景色设置 */
-:root {
-  background-color: #ffffff;
-}
+@layer base {
+  :root {
+    color-scheme: light;
+    /* 基础颜色 */
+    --color-primary: 9 112 84;
+    --color-secondary: 88 137 223;
+    --color-accent: 111 66 193;
+    --color-success: 45 164 78;
+    --color-warning: 251 202 4;
+    --color-error: 182 2 5;
+    
+    /* 语义化颜色 */
+    --color-bg-primary: 255 255 255;
+    --color-bg-secondary: 246 248 250;
+    --color-bg-tertiary: 234 238 242;
+    
+    --color-text-primary: 36 41 47;
+    --color-text-secondary: 87 96 106;
+    --color-text-tertiary: 118 131 144;
+    
+    --color-border-primary: 208 215 222;
+    --color-border-secondary: 225 228 232;
+    
+    --radius: 0.5rem;
+  }
+ 
+  :root.dark {
+    color-scheme: dark;
+    /* 暗色主题颜色 */
+    --color-bg-primary: 34 39 46;
+    --color-bg-secondary: 45 51 59;
+    --color-bg-tertiary: 55 62 71;
+    
+    --color-text-primary: 173 186 199;
+    --color-text-secondary: 118 131 144;
+    --color-text-tertiary: 87 96 106;
+    
+    --color-border-primary: 55 62 71;
+    --color-border-secondary: 48 54 62;
+  }
 
-:root[class~="dark"] {
-  background-color: rgb(34 39 46);
-}
+  * {
+    @apply border-border-primary;
+  }
 
-/* 统一主题切换效果 */
-:root {
-  --theme-transition-duration: 400ms;
-  --theme-transition-timing: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-*,
-*::before,
-*::after {
-  transition: background-color var(--theme-transition-duration) var(--theme-transition-timing),
-              border-color var(--theme-transition-duration) var(--theme-transition-timing),
-              color var(--theme-transition-duration) var(--theme-transition-timing),
-              fill var(--theme-transition-duration) var(--theme-transition-timing),
-              stroke var(--theme-transition-duration) var(--theme-transition-timing),
-              opacity var(--theme-transition-duration) var(--theme-transition-timing),
-              box-shadow var(--theme-transition-duration) var(--theme-transition-timing) !important;
-}
-
-html {
-  overflow-y: scroll;
+  body {
+    @apply bg-bg-primary text-text-primary;
+  }
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */
@@ -58,53 +77,4 @@ html {
 * {
   scrollbar-width: thin;
   scrollbar-color: #444c56 transparent;
-}
-
-@layer base {
-  :root {
-    /* 基础颜色 */
-    --color-primary: 9 112 84;
-    --color-secondary: 88 137 223;
-    --color-accent: 111 66 193;
-    --color-success: 45 164 78;
-    --color-warning: 251 202 4;
-    --color-error: 182 2 5;
-    
-    /* 语义化颜色 */
-    --color-bg-primary: 255 255 255;
-    --color-bg-secondary: 246 248 250;
-    --color-bg-tertiary: 234 238 242;
-    
-    --color-text-primary: 36 41 47;
-    --color-text-secondary: 87 96 106;
-    --color-text-tertiary: 118 131 144;
-    
-    --color-border-primary: 208 215 222;
-    --color-border-secondary: 225 228 232;
-    
-    --radius: 0.5rem;
-  }
- 
-  .dark {
-    /* 暗色主题颜色 */
-    --color-bg-primary: 34 39 46;
-    --color-bg-secondary: 45 51 59;
-    --color-bg-tertiary: 55 62 71;
-    
-    --color-text-primary: 173 186 199;
-    --color-text-secondary: 118 131 144;
-    --color-text-tertiary: 87 96 106;
-    
-    --color-border-primary: 55 62 71;
-    --color-border-secondary: 48 54 62;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border-primary;
-  }
-  body {
-    @apply bg-bg-primary text-text-primary;
-  }
 }

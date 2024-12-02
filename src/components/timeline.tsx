@@ -161,8 +161,8 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
 
   return (
     <div className="space-y-8">
-      <div className="flex gap-6">
-        <div className="pt-1">
+      <div className="flex gap-6 relative">
+        <div className="fixed pt-1" style={{ top: '150px', width: '210px' }}>
           <ActivityHeatmap 
             issues={currentMonthIssues}
             year={year}
@@ -171,77 +171,79 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
             onDateClick={handleDateClick}
           />
         </div>
-        <div className="flex-1 relative overflow-y-scroll">
-          <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#444c56] -ml-3"></div>
-          {hasIssues ? (
-            <div className="space-y-6">
-              {Object.entries(monthIssues).map(([dayKey, dayIssues]) => {
-                const filteredDayIssues = dayIssues.filter(issue => {
-                  if (!searchQuery) return true;
+        <div className="flex-1 ml-[240px]">
+          <div className="relative">
+            <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#444c56] -ml-3"></div>
+            {hasIssues ? (
+              <div className="space-y-6">
+                {Object.entries(monthIssues).map(([dayKey, dayIssues]) => {
+                  const filteredDayIssues = dayIssues.filter(issue => {
+                    if (!searchQuery) return true;
 
-                  const searchLower = searchQuery.toLowerCase();
-                  const titleMatch = issue.title.toLowerCase().includes(searchLower);
-                  const bodyMatch = (issue.body || '').toLowerCase().includes(searchLower);
-                  const labelsMatch = issue.labels.some(label => 
-                    label.name.toLowerCase().includes(searchLower) ||
-                    (label.description || '').toLowerCase().includes(searchLower)
-                  );
+                    const searchLower = searchQuery.toLowerCase();
+                    const titleMatch = issue.title.toLowerCase().includes(searchLower);
+                    const bodyMatch = (issue.body || '').toLowerCase().includes(searchLower);
+                    const labelsMatch = issue.labels.some(label => 
+                      label.name.toLowerCase().includes(searchLower) ||
+                      (label.description || '').toLowerCase().includes(searchLower)
+                    );
 
-                  return titleMatch || bodyMatch || labelsMatch;
-                });
+                    return titleMatch || bodyMatch || labelsMatch;
+                  });
 
-                // Only render the day section if there are filtered issues
-                if (filteredDayIssues.length === 0) {
-                  return null;
-                }
+                  // Only render the day section if there are filtered issues
+                  if (filteredDayIssues.length === 0) {
+                    return null;
+                  }
 
-                return (
-                  <div key={dayKey} className="relative" data-date={dayKey}>
-                    <div className="absolute -left-[17px] top-[14px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
-                    <div className="pl-6">
-                      <div className="space-y-3">
-                        {filteredDayIssues.map((issue) => (
-                          <IssueCard
-                            key={issue.number}
-                            issue={issue}
-                            selectedLabel={selectedLabel}
-                            onLabelClick={onLabelClick}
-                            showStatus={false}
-                          />
-                        ))}
+                  return (
+                    <div key={dayKey} className="relative" data-date={dayKey}>
+                      <div className="absolute -left-[17px] top-[14px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
+                      <div className="pl-6">
+                        <div className="space-y-3">
+                          {filteredDayIssues.map((issue) => (
+                            <IssueCard
+                              key={issue.number}
+                              issue={issue}
+                              selectedLabel={selectedLabel}
+                              onLabelClick={onLabelClick}
+                              showStatus={false}
+                            />
+                          ))}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="relative">
-                <div className="absolute -left-[17px] top-[14px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
-                <div className="pl-6">
-                  <div className="space-y-3">
-                    <div className="group border border-[#d0d7de] dark:border-[#444c56] rounded-lg shadow-card dark:shadow-card-dark hover:shadow-card-hover dark:hover:shadow-card-dark-hover transition-shadow bg-white dark:bg-[#2d333b] px-6 py-16">
-                      <div className="flex flex-col items-center justify-center text-center">
-                        <svg className="w-12 h-12 text-[#768390] mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                        </svg>
-                        <h3 className="text-lg font-semibold text-[#adbac7] mb-2">No issues found</h3>
-                        <p className="text-[#768390]">
-                          {searchQuery 
-                            ? 'No issues found matching your search'
-                            : selectedLabel
-                              ? 'No issues found with this label'
-                              : `No issues for ${formatMonthAndYear(year, month)}`
-                          }
-                        </p>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="relative">
+                  <div className="absolute -left-[17px] top-[14px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
+                  <div className="pl-6">
+                    <div className="space-y-3">
+                      <div className="group border border-[#d0d7de] dark:border-[#444c56] rounded-lg shadow-card dark:shadow-card-dark hover:shadow-card-hover dark:hover:shadow-card-dark-hover transition-shadow bg-white dark:bg-[#2d333b] px-6 py-16">
+                        <div className="flex flex-col items-center justify-center text-center">
+                          <svg className="w-12 h-12 text-[#768390] mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                          </svg>
+                          <h3 className="text-lg font-semibold text-[#adbac7] mb-2">No issues found</h3>
+                          <p className="text-[#768390]">
+                            {searchQuery 
+                              ? 'No issues found matching your search'
+                              : selectedLabel
+                                ? 'No issues found with this label'
+                                : `No issues for ${formatMonthAndYear(year, month)}`
+                            }
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
       {hasMore && filteredIssues.length >= 10 && (

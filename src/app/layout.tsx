@@ -21,50 +21,50 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            (function() {
-              try {
-                let isDark = true;
-                const theme = localStorage.getItem('theme');
-                const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                
-                if (theme === 'light' || (theme === 'system' && !systemDark)) {
-                  isDark = false;
-                }
-                
-                if (isDark) {
-                  document.documentElement.classList.add('dark');
-                  document.documentElement.style.colorScheme = 'dark';
-                  document.documentElement.style.backgroundColor = '#09090b';
-                } else {
-                  document.documentElement.classList.remove('dark');
-                  document.documentElement.style.colorScheme = 'light';
-                  document.documentElement.style.backgroundColor = '#ffffff';
-                }
-              } catch (e) {
-                // 如果出错，默认使用暗色主题
-                document.documentElement.classList.add('dark');
-                document.documentElement.style.colorScheme = 'dark';
-                document.documentElement.style.backgroundColor = '#09090b';
-              }
-            })();
-          `,
-        }}
-      />
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                function getThemePreference() {
+                  if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+                    return localStorage.getItem('theme');
+                  }
+                  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                }
+
+                function setTheme(theme) {
+                  if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                    document.documentElement.classList.add('dark');
+                  } else {
+                    document.documentElement.classList.remove('dark');
+                  }
+                }
+
+                // Apply theme immediately
+                setTheme(getThemePreference());
+
+                // Handle system theme changes
+                window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                  if (getThemePreference() === 'system') {
+                    setTheme('system');
+                  }
+                });
+              })();
+            `,
+          }}
+        />
         <style>{`
           :root {
-            color-scheme: dark;
-            --bg-color: #09090b;
-          }
-          :root:not(.dark) {
             color-scheme: light;
-            --bg-color: #ffffff;
+            background-color: white;
           }
-          html, body {
-            background-color: var(--bg-color);
+          :root.dark {
+            color-scheme: dark;
+            background-color: #22272e;
+          }
+          body {
+            background-color: inherit;
           }
         `}</style>
         <link
@@ -73,7 +73,12 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
           <div className="min-h-screen bg-background">
             {children}
             <RootFooter />

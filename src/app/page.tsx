@@ -12,7 +12,7 @@ export default function Home() {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [issues, setIssues] = useState<Issue[]>([]);
-  const { theme } = useTheme();
+  const { } = useTheme();
   const [showConfig, setShowConfig] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [githubConfig, setGithubConfig] = useState<GitHubConfig>({

@@ -64,19 +64,18 @@ export default function RootLayout({
             background-color: #22272e;
           }
           html {
-            transition: background-color 0.3s ease, color 0.15s ease;
+            transition: background-color 0.3s ease;
           }
           body {
             background-color: inherit;
-            transition: background-color 0.3s ease, color 0.15s ease;
+            transition: background-color 0.3s ease;
           }
           /* 添加全局过渡效果 */
           *, *::before, *::after {
             transition: background-color 0.3s ease,
-                        border-color 0.2s ease,
-                        color 0.15s ease,
-                        fill 0.2s ease,
-                        stroke 0.2s ease;
+                        border-color 0.1s ease,
+                        fill 0.1s ease,
+                        stroke 0.1s ease;
           }
         `}</style>
         <link

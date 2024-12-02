@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Issue } from '@/types/github';
+import { FormattedDate } from './formatted-date';
 
 // 格式化日期，确保服务端和客户端渲染结果一致
 function formatDate(date: string | Date) {
@@ -116,9 +117,13 @@ export function ActivityHeatmap({ issues, year, month, onMonthChange, onDateClic
         <div
           key={dateKey}
           className={`w-3 h-3 rounded-sm ${bgColor} cursor-pointer transition-all hover:scale-110 hover:brightness-125`}
-          title={`${formatDate(dateKey)}: ${count} issues`}
+          title={`${count} issues`}
           onClick={() => onDateClick?.(dateKey)}
-        />
+        >
+          <span className="sr-only">
+            <FormattedDate date={dateKey} />: {count} issues
+          </span>
+        </div>
       );
     }
 
@@ -127,35 +132,6 @@ export function ActivityHeatmap({ issues, year, month, onMonthChange, onDateClic
 
   return (
     <div className="w-36">
-      <div className="flex items-center justify-between mb-2">
-        <button
-          onClick={handlePrevMonth}
-          className="text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] transition-colors p-1 -ml-1"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M15 18l-6-6 6-6"/>
-          </svg>
-        </button>
-        <div className="flex flex-col items-center">
-          <h2 className="text-3xl font-bold text-[#24292f] dark:text-[#adbac7]">
-            {formatMonthName(month)}
-          </h2>
-          <div className="text-sm text-[#57606a] dark:text-[#768390]">
-            {year}
-          </div>
-        </div>
-        <button
-          onClick={handleNextMonth}
-          className="text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] transition-colors p-1 -mr-1"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 18l6-6-6-6"/>
-          </svg>
-        </button>
-      </div>
-      <div className="text-xs text-[#57606a] dark:text-[#768390] mb-2 text-center">
-        Total: {issues.length}
-      </div>
       <div className="grid grid-cols-7 gap-[3px]">
         {generateMonthGrid()}
       </div>

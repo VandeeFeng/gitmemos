@@ -4,6 +4,7 @@ import { Issue } from '@/types/github';
 import { Button } from './ui/button';
 import { ActivityHeatmap } from './activity-heatmap';
 import { IssueCard } from './issue-card';
+import { FormattedDate } from './formatted-date';
 
 interface TimelineProps {
   searchQuery: string;
@@ -12,12 +13,12 @@ interface TimelineProps {
 }
 
 // 格式化月份和年份，确保服务端和客户端渲染结果一致
-function formatMonthAndYear(year: number, month: number) {
-  const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  return `${months[month]} ${year}`;
+function formatMonthAndYear(month: number, year: number) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return {
+    month: months[month],
+    year: year.toString()
+  };
 }
 
 // 获取当前日期的年份和月份
@@ -161,17 +162,68 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
 
   return (
     <div className="space-y-8">
-      <div className="flex gap-6 relative">
-        <div className="fixed pt-1" style={{ top: '150px', width: '180px' }}>
-          <ActivityHeatmap 
-            issues={currentMonthIssues}
-            year={year}
-            month={month}
-            onMonthChange={handleMonthChange}
-            onDateClick={handleDateClick}
-          />
+      {/* Container wrapper with responsive layout */}
+      <div className="flex flex-col sm:flex-row gap-6">
+        {/* Fixed Container for Calendar and Heatmap */}
+        <div className="relative sm:w-[180px]">
+          <div className="sm:fixed sm:w-[180px] sm:top-[150px]">
+            {/* Mobile Layout: Calendar and Heatmap side by side */}
+            <div className="flex sm:block gap-4 justify-between">
+              {/* Calendar Section */}
+              <div className="flex-1 sm:flex-none sm:w-36">
+                <div className="flex items-center justify-between mb-2">
+                  <button
+                    onClick={() => handleMonthChange(
+                      month === 0 ? year - 1 : year,
+                      month === 0 ? 11 : month - 1
+                    )}
+                    className="text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] transition-colors p-1 -ml-1"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M15 18l-6-6 6-6"/>
+                    </svg>
+                  </button>
+                  <div className="flex flex-col items-center">
+                    <h2 className="text-2xl font-bold text-[#24292f] dark:text-[#adbac7]">
+                      {formatMonthAndYear(month, year).month}
+                    </h2>
+                    <div className="text-sm text-[#57606a] dark:text-[#768390]">
+                      {formatMonthAndYear(month, year).year}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleMonthChange(
+                      month === 11 ? year + 1 : year,
+                      month === 11 ? 0 : month + 1
+                    )}
+                    className="text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] transition-colors p-1 -mr-1"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 18l6-6-6-6"/>
+                    </svg>
+                  </button>
+                </div>
+                <div className="text-xs text-[#57606a] dark:text-[#768390] mb-2 text-center">
+                  Total: {currentMonthIssues.length}
+                </div>
+              </div>
+
+              {/* Heatmap Section */}
+              <div className="flex-1 sm:flex-none sm:mt-4">
+                <ActivityHeatmap 
+                  issues={currentMonthIssues}
+                  year={year}
+                  month={month}
+                  onMonthChange={handleMonthChange}
+                  onDateClick={handleDateClick}
+                />
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="flex-1 ml-[180px]">
+
+        {/* Timeline Content Container */}
+        <div className="flex-1">
           <div className="relative">
             <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#444c56]"></div>
             {hasIssues ? (
@@ -179,7 +231,6 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
                 {Object.entries(monthIssues).map(([dayKey, dayIssues]) => {
                   const filteredDayIssues = dayIssues.filter(issue => {
                     if (!searchQuery) return true;
-
                     const searchLower = searchQuery.toLowerCase();
                     const titleMatch = issue.title.toLowerCase().includes(searchLower);
                     const bodyMatch = (issue.body || '').toLowerCase().includes(searchLower);
@@ -187,19 +238,20 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
                       label.name.toLowerCase().includes(searchLower) ||
                       (label.description || '').toLowerCase().includes(searchLower)
                     );
-
                     return titleMatch || bodyMatch || labelsMatch;
                   });
 
-                  // Only render the day section if there are filtered issues
-                  if (filteredDayIssues.length === 0) {
-                    return null;
-                  }
+                  if (filteredDayIssues.length === 0) return null;
 
                   return (
                     <div key={dayKey} className="relative" data-date={dayKey}>
-                      <div className="absolute -left-[5px] top-[14px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
-                      <div className="pl-6">
+                      <div className="relative flex items-center h-6">
+                        <div className="absolute -left-[5px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
+                        <div className="pl-6 text-sm text-[#768390]">
+                          <FormattedDate date={dayKey} />
+                        </div>
+                      </div>
+                      <div className="pl-6 mt-3">
                         <div className="space-y-3">
                           {filteredDayIssues.map((issue) => (
                             <IssueCard
@@ -233,7 +285,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
                               ? 'No issues found matching your search'
                               : selectedLabel
                                 ? 'No issues found with this label'
-                                : `No issues for ${formatMonthAndYear(year, month)}`
+                                : `No issues for ${formatMonthAndYear(month, year).month} ${formatMonthAndYear(month, year).year}`
                             }
                           </p>
                         </div>
@@ -246,6 +298,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
           </div>
         </div>
       </div>
+
       {hasMore && filteredIssues.length >= 10 && (
         <div className="flex justify-center">
           <Button

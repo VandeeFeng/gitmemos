@@ -68,11 +68,13 @@ export default function RootLayout({
             color-scheme: dark;
           }
           html {
-            transition: background-color 0.5s ease;
+            transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: background-color;
           }
           body {
             background-color: inherit;
-            transition: background-color 0.5s ease;
+            transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            will-change: background-color;
           }
           /* Prevent flash during page load */
           html.dark body {
@@ -80,6 +82,13 @@ export default function RootLayout({
           }
           html body {
             background-color: #ffffff;
+          }
+          /* 添加全局过渡效果 */
+          *, *::before, *::after {
+            transition: background-color 0.3s ease,
+                        border-color 0.1s ease,
+                        fill 0.1s ease,
+                        stroke 0.1s ease;
           }
         `}</style>
         <link

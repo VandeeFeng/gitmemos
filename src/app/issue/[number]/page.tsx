@@ -84,17 +84,6 @@ export default function IssuePage({ params }: PageProps) {
                   </span>
                 </div>
               </div>
-              <Button
-                variant="outline"
-                onClick={() => router.push(`/editor?edit=${issue.number}`)}
-                className="text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] hover:bg-[#f6f8fa] dark:hover:bg-[#373e47] border-[#d0d7de] dark:border-[#444c56]"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
-                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                </svg>
-                Edit
-              </Button>
             </div>
             <div className="prose dark:prose-invert max-w-none">
               <ReactMarkdown

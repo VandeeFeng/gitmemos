@@ -162,7 +162,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
   return (
     <div className="space-y-8">
       <div className="flex gap-6 relative">
-        <div className="fixed pt-1" style={{ top: '150px', width: '210px' }}>
+        <div className="fixed pt-1" style={{ top: '150px', width: '180px' }}>
           <ActivityHeatmap 
             issues={currentMonthIssues}
             year={year}
@@ -171,9 +171,9 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
             onDateClick={handleDateClick}
           />
         </div>
-        <div className="flex-1 ml-[240px]">
+        <div className="flex-1 ml-[180px]">
           <div className="relative">
-            <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#444c56] -ml-3"></div>
+            <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#444c56]"></div>
             {hasIssues ? (
               <div className="space-y-6">
                 {Object.entries(monthIssues).map(([dayKey, dayIssues]) => {
@@ -198,7 +198,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
 
                   return (
                     <div key={dayKey} className="relative" data-date={dayKey}>
-                      <div className="absolute -left-[17px] top-[14px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
+                      <div className="absolute -left-[5px] top-[14px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
                       <div className="pl-6">
                         <div className="space-y-3">
                           {filteredDayIssues.map((issue) => (
@@ -219,7 +219,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
             ) : (
               <div className="space-y-6">
                 <div className="relative">
-                  <div className="absolute -left-[17px] top-[14px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
+                  <div className="absolute -left-[5px] top-[14px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
                   <div className="pl-6">
                     <div className="space-y-3">
                       <div className="group border border-[#d0d7de] dark:border-[#444c56] rounded-lg shadow-card dark:shadow-card-dark hover:shadow-card-hover dark:hover:shadow-card-dark-hover transition-shadow bg-white dark:bg-[#2d333b] px-6 py-16">

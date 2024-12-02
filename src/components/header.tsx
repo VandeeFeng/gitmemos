@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { useTheme } from 'next-themes';
+import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { SearchBar } from '@/components/search-bar';
 import { LabelFilter } from '@/components/label-filter';
@@ -25,6 +26,8 @@ export function Header({
   onConfigClick
 }: HeaderProps) {
   const { theme, setTheme } = useTheme();
+  const pathname = usePathname();
+  const isTimelinePage = pathname === '/timeline';
 
   return (
     <header className="fixed top-0 left-0 right-0 bg-white/80 dark:bg-[#22272e]/80 backdrop-blur-sm z-40">
@@ -39,7 +42,7 @@ export function Header({
             </Link>
             <Link
               href="/timeline"
-              className="text-text-secondary hover:text-text-primary transition-colors"
+              className={`transition-colors ${isTimelinePage ? 'text-[#0969da] dark:text-[#2f81f7]' : 'text-text-secondary hover:text-text-primary'}`}
               title="Timeline"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -161,11 +161,11 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
   const hasIssues = Object.keys(monthIssues).length > 0 && filteredIssues.length > 0;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 h-[calc(100vh-150px)] relative">
       {/* Main Layout Container */}
-      <div className="flex flex-col sm:flex-row gap-6 sm:gap-0">
+      <div className="flex flex-col sm:flex-row gap-6 sm:gap-0 h-full">
         {/* Left Sidebar Container (Calendar + Heatmap) */}
-        <div className="sm:fixed sm:w-[180px] sm:top-[150px] sm:pr-2">
+        <div className="sm:sticky sm:w-[180px] sm:top-0 sm:pr-2 flex-shrink-0">
           <div className="flex sm:flex sm:flex-col sm:items-center gap-4 sm:gap-0 justify-between">
             {/* Calendar Container */}
             <div className="flex-1 sm:flex-none sm:w-36">
@@ -219,11 +219,11 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
         </div>
 
         {/* Right Content Container */}
-        <div className="flex-1 sm:ml-[190px]">
+        <div className="flex-1 sm:ml-[10px] overflow-y-auto pr-4">
           {/* Timeline Container */}
-          <div className="relative">
+          <div className="relative pl-6">
             {/* Timeline Line */}
-            <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#444c56]"></div>
+            <div className="absolute left-[11px] top-0 bottom-0 w-[2px] bg-[#444c56]"></div>
 
             {/* Issues Container */}
             {hasIssues ? (
@@ -246,12 +246,12 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
                   return (
                     <div key={dayKey} className="relative" data-date={dayKey}>
                       <div className="relative flex items-center h-6">
-                        <div className="absolute -left-[5px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
-                        <div className="pl-6 text-sm text-[#768390]">
+                        <div className="absolute -left-[17px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
+                        <div className="text-sm text-[#768390]">
                           <FormattedDate date={dayKey} />
                         </div>
                       </div>
-                      <div className="pl-6 mt-3">
+                      <div className="mt-3">
                         <div className="space-y-3">
                           {filteredDayIssues.map((issue) => (
                             <IssueCard
@@ -271,7 +271,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
             ) : (
               <div className="space-y-6">
                 <div className="relative">
-                  <div className="absolute -left-[5px] top-[14px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
+                  <div className="absolute -left-[17px] top-[14px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
                   <div className="pl-6">
                     <div className="space-y-3">
                       <div className="group border border-[#d0d7de] dark:border-[#444c56] rounded-lg shadow-card dark:shadow-card-dark hover:shadow-card-hover dark:hover:shadow-card-dark-hover transition-shadow bg-white dark:bg-[#2d333b] px-6 py-16">
@@ -296,32 +296,32 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
               </div>
             )}
           </div>
+
+          {/* Load More Button */}
+          {hasMore && filteredIssues.length >= 10 && (
+            <div className="flex justify-center py-4">
+              <Button
+                variant="outline"
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="text-[#768390] border-[#444c56] hover:bg-[#373e47] hover:text-[#adbac7] shadow-card dark:shadow-card-dark"
+              >
+                {loadingMore ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Loading...
+                  </span>
+                ) : (
+                  'Load more'
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Load More Button */}
-      {hasMore && filteredIssues.length >= 10 && (
-        <div className="flex justify-center">
-          <Button
-            variant="outline"
-            onClick={loadMore}
-            disabled={loadingMore}
-            className="text-[#768390] border-[#444c56] hover:bg-[#373e47] hover:text-[#adbac7] shadow-card dark:shadow-card-dark"
-          >
-            {loadingMore ? (
-              <span className="flex items-center gap-2">
-                <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Loading...
-              </span>
-            ) : (
-              'Load more'
-            )}
-          </Button>
-        </div>
-      )}
     </div>
   );
 } 

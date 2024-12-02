@@ -162,70 +162,71 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
 
   return (
     <div className="space-y-8">
-      {/* Container wrapper with responsive layout */}
-      <div className="flex flex-col sm:flex-row gap-6">
-        {/* Fixed Container for Calendar and Heatmap */}
-        <div className="relative sm:w-[180px]">
-          <div className="sm:fixed sm:w-[180px] sm:top-[150px]">
-            {/* Mobile Layout: Calendar and Heatmap side by side */}
-            <div className="flex sm:block gap-4 justify-between">
-              {/* Calendar Section */}
-              <div className="flex-1 sm:flex-none sm:w-36">
-                <div className="flex items-center justify-between mb-2">
-                  <button
-                    onClick={() => handleMonthChange(
-                      month === 0 ? year - 1 : year,
-                      month === 0 ? 11 : month - 1
-                    )}
-                    className="text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] transition-colors p-1 -ml-1"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M15 18l-6-6 6-6"/>
-                    </svg>
-                  </button>
-                  <div className="flex flex-col items-center">
-                    <h2 className="text-2xl font-bold text-[#24292f] dark:text-[#adbac7]">
-                      {formatMonthAndYear(month, year).month}
-                    </h2>
-                    <div className="text-sm text-[#57606a] dark:text-[#768390]">
-                      {formatMonthAndYear(month, year).year}
-                    </div>
+      {/* Main Layout Container */}
+      <div className="flex flex-col sm:flex-row gap-6 sm:gap-0">
+        {/* Left Sidebar Container (Calendar + Heatmap) */}
+        <div className="sm:fixed sm:w-[180px] sm:top-[150px] sm:pr-2">
+          <div className="flex sm:flex sm:flex-col sm:items-center gap-4 sm:gap-0 justify-between">
+            {/* Calendar Container */}
+            <div className="flex-1 sm:flex-none sm:w-36">
+              <div className="flex items-center justify-between mb-2">
+                <button
+                  onClick={() => handleMonthChange(
+                    month === 0 ? year - 1 : year,
+                    month === 0 ? 11 : month - 1
+                  )}
+                  className="text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] transition-colors p-1 -ml-1"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 18l-6-6 6-6"/>
+                  </svg>
+                </button>
+                <div className="flex flex-col items-center">
+                  <h2 className="text-2xl font-bold text-[#24292f] dark:text-[#adbac7]">
+                    {formatMonthAndYear(month, year).month}
+                  </h2>
+                  <div className="text-sm text-[#57606a] dark:text-[#768390]">
+                    {formatMonthAndYear(month, year).year}
                   </div>
-                  <button
-                    onClick={() => handleMonthChange(
-                      month === 11 ? year + 1 : year,
-                      month === 11 ? 0 : month + 1
-                    )}
-                    className="text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] transition-colors p-1 -mr-1"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M9 18l6-6-6-6"/>
-                    </svg>
-                  </button>
                 </div>
-                <div className="text-xs text-[#57606a] dark:text-[#768390] mb-2 text-center">
-                  Total: {currentMonthIssues.length}
-                </div>
+                <button
+                  onClick={() => handleMonthChange(
+                    month === 11 ? year + 1 : year,
+                    month === 11 ? 0 : month + 1
+                  )}
+                  className="text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] transition-colors p-1 -mr-1"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 18l6-6-6-6"/>
+                  </svg>
+                </button>
               </div>
+              <div className="text-xs text-[#57606a] dark:text-[#768390] mb-2 text-center">
+                Total: {currentMonthIssues.length}
+              </div>
+            </div>
 
-              {/* Heatmap Section */}
-              <div className="flex-1 sm:flex-none sm:mt-4">
-                <ActivityHeatmap 
-                  issues={currentMonthIssues}
-                  year={year}
-                  month={month}
-                  onMonthChange={handleMonthChange}
-                  onDateClick={handleDateClick}
-                />
-              </div>
+            {/* Heatmap Container */}
+            <div className="flex-1 sm:flex-none sm:mt-1">
+              <ActivityHeatmap 
+                issues={currentMonthIssues}
+                year={year}
+                month={month}
+                onMonthChange={handleMonthChange}
+                onDateClick={handleDateClick}
+              />
             </div>
           </div>
         </div>
 
-        {/* Timeline Content Container */}
-        <div className="flex-1">
+        {/* Right Content Container */}
+        <div className="flex-1 sm:ml-[190px]">
+          {/* Timeline Container */}
           <div className="relative">
+            {/* Timeline Line */}
             <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-[#444c56]"></div>
+
+            {/* Issues Container */}
             {hasIssues ? (
               <div className="space-y-6">
                 {Object.entries(monthIssues).map(([dayKey, dayIssues]) => {
@@ -299,6 +300,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
         </div>
       </div>
 
+      {/* Load More Button */}
       {hasMore && filteredIssues.length >= 10 && (
         <div className="flex justify-center">
           <Button

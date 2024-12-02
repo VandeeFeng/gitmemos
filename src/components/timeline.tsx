@@ -4,7 +4,6 @@ import { Issue } from '@/types/github';
 import { Button } from './ui/button';
 import { ActivityHeatmap } from './activity-heatmap';
 import { IssueCard } from './issue-card';
-import { FormattedDate } from './formatted-date';
 
 interface TimelineProps {
   searchQuery: string;

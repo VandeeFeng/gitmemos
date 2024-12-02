@@ -127,7 +127,7 @@ export default function Home() {
         )}
         <header className="fixed top-0 left-0 right-0 bg-white/80 dark:bg-[#22272e]/80 backdrop-blur-sm z-40">
           <div className="container mx-auto px-4 max-w-4xl">
-            <div className="flex items-center justify-between py-10">
+            <div className="flex flex-col md:flex-row md:items-center justify-between py-4 md:py-10">
               <div className="flex items-center gap-4">
                 <Link
                   href="/"
@@ -176,11 +176,11 @@ export default function Home() {
                   )}
                 </button>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 mt-4 md:mt-0">
                 <SearchBar onSearch={handleSearch} issues={issues} />
                 <Button 
                   onClick={handleNewIssue}
-                  className="bg-success hover:bg-success/90 text-white border-0 shadow-none transition-colors"
+                  className="bg-success hover:bg-success/90 text-white border-0 shadow-none transition-colors whitespace-nowrap"
                 >
                   <span className="flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -195,7 +195,7 @@ export default function Home() {
           </div>
         </header>
 
-        <main className="pt-40">
+        <main className="pt-32 md:pt-40">
           <div className="bg-white dark:bg-[#22272e]">
             {showConfig ? (
               <div className="fixed inset-0 bg-black/50 dark:bg-black/70 flex items-center justify-center z-50 animate-fade-in">

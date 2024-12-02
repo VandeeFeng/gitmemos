@@ -7,7 +7,6 @@ import { useTheme } from "next-themes";
 import { setGitHubConfig, getGitHubConfig, getIssues } from '@/lib/github';
 import { Issue, GitHubConfig } from '@/types/github';
 import { Header } from '@/components/header';
-import { useRouter } from 'next/navigation';
 
 export default function Home() {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
@@ -23,7 +22,6 @@ export default function Home() {
     token: '',
     issuesPerPage: 10
   });
-  const router = useRouter();
 
   useEffect(() => {
     setMounted(true);

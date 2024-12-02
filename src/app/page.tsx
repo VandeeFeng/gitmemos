@@ -13,7 +13,6 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [issues, setIssues] = useState<Issue[]>([]);
   const { } = useTheme();
-  const [mounted, setMounted] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [githubConfig, setGithubConfig] = useState<GitHubConfig>({
@@ -24,17 +23,11 @@ export default function Home() {
   });
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (mounted) {
-      const uiConfig = getGitHubConfig(false);
-      if (uiConfig.owner || uiConfig.repo || uiConfig.token) {
-        setGithubConfig(uiConfig);
-      }
+    const uiConfig = getGitHubConfig(false);
+    if (uiConfig.owner || uiConfig.repo || uiConfig.token) {
+      setGithubConfig(uiConfig);
     }
-  }, [mounted]);
+  }, []);
 
   useEffect(() => {
     async function fetchIssues() {
@@ -45,10 +38,8 @@ export default function Home() {
         console.error('Error fetching issues:', error);
       }
     }
-    if (mounted) {
-      fetchIssues();
-    }
-  }, [mounted]);
+    fetchIssues();
+  }, []);
 
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,16 +65,6 @@ export default function Home() {
   const handleSearch = (query: string) => {
     setSearchQuery(query);
   };
-
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500">
-        <div className="container mx-auto p-4 max-w-4xl">
-          <Header />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500">

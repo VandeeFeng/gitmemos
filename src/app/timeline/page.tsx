@@ -8,13 +8,8 @@ import { Header } from '@/components/header';
 
 export default function TimelinePage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [mounted, setMounted] = useState(false);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     async function fetchIssues() {
@@ -32,16 +27,8 @@ export default function TimelinePage() {
     setSearchQuery(query);
   };
 
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-gray-300 dark:border-gray-600 border-t-blue-500 rounded-full animate-spin" />
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500 overflow-y-scroll">
+    <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500">
       <Header 
         selectedLabel={selectedLabel}
         onLabelSelect={(label) => setSelectedLabel(label === selectedLabel ? null : label)}

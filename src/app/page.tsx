@@ -12,7 +12,7 @@ export default function Home() {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [issues, setIssues] = useState<Issue[]>([]);
-  const { } = useTheme();
+  const { theme, mounted } = useTheme();
   const [showConfig, setShowConfig] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [githubConfig, setGithubConfig] = useState<GitHubConfig>({
@@ -21,6 +21,10 @@ export default function Home() {
     token: '',
     issuesPerPage: 10
   });
+
+  if (!mounted) {
+    return <div style={{ visibility: 'hidden' }} />;
+  }
 
   useEffect(() => {
     const uiConfig = getGitHubConfig(false);

@@ -34,6 +34,11 @@ export default function RootLayout({
                 }
 
                 function setTheme(theme) {
+                  document.documentElement.style.backgroundColor = 
+                    theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+                      ? '#22272e'
+                      : '#ffffff';
+                      
                   if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
                     document.documentElement.classList.add('dark');
                   } else {
@@ -41,8 +46,9 @@ export default function RootLayout({
                   }
                 }
 
-                // Apply theme immediately
-                setTheme(getThemePreference());
+                // Apply theme immediately to prevent flash
+                const theme = getThemePreference();
+                setTheme(theme);
 
                 // Handle system theme changes
                 window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
@@ -57,18 +63,23 @@ export default function RootLayout({
         <style>{`
           :root {
             color-scheme: light;
-            background-color: white;
           }
           :root.dark {
             color-scheme: dark;
-            background-color: #22272e;
           }
           html {
-            transition: background-color 0.3s ease;
+            transition: background-color 0.5s ease;
           }
           body {
             background-color: inherit;
-            transition: background-color 0.3s ease;
+            transition: background-color 0.5s ease;
+          }
+          /* Prevent flash during page load */
+          html.dark body {
+            background-color: #22272e;
+          }
+          html body {
+            background-color: #ffffff;
           }
         `}</style>
         <link

@@ -219,7 +219,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
         </div>
 
         {/* Right Content Container */}
-        <div className="flex-1 sm:ml-[10px] overflow-y-auto pr-4">
+        <div className="flex-1 sm:ml-[10px] overflow-y-auto pr-4 pb-16">
           {/* Timeline Container */}
           <div className="relative pl-6">
             {/* Timeline Line */}
@@ -246,7 +246,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
                   return (
                     <div key={dayKey} className="relative" data-date={dayKey}>
                       <div className="relative flex items-center h-6">
-                        <div className="absolute -left-[17px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
+                        <div className="absolute -left-[18px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
                         <div className="text-sm text-[#768390]">
                           <FormattedDate date={dayKey} />
                         </div>
@@ -271,7 +271,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
             ) : (
               <div className="space-y-6">
                 <div className="relative">
-                  <div className="absolute -left-[17px] top-[14px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
+                  <div className="absolute -left-[18px] top-[14px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
                   <div className="pl-6">
                     <div className="space-y-3">
                       <div className="group border border-[#d0d7de] dark:border-[#444c56] rounded-lg shadow-card dark:shadow-card-dark hover:shadow-card-hover dark:hover:shadow-card-dark-hover transition-shadow bg-white dark:bg-[#2d333b] px-6 py-16">

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
+import { RootFooter } from '@/components/root-footer'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -37,9 +38,10 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <main className="min-h-screen bg-background">
+          <div className="min-h-screen bg-background">
             {children}
-          </main>
+            <RootFooter />
+          </div>
         </ThemeProvider>
       </body>
     </html>

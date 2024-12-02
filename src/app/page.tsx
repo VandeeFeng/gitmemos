@@ -190,7 +190,7 @@ export default function Home() {
               <div className="animate-fade-in">
                 <IssueList
                   onSelect={(issue) => {
-                    router.push(`/editor?edit=${issue.number}`);
+                    router.push(`/issue/${issue.number}`);
                   }}
                   selectedLabel={selectedLabel}
                   onLabelClick={(label) => {

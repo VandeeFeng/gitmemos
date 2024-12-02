@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { getIssue } from '@/lib/github';
@@ -14,26 +14,29 @@ import { Backlinks } from '@/components/backlinks';
 import { FormattedDate } from '@/components/formatted-date';
 
 interface PageProps {
-  params: {
+  params: Promise<{
     number: string;
-  };
+  }>;
 }
 
 export default function IssuePage({ params }: PageProps) {
+  const resolvedParams = use(params);
   const [issue, setIssue] = useState<Issue | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     async function fetchIssue() {
+      if (!resolvedParams?.number) return;
+      
       try {
-        const data = await getIssue(parseInt(params.number));
+        const data = await getIssue(parseInt(resolvedParams.number));
         setIssue(data);
       } catch (error) {
         console.error('Error fetching issue:', error);
       }
     }
     fetchIssue();
-  }, [params.number]);
+  }, [resolvedParams]);
 
   if (!issue) {
     return (
@@ -83,7 +86,7 @@ export default function IssuePage({ params }: PageProps) {
               </div>
               <Button
                 variant="outline"
-                onClick={() => router.push(`/?edit=${issue.number}`)}
+                onClick={() => router.push(`/editor?edit=${issue.number}`)}
                 className="text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] hover:bg-[#f6f8fa] dark:hover:bg-[#373e47] border-[#d0d7de] dark:border-[#444c56]"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">

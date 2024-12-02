@@ -101,7 +101,7 @@ export function IssueList({
       ) : (
         <>
           {filteredIssues.map((issue) => (
-            <div key={issue.number} onClick={() => onSelect(issue)}>
+            <div key={issue.number}>
               <IssueCard
                 issue={issue}
                 selectedLabel={selectedLabel}

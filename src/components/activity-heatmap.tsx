@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Issue } from '@/types/github';
+import { FormattedDate } from './formatted-date';
 
 interface ActivityHeatmapProps {
   issues: Issue[];
   year: number;
   month: number;
   onMonthChange: (year: number, month: number) => void;
+  onDateClick?: (date: string) => void;
 }
 
 interface DayActivity {
@@ -13,7 +15,28 @@ interface DayActivity {
   count: number;
 }
 
-export function ActivityHeatmap({ issues, year, month, onMonthChange }: ActivityHeatmapProps) {
+// 格式化月份名称，确保服务端和客户端渲染结果一致
+function formatMonthName(month: number) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return months[month];
+}
+
+// 获取指定月份的天数
+function getDaysInMonth(year: number, month: number) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+// 获取指定日期的星期几（0-6）
+function getFirstDayOfMonth(year: number, month: number) {
+  return new Date(year, month, 1).getDay();
+}
+
+// 格式化日期为 ISO 字符串的日期部分
+function formatDateKey(year: number, month: number, day: number) {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+export function ActivityHeatmap({ issues, year, month, onMonthChange, onDateClick }: ActivityHeatmapProps) {
   const [activityData, setActivityData] = useState<Record<string, DayActivity>>({});
   const [maxCount, setMaxCount] = useState(0);
   
@@ -62,8 +85,8 @@ export function ActivityHeatmap({ issues, year, month, onMonthChange }: Activity
   };
 
   const generateMonthGrid = () => {
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = getDaysInMonth(year, month);
+    const firstDay = getFirstDayOfMonth(year, month);
     const days = [];
     
     // Add empty cells for days before the first day of the month
@@ -73,8 +96,7 @@ export function ActivityHeatmap({ issues, year, month, onMonthChange }: Activity
     
     // Add cells for each day
     for (let day = 1; day <= daysInMonth; day++) {
-      const date = new Date(year, month, day);
-      const dateKey = date.toISOString().split('T')[0];
+      const dateKey = formatDateKey(year, month, day);
       const activity = activityData[dateKey];
       const count = activity?.count || 0;
       
@@ -88,8 +110,9 @@ export function ActivityHeatmap({ issues, year, month, onMonthChange }: Activity
       days.push(
         <div
           key={dateKey}
-          className={`w-3 h-3 rounded-sm ${bgColor} cursor-pointer transition-colors`}
-          title={`${date.toLocaleDateString()}: ${count} issues`}
+          className={`w-3 h-3 rounded-sm ${bgColor} cursor-pointer transition-all hover:scale-110 hover:brightness-125`}
+          title={`${dateKey}: ${count} issues`}
+          onClick={() => onDateClick?.(dateKey)}
         />
       );
     }
@@ -110,7 +133,7 @@ export function ActivityHeatmap({ issues, year, month, onMonthChange }: Activity
         </button>
         <div className="flex flex-col items-center">
           <h2 className="text-3xl font-bold text-[#24292f] dark:text-[#adbac7]">
-            {new Date(year, month).toLocaleString('default', { month: 'short' })}
+            {formatMonthName(month)}
           </h2>
           <div className="text-sm text-[#57606a] dark:text-[#768390]">
             {year}

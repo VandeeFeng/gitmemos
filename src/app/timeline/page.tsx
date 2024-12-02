@@ -55,7 +55,7 @@ export default function TimelinePage() {
         issues={issues}
       />
       <main className="container mx-auto px-4 max-w-4xl pt-32 md:pt-40">
-        <div>
+        <div className="animate-fade-in">
           <Timeline 
             searchQuery={searchQuery} 
             selectedLabel={selectedLabel} 

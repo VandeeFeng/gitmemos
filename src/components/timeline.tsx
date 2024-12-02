@@ -212,7 +212,6 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
                 issues={currentMonthIssues}
                 year={year}
                 month={month}
-                onMonthChange={handleMonthChange}
                 onDateClick={handleDateClick}
               />
             </div>

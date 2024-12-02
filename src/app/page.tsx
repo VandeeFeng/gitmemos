@@ -12,7 +12,7 @@ export default function Home() {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [issues, setIssues] = useState<Issue[]>([]);
-  const { theme, mounted } = useTheme();
+  const { theme } = useTheme();
   const [showConfig, setShowConfig] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [githubConfig, setGithubConfig] = useState<GitHubConfig>({
@@ -22,9 +22,14 @@ export default function Home() {
     issuesPerPage: 10
   });
 
-  if (!mounted) {
-    return <div style={{ visibility: 'hidden' }} />;
-  }
+  const fetchIssues = async () => {
+    try {
+      const data = await getIssues(1);
+      setIssues(data);
+    } catch (error) {
+      console.error('Error fetching issues:', error);
+    }
+  };
 
   useEffect(() => {
     const uiConfig = getGitHubConfig(false);
@@ -34,14 +39,6 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    async function fetchIssues() {
-      try {
-        const data = await getIssues(1);
-        setIssues(data);
-      } catch (error) {
-        console.error('Error fetching issues:', error);
-      }
-    }
     fetchIssues();
   }, []);
 
@@ -56,9 +53,10 @@ export default function Home() {
       setShowConfig(false);
       setShowSuccess(true);
       
+      await fetchIssues();
+      
       setTimeout(() => {
         setShowSuccess(false);
-        window.location.reload();
       }, 3000);
     } catch (error) {
       console.error('Error saving config:', error);

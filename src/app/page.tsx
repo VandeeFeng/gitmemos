@@ -189,9 +189,6 @@ export default function Home() {
             ) : (
               <div className="animate-fade-in">
                 <IssueList
-                  onSelect={(issue) => {
-                    router.push(`/issue/${issue.number}`);
-                  }}
                   selectedLabel={selectedLabel}
                   onLabelClick={(label) => {
                     setSelectedLabel(label === selectedLabel ? null : label);

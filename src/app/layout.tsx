@@ -22,37 +22,39 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                document.documentElement.classList.add('dark');
-                document.documentElement.style.colorScheme = 'dark';
-              })()
-            `,
-          }}
-        />
-        <Script
-          id="theme-init"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
               try {
                 let isDark = true;
-                const theme = localStorage.getItem('theme')
-                if (theme === 'light' || (theme === 'system' && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                const theme = localStorage.getItem('theme');
+                const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                
+                if (theme === 'light' || (theme === 'system' && !systemDark)) {
                   isDark = false;
-                  document.documentElement.style.colorScheme = 'light';
-                  document.documentElement.classList.remove('dark');
-                } else {
-                  document.documentElement.style.colorScheme = 'dark';
-                  document.documentElement.classList.add('dark');
                 }
-              } catch (e) {}
-            `,
-          }}
-        />
+                
+                if (isDark) {
+                  document.documentElement.classList.add('dark');
+                  document.documentElement.style.colorScheme = 'dark';
+                  document.documentElement.style.backgroundColor = '#09090b';
+                } else {
+                  document.documentElement.classList.remove('dark');
+                  document.documentElement.style.colorScheme = 'light';
+                  document.documentElement.style.backgroundColor = '#ffffff';
+                }
+              } catch (e) {
+                // 如果出错，默认使用暗色主题
+                document.documentElement.classList.add('dark');
+                document.documentElement.style.colorScheme = 'dark';
+                document.documentElement.style.backgroundColor = '#09090b';
+              }
+            })();
+          `,
+        }}
+      />
+      <head>
         <style>{`
           :root {
             color-scheme: dark;

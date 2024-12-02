@@ -115,7 +115,7 @@ export default function TimelinePage() {
 
       <main className="pt-32 md:pt-40">
         <div className="container mx-auto px-4 max-w-4xl">
-          <div className="space-y-8 py-6">
+          <div>
             <Timeline searchQuery={searchQuery} selectedLabel={selectedLabel} />
           </div>
         </div>

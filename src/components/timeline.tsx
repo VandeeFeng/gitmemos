@@ -181,20 +181,20 @@ export function Timeline({ searchQuery, selectedLabel }: TimelineProps) {
                               {filteredDayIssues.map((issue) => (
                                 <div 
                                   key={issue.number}
-                                  className="group border border-[#444c56] rounded-lg shadow-card dark:shadow-card-dark hover:shadow-card-hover dark:hover:shadow-card-dark-hover transition-shadow bg-[#2d333b]"
+                                  className="group border border-[#d0d7de] dark:border-[#444c56] rounded-lg shadow-card dark:shadow-card-dark hover:shadow-card-hover dark:hover:shadow-card-dark-hover transition-shadow bg-white dark:bg-[#2d333b]"
                                 >
                                   <div className="px-6 py-4">
                                     <div className="flex items-start justify-between">
                                       <div className="space-y-1 flex-1 min-w-0 pr-4">
-                                        <h3 className="font-semibold text-[#adbac7]">
+                                        <h3 className="font-semibold text-[#24292f] dark:text-[#adbac7]">
                                           <Link
                                             href={`/issue/${issue.number}`}
-                                            className="hover:text-[#2f81f7] transition-colors"
+                                            className="hover:text-[#0969da] dark:hover:text-[#2f81f7] transition-colors"
                                           >
                                             {issue.title}
                                           </Link>
                                         </h3>
-                                        <div className="flex items-center gap-2 text-xs text-[#768390]">
+                                        <div className="flex items-center gap-2 text-xs text-[#57606a] dark:text-[#768390]">
                                           <span>#{issue.number}</span>
                                           <span>·</span>
                                           <span>
@@ -210,7 +210,7 @@ export function Timeline({ searchQuery, selectedLabel }: TimelineProps) {
                                                 key={label.id}
                                                 className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${
                                                   selectedLabel === label.name 
-                                                    ? 'outline outline-2 outline-offset-1 outline-[#2f81f7] dark:outline-[#2f81f7]' 
+                                                    ? 'outline outline-2 outline-offset-1 outline-[#0969da] dark:outline-[#2f81f7]' 
                                                     : ''
                                                 }`}
                                                 style={{
@@ -228,10 +228,10 @@ export function Timeline({ searchQuery, selectedLabel }: TimelineProps) {
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="opacity-0 group-hover:opacity-100 transition-opacity text-[#768390] hover:text-[#adbac7] hover:bg-[#373e47] -mr-1.5 shrink-0"
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] hover:bg-[#f6f8fa] dark:hover:bg-[#373e47] -mr-1.5 shrink-0"
                                         asChild
                                       >
-                                        <Link href={`/issue/${issue.number}`}>
+                                        <Link href={`/?edit=${issue.number}`}>
                                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
                                             <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                             <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
@@ -242,7 +242,7 @@ export function Timeline({ searchQuery, selectedLabel }: TimelineProps) {
                                     </div>
                                   </div>
                                   {issue.body && (
-                                    <div className="border-t border-[#444c56]">
+                                    <div className="border-t border-[#d0d7de] dark:border-[#444c56]">
                                       <div className="px-6 py-3">
                                         <div className="prose dark:prose-invert max-w-none relative">
                                           <div className="relative">
@@ -253,25 +253,25 @@ export function Timeline({ searchQuery, selectedLabel }: TimelineProps) {
                                                   : 'max-h-[10000px]'
                                               }`}
                                             >
-                                              <div className="prose dark:prose-invert max-w-none prose-pre:bg-bg-secondary dark:prose-pre:bg-bg-tertiary prose-pre:p-4 prose-pre:rounded-lg prose-pre:my-4 prose-code:text-text-primary dark:prose-code:text-text-primary prose-code:before:content-none prose-code:after:content-none prose-p:leading-relaxed">
+                                              <div className="prose dark:prose-invert max-w-none prose-pre:bg-[#f6f8fa] dark:prose-pre:bg-[#2d333b] prose-pre:p-4 prose-pre:rounded-lg prose-pre:my-4 prose-code:text-[#24292f] dark:prose-code:text-[#adbac7] prose-code:before:content-none prose-code:after:content-none prose-p:leading-relaxed">
                                                 <ReactMarkdown
                                                   remarkPlugins={[remarkGfm]}
                                                   rehypePlugins={[rehypeRaw, rehypeSanitize]}
                                                   components={markdownComponents}
-                                                  className="text-text-primary"
+                                                  className="text-[#24292f] dark:text-[#adbac7]"
                                                 >
                                                   {issue.body}
                                                 </ReactMarkdown>
                                               </div>
                                             </div>
                                             {!expandedIssues[issue.number] && (issue.body?.length ?? 0) > 300 && (
-                                              <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-[#2d333b] to-transparent opacity-100 transition-all duration-500" />
+                                              <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-white dark:from-[#2d333b] to-transparent opacity-100 transition-all duration-500" />
                                             )}
                                           </div>
                                           {(issue.body?.length ?? 0) > 300 && (
                                             <button
                                               onClick={(e) => toggleExpand(e, issue.number)}
-                                              className="mt-2 text-xs font-semibold text-[#2f81f7] hover:text-[#2f81f7]/90 relative z-10"
+                                              className="mt-2 text-xs font-semibold text-[#0969da] hover:text-[#0969da]/90 dark:text-[#2f81f7] dark:hover:text-[#2f81f7]/90 relative z-10"
                                             >
                                               {expandedIssues[issue.number] ? 'Show less' : 'Show more'}
                                             </button>
@@ -295,7 +295,7 @@ export function Timeline({ searchQuery, selectedLabel }: TimelineProps) {
                       <div className="absolute -left-[17px] top-[14px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
                       <div className="pl-6">
                         <div className="space-y-3">
-                          <div className="border border-[#444c56] rounded-lg shadow-card dark:shadow-card-dark bg-[#2d333b] px-6 py-16">
+                          <div className="group border border-[#d0d7de] dark:border-[#444c56] rounded-lg shadow-card dark:shadow-card-dark hover:shadow-card-hover dark:hover:shadow-card-dark-hover transition-shadow bg-white dark:bg-[#2d333b] px-6 py-16">
                             <div className="flex flex-col items-center justify-center text-center">
                               <svg className="w-12 h-12 text-[#768390] mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />

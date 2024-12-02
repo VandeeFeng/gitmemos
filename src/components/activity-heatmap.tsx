@@ -79,10 +79,10 @@ export function ActivityHeatmap({ issues, year, month, onMonthChange }: Activity
       const count = activity?.count || 0;
       
       // Calculate color intensity based on activity count
-      let bgColor = 'bg-[#1e2937]';
+      let bgColor = 'bg-[#ebedf0] dark:bg-[#2d333b]';
       if (count > 0) {
         const intensity = Math.ceil((count / maxCount) * 4);
-        bgColor = `bg-[#2f81f7] opacity-${Math.min(intensity * 25, 100)}`;
+        bgColor = `bg-[#0969da] dark:bg-[#2f81f7] opacity-${Math.min(intensity * 25, 100)}`;
       }
       
       days.push(
@@ -102,43 +102,43 @@ export function ActivityHeatmap({ issues, year, month, onMonthChange }: Activity
       <div className="flex items-center justify-between mb-2">
         <button
           onClick={handlePrevMonth}
-          className="text-[#768390] hover:text-[#adbac7] transition-colors p-1 -ml-1"
+          className="text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] transition-colors p-1 -ml-1"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M15 18l-6-6 6-6"/>
           </svg>
         </button>
         <div className="flex flex-col items-center">
-          <h2 className="text-3xl font-bold text-[#adbac7]">
+          <h2 className="text-3xl font-bold text-[#24292f] dark:text-[#adbac7]">
             {new Date(year, month).toLocaleString('default', { month: 'short' })}
           </h2>
-          <div className="text-sm text-[#768390]">
+          <div className="text-sm text-[#57606a] dark:text-[#768390]">
             {year}
           </div>
         </div>
         <button
           onClick={handleNextMonth}
-          className="text-[#768390] hover:text-[#adbac7] transition-colors p-1 -mr-1"
+          className="text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7] transition-colors p-1 -mr-1"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M9 18l6-6-6-6"/>
           </svg>
         </button>
       </div>
-      <div className="text-xs text-[#768390] mb-2 text-center">
+      <div className="text-xs text-[#57606a] dark:text-[#768390] mb-2 text-center">
         Total: {issues.length}
       </div>
       <div className="grid grid-cols-7 gap-[3px]">
         {generateMonthGrid()}
       </div>
-      <div className="mt-3 flex items-center justify-between text-[11px] text-[#768390]">
+      <div className="mt-3 flex items-center justify-between text-[11px] text-[#57606a] dark:text-[#768390]">
         <span>Less</span>
         <div className="flex gap-[3px]">
-          <div className="w-2.5 h-2.5 rounded-sm bg-[#1e2937]" />
-          <div className="w-2.5 h-2.5 rounded-sm bg-[#2f81f7] opacity-25" />
-          <div className="w-2.5 h-2.5 rounded-sm bg-[#2f81f7] opacity-50" />
-          <div className="w-2.5 h-2.5 rounded-sm bg-[#2f81f7] opacity-75" />
-          <div className="w-2.5 h-2.5 rounded-sm bg-[#2f81f7]" />
+          <div className="w-2.5 h-2.5 rounded-sm bg-[#ebedf0] dark:bg-[#2d333b]" />
+          <div className="w-2.5 h-2.5 rounded-sm bg-[#0969da] dark:bg-[#2f81f7] opacity-25" />
+          <div className="w-2.5 h-2.5 rounded-sm bg-[#0969da] dark:bg-[#2f81f7] opacity-50" />
+          <div className="w-2.5 h-2.5 rounded-sm bg-[#0969da] dark:bg-[#2f81f7] opacity-75" />
+          <div className="w-2.5 h-2.5 rounded-sm bg-[#0969da] dark:bg-[#2f81f7]" />
         </div>
         <span>More</span>
       </div>

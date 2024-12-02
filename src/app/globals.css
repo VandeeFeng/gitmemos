@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 统一主题切换效果 */
+:root {
+  --theme-transition-duration: 400ms;
+  --theme-transition-timing: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+*,
+*::before,
+*::after {
+  transition: background-color var(--theme-transition-duration) var(--theme-transition-timing),
+              border-color var(--theme-transition-duration) var(--theme-transition-timing),
+              color var(--theme-transition-duration) var(--theme-transition-timing),
+              fill var(--theme-transition-duration) var(--theme-transition-timing),
+              stroke var(--theme-transition-duration) var(--theme-transition-timing),
+              opacity var(--theme-transition-duration) var(--theme-transition-timing),
+              box-shadow var(--theme-transition-duration) var(--theme-transition-timing) !important;
+}
+
 html {
   overflow-y: scroll;
 }
@@ -31,13 +49,6 @@ html {
 * {
   scrollbar-width: thin;
   scrollbar-color: #444c56 transparent;
-}
-
-/* 主题切换过渡效果 */
-* {
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 200ms;
 }
 
 @layer base {

@@ -2,12 +2,6 @@ import { useEffect, useState } from 'react';
 import { Issue } from '@/types/github';
 import { FormattedDate } from './formatted-date';
 
-// 格式化日期，确保服务端和客户端渲染结果一致
-function formatDate(date: string | Date) {
-  const dateObj = date instanceof Date ? date : new Date(date);
-  return `${dateObj.getFullYear()}-${String(dateObj.getMonth() + 1).padStart(2, '0')}-${String(dateObj.getDate()).padStart(2, '0')}`;
-}
-
 interface ActivityHeatmapProps {
   issues: Issue[];
   year: number;
@@ -60,30 +54,6 @@ export function ActivityHeatmap({ issues, year, month, onMonthChange, onDateClic
     setMaxCount(max);
   }, [issues]);
 
-  const handlePrevMonth = () => {
-    let newYear = year;
-    let newMonth = month - 1;
-    
-    if (newMonth < 0) {
-      newMonth = 11;
-      newYear--;
-    }
-    
-    onMonthChange(newYear, newMonth);
-  };
-
-  const handleNextMonth = () => {
-    let newYear = year;
-    let newMonth = month + 1;
-    
-    if (newMonth > 11) {
-      newMonth = 0;
-      newYear++;
-    }
-    
-    onMonthChange(newYear, newMonth);
-  };
-
   const generateMonthGrid = () => {
     const daysInMonth = getDaysInMonth(year, month);
     const firstDay = getFirstDayOfMonth(year, month);
@@ -126,25 +96,6 @@ export function ActivityHeatmap({ issues, year, month, onMonthChange, onDateClic
 
   return (
     <div className="w-36">
-      <div className="flex items-center justify-between mb-2">
-        <button
-          onClick={handlePrevMonth}
-          className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
-          aria-label="Previous month"
-        >
-          ←
-        </button>
-        <span className="text-sm text-gray-600 dark:text-gray-400">
-          {new Date(year, month).toLocaleString('default', { month: 'short' })} {year}
-        </span>
-        <button
-          onClick={handleNextMonth}
-          className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200"
-          aria-label="Next month"
-        >
-          →
-        </button>
-      </div>
       <div className="grid grid-cols-7 gap-[3px]">
         {generateMonthGrid()}
       </div>

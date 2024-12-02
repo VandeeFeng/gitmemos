@@ -37,7 +37,7 @@ export default function RootLayout({
         `}</style>
       </head>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" enableSystem>
           <div className="min-h-screen bg-background">
             {children}
             <RootFooter />

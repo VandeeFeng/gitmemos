@@ -6,7 +6,6 @@ interface ActivityHeatmapProps {
   issues: Issue[];
   year: number;
   month: number;
-  onMonthChange: (year: number, month: number) => void;
   onDateClick?: (date: string) => void;
 }
 
@@ -30,7 +29,7 @@ function formatDateKey(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-export function ActivityHeatmap({ issues, year, month, onMonthChange, onDateClick }: ActivityHeatmapProps) {
+export function ActivityHeatmap({ issues, year, month, onDateClick }: ActivityHeatmapProps) {
   const [activityData, setActivityData] = useState<Record<string, DayActivity>>({});
   const [maxCount, setMaxCount] = useState(0);
   

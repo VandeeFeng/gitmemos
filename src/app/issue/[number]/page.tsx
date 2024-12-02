@@ -13,7 +13,13 @@ import { markdownComponents } from '@/components/markdown-components';
 import { Backlinks } from '@/components/backlinks';
 import { FormattedDate } from '@/components/formatted-date';
 
-export default function IssuePage({ params }: { params: { number: string } }) {
+interface PageProps {
+  params: {
+    number: string;
+  };
+}
+
+export default function IssuePage({ params }: PageProps) {
   const [issue, setIssue] = useState<Issue | null>(null);
   const router = useRouter();
 

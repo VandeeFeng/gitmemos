@@ -20,6 +20,18 @@ export function IssueList({
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [configVersion, setConfigVersion] = useState(0);
+
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'github-config') {
+        setConfigVersion(prev => prev + 1);
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   useEffect(() => {
     async function fetchIssues() {
@@ -36,7 +48,7 @@ export function IssueList({
       }
     }
     fetchIssues();
-  }, [selectedLabel]);
+  }, [selectedLabel, configVersion]);
 
   const loadMore = async () => {
     setLoadingMore(true);

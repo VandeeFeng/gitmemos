@@ -4,14 +4,13 @@ import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { IssueList } from '@/components/issue-list';
 import { useTheme } from "next-themes";
-import { setGitHubConfig, getGitHubConfig, getIssues } from '@/lib/github';
-import { Issue, GitHubConfig } from '@/types/github';
+import { setGitHubConfig, getGitHubConfig } from '@/lib/github';
+import { GitHubConfig } from '@/types/github';
 import { Header } from '@/components/header';
 
 export default function Home() {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [issues, setIssues] = useState<Issue[]>([]);
   const { } = useTheme();
   const [showConfig, setShowConfig] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -22,24 +21,11 @@ export default function Home() {
     issuesPerPage: 10
   });
 
-  const fetchIssues = async () => {
-    try {
-      const data = await getIssues(1);
-      setIssues(data);
-    } catch (error) {
-      console.error('Error fetching issues:', error);
-    }
-  };
-
   useEffect(() => {
     const uiConfig = getGitHubConfig(false);
     if (uiConfig.owner || uiConfig.repo || uiConfig.token) {
       setGithubConfig(uiConfig);
     }
-  }, []);
-
-  useEffect(() => {
-    fetchIssues();
   }, []);
 
   const handleConfigSubmit = async (e: React.FormEvent) => {
@@ -52,8 +38,6 @@ export default function Home() {
       setGitHubConfig(githubConfig);
       setShowConfig(false);
       setShowSuccess(true);
-      
-      await fetchIssues();
       
       setTimeout(() => {
         setShowSuccess(false);
@@ -81,7 +65,7 @@ export default function Home() {
         )}
         <Header 
           onSearch={handleSearch}
-          issues={issues}
+          issues={[]}
           selectedLabel={selectedLabel}
           onLabelSelect={setSelectedLabel}
           showConfig={true}

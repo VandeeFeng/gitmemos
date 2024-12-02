@@ -21,30 +21,33 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `
+            try {
+              let isDark = true;
+              const theme = localStorage.getItem('theme')
+              if (theme === 'light' || (theme === 'system' && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                isDark = false;
+                document.documentElement.style.colorScheme = 'light';
+                document.documentElement.classList.remove('dark');
+              } else {
+                document.documentElement.style.colorScheme = 'dark';
+                document.documentElement.classList.add('dark');
+              }
+            } catch (e) {}
+          `,
+        }}
+      />
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              try {
-                let isDark = true;
-                const theme = localStorage.getItem('theme')
-                if (theme === 'light' || (theme === 'system' && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                  isDark = false;
-                }
-                document.documentElement.classList.toggle('dark', isDark);
-                document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
-              } catch (e) {}
-            `,
-          }}
-        />
         <style>{`
           :root {
-            color-scheme: light;
-            --bg-color: #ffffff;
-          }
-          :root.dark {
             color-scheme: dark;
             --bg-color: #09090b;
+          }
+          :root:not(.dark) {
+            color-scheme: light;
+            --bg-color: #ffffff;
           }
           html, body {
             background-color: var(--bg-color);

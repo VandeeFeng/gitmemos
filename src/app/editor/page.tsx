@@ -8,21 +8,15 @@ import { Issue } from '@/types/github';
 import { getIssue } from '@/lib/github';
 
 function EditorContent() {
-  const [mounted, setMounted] = useState(false);
   const [issue, setIssue] = useState<Issue | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const searchParams = useSearchParams();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     async function fetchIssue() {
       const issueNumber = searchParams.get('edit');
       if (issueNumber) {
-        setLoading(true);
         try {
           const data = await getIssue(parseInt(issueNumber));
           setIssue(data);
@@ -32,27 +26,16 @@ function EditorContent() {
         } finally {
           setLoading(false);
         }
+      } else {
+        setLoading(false);
       }
     }
-
-    if (mounted) {
-      fetchIssue();
-    }
-  }, [mounted, searchParams, router]);
+    fetchIssue();
+  }, [searchParams, router]);
 
   const handleEditComplete = () => {
     router.push('/');
   };
-
-  if (!mounted) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500">
-        <div className="container mx-auto p-4 max-w-4xl">
-          <Header />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500">

@@ -5,9 +5,6 @@ import { Button } from "@/components/ui/button";
 import { IssueList } from '@/components/issue-list';
 import { useTheme } from "next-themes";
 import { setGitHubConfig, getGitHubConfig, getIssues } from '@/lib/github';
-import { LabelFilter } from '@/components/label-filter';
-import { SearchBar } from '@/components/search-bar';
-import Link from 'next/link';
 import { Issue, GitHubConfig, EditableIssue } from '@/types/github';
 import { Header } from '@/components/header';
 import { useRouter } from 'next/navigation';
@@ -23,7 +20,7 @@ export default function Home() {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [issues, setIssues] = useState<Issue[]>([]);
-  const { theme, setTheme } = useTheme();
+  const { } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);

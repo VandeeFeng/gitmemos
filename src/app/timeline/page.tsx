@@ -15,7 +15,7 @@ import { IssueEditor } from '@/components/issue-editor';
 export default function TimelinePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [mounted, setMounted] = useState(false);
-  const { theme, setTheme } = useTheme();
+  const { } = useTheme();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
 

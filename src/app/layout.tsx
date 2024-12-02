@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from 'next-themes'
 import { RootFooter } from '@/components/root-footer'
+import Script from 'next/script'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -21,25 +22,37 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            try {
-              let isDark = true;
-              const theme = localStorage.getItem('theme')
-              if (theme === 'light' || (theme === 'system' && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                isDark = false;
-                document.documentElement.style.colorScheme = 'light';
-                document.documentElement.classList.remove('dark');
-              } else {
-                document.documentElement.style.colorScheme = 'dark';
-                document.documentElement.classList.add('dark');
-              }
-            } catch (e) {}
-          `,
-        }}
-      />
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                document.documentElement.classList.add('dark');
+                document.documentElement.style.colorScheme = 'dark';
+              })()
+            `,
+          }}
+        />
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                let isDark = true;
+                const theme = localStorage.getItem('theme')
+                if (theme === 'light' || (theme === 'system' && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                  isDark = false;
+                  document.documentElement.style.colorScheme = 'light';
+                  document.documentElement.classList.remove('dark');
+                } else {
+                  document.documentElement.style.colorScheme = 'dark';
+                  document.documentElement.classList.add('dark');
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
         <style>{`
           :root {
             color-scheme: dark;

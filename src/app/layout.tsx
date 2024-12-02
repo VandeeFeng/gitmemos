@@ -24,37 +24,26 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{
           __html: `
-            (function() {
-              function getTheme() {
-                try {
-                  const stored = localStorage.getItem('theme');
-                  if (stored === 'light' || stored === 'dark') return stored;
-                  
-                  if (typeof localStorage !== 'undefined' && localStorage.getItem('theme') === null) {
-                    const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    const theme = systemDark ? 'dark' : 'light';
-                    localStorage.setItem('theme', theme);
-                    return theme;
-                  }
-                  
-                  return 'dark';
-                } catch (e) {
-                  return 'dark';
-                }
+            try {
+              let theme = localStorage.getItem('theme');
+              if (!theme) {
+                theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+                localStorage.setItem('theme', theme);
               }
-              const theme = getTheme();
-              document.documentElement.style.backgroundColor = theme === 'dark' ? '#09090b' : '#ffffff';
               document.documentElement.classList.add(theme);
-            })()
+            } catch (e) {
+              document.documentElement.classList.add('dark');
+            }
           `
         }} />
         <style>{`
           :root {
-            color-scheme: light;
+            color-scheme: light dark;
+          }
+          :root, :root.light {
             background-color: #ffffff;
           }
-          :root[class~="dark"] {
-            color-scheme: dark;
+          :root.dark {
             background-color: #09090b;
           }
           body {
@@ -67,7 +56,7 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem={false}>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <div className="min-h-screen bg-background">
             {children}
             <RootFooter />

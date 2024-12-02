@@ -2,15 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { Timeline } from '@/components/timeline';
-import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { SearchBar } from '@/components/search-bar';
 import { useTheme } from 'next-themes';
 import { getIssues } from '@/lib/github';
 import { Issue } from '@/types/github';
-import { LabelFilter } from '@/components/label-filter';
 import { Header } from '@/components/header';
-import { IssueEditor } from '@/components/issue-editor';
 
 export default function TimelinePage() {
   const [searchQuery, setSearchQuery] = useState('');

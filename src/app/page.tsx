@@ -5,18 +5,11 @@ import { Button } from "@/components/ui/button";
 import { IssueList } from '@/components/issue-list';
 import { useTheme } from "next-themes";
 import { setGitHubConfig, getGitHubConfig, getIssues } from '@/lib/github';
-import { Issue, GitHubConfig, EditableIssue } from '@/types/github';
+import { Issue, GitHubConfig } from '@/types/github';
 import { Header } from '@/components/header';
 import { useRouter } from 'next/navigation';
 
-// 将 Issue 转换为 EditableIssue
-const toEditableIssue = (issue: Issue): EditableIssue => ({
-  ...issue,
-  body: issue.body || ''
-});
-
 export default function Home() {
-  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [issues, setIssues] = useState<Issue[]>([]);

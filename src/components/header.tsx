@@ -6,7 +6,6 @@ import { LabelFilter } from '@/components/label-filter';
 import { Issue } from '@/types/github';
 
 interface HeaderProps {
-  onNewIssue?: () => void;
   onSearch?: (query: string) => void;
   issues?: Issue[];
   selectedLabel?: string | null;
@@ -17,7 +16,6 @@ interface HeaderProps {
 }
 
 export function Header({
-  onNewIssue,
   onSearch,
   issues = [],
   selectedLabel,

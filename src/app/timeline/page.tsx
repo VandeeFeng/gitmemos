@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { Timeline } from '@/components/timeline';
-import { useTheme } from 'next-themes';
 import { getIssues } from '@/lib/github';
 import { Issue } from '@/types/github';
 import { Header } from '@/components/header';

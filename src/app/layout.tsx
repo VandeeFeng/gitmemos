@@ -26,10 +26,10 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                let isDark = false;
+                let isDark = true;
                 const theme = localStorage.getItem('theme')
-                if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                  isDark = true;
+                if (theme === 'light' || (theme === 'system' && !window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                  isDark = false;
                 }
                 document.documentElement.classList.toggle('dark', isDark);
                 document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
@@ -56,7 +56,7 @@ export default function RootLayout({
         />
       </head>
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
           <div className="min-h-screen bg-background">
             {children}
             <RootFooter />

@@ -157,13 +157,10 @@ export default function Home() {
           const issuesCount = await loadFromDatabase();
           setLoading(false);
           
-          // 2. 然后在后台从 GitHub 同步到数据库
+          // 2. 只在必要时从 GitHub 同步到数据库
           if (issuesCount === 0) {
             // 如果数据库没有数据，立即同步
             syncFromGitHub();
-          } else {
-            // 如果有数据，延迟同步以优先保证页面响应
-            setTimeout(syncFromGitHub, 1000);
           }
         } else {
           setShowConfig(true);

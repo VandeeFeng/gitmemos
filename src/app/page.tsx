@@ -383,14 +383,6 @@ export default function Home() {
         )}
       </div>
       <ToastContainer toasts={toasts} />
-      
-      {/* Add last sync info display */}
-      {lastSyncInfo && (
-        <div className="text-sm text-gray-500 dark:text-gray-400 mt-2 mb-4">
-          Last synced: {new Date(lastSyncInfo.lastSyncAt).toLocaleString()} 
-          ({lastSyncInfo.totalSynced} issues)
-        </div>
-      )}
     </PageLayout>
   );
 }

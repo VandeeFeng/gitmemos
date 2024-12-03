@@ -3,15 +3,13 @@
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { IssueList } from '@/components/issue-list';
-import { useTheme } from "next-themes";
 import { setGitHubConfig, getGitHubConfig, getIssues } from '@/lib/github';
-import { GitHubConfig } from '@/types/github';
+import { GitHubConfig, Issue } from '@/types/github';
 import { PageLayout } from '@/components/layouts/page-layout';
 import { Loading } from '@/components/ui/loading';
 import { animations } from '@/lib/animations';
 import { componentStates } from '@/lib/component-states';
 import { cn } from '@/lib/utils';
-import { Issue } from '@/types/github';
 
 export default function Home() {
   const [showConfig, setShowConfig] = useState(false);

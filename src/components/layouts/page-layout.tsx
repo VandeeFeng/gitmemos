@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils"
 import { Header } from "@/components/header"
 import { Footer } from "@/components/footer"
 import { usePathname } from 'next/navigation'
+import { Issue } from "@/types/github"
 
 interface PageLayoutProps {
   children: React.ReactNode
@@ -14,7 +15,7 @@ interface PageLayoutProps {
   showConfig?: boolean
   onConfigClick?: () => void
   showSearchAndNew?: boolean
-  issues?: any[]
+  issues?: Issue[]
 }
 
 export function PageLayout({ 
@@ -32,7 +33,6 @@ export function PageLayout({
 }: PageLayoutProps) {
   const pathname = usePathname()
   const isTimelinePage = pathname === '/timeline'
-  const isEditorPage = pathname === '/editor' || pathname?.startsWith('/editor?')
 
   return (
     <div className="min-h-screen flex flex-col bg-bg-primary transition-colors duration-500">

@@ -13,23 +13,47 @@ import { componentStates } from '@/lib/component-states';
 import { cn } from '@/lib/utils';
 
 // 提示组件
-function Toast({ message, onClose }: { message: string; onClose: () => void }) {
+interface Toast {
+  id: string;
+  message: string;
+}
+
+function ToastContainer({ toasts, onClose }: { 
+  toasts: Toast[];
+  onClose: (id: string) => void;
+}) {
   const { theme } = useTheme();
 
-  useEffect(() => {
-    const timer = setTimeout(onClose, 3000);
-    return () => clearTimeout(timer);
-  }, [onClose]);
-
   return (
-    <div className={cn(
-      "fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg transition-all duration-300 transform translate-y-0",
-      theme === 'light' 
-        ? "bg-[#2da44e] text-white" 
-        : "bg-[#238636] text-white",
-      animations.fade.in
-    )}>
-      {message}
+    <div className="fixed bottom-4 right-4 flex flex-col gap-1.5 max-w-xs">
+      {toasts.map((toast) => (
+        <div
+          key={toast.id}
+          className={cn(
+            "px-4 py-2 rounded-md shadow-lg transition-all duration-300 transform",
+            "flex items-center space-x-2 text-sm",
+            theme === 'light' 
+              ? "bg-[#24292f] text-white" 
+              : "bg-[#2d333b] text-white",
+            animations.fade.in
+          )}
+        >
+          <svg 
+            className="w-4 h-4 flex-shrink-0" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              strokeWidth={2} 
+              d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" 
+            />
+          </svg>
+          <span className="line-clamp-2">{toast.message}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -40,9 +64,13 @@ export default function Home() {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [allIssues, setAllIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [syncingWithGitHub, setSyncingWithGitHub] = useState(false);
+  const [lastSyncInfo, setLastSyncInfo] = useState<{
+    lastSyncAt: string;
+    totalSynced: number;
+  } | null>(null);
   const { theme } = useTheme();
   const [githubConfig, setGithubConfig] = useState<GitHubConfig>({
     owner: '',
@@ -51,15 +79,40 @@ export default function Home() {
     issuesPerPage: 10
   });
 
-  const showToast = (message: string) => {
-    setToast(message);
-  };
+  const showToast = useCallback((message: string) => {
+    const id = Math.random().toString(36).substring(7);
+    setToasts(prev => [...prev, { id, message }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(toast => toast.id !== id));
+    }, 5000);
+  }, []);
+
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  }, []);
 
   // 从数据库加载数据到页面
   const loadFromDatabase = useCallback(async () => {
     try {
       const result = await getIssues(1, undefined, false);
       setAllIssues(result.issues);
+      if (result.syncStatus?.lastSyncAt) {
+        setLastSyncInfo({
+          lastSyncAt: result.syncStatus.lastSyncAt,
+          totalSynced: result.syncStatus.totalSynced
+        });
+        // 显示上次同步时间的通知
+        const lastSyncDate = new Date(result.syncStatus.lastSyncAt);
+        const now = new Date();
+        const hoursSinceLastSync = (now.getTime() - lastSyncDate.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursSinceLastSync < 24) {
+          showToast(`Last synced ${Math.round(hoursSinceLastSync)} hours ago (${result.syncStatus.totalSynced} issues)`);
+        } else {
+          const daysAgo = Math.floor(hoursSinceLastSync / 24);
+          showToast(`Last synced ${daysAgo} days ago. Consider syncing again.`);
+        }
+      }
       return result.issues.length;
     } catch (error) {
       console.error('Error loading from database:', error);
@@ -80,7 +133,14 @@ export default function Home() {
       setAllIssues(result.issues);
       
       if (result.syncStatus?.success) {
-        showToast(`Successfully synced ${result.syncStatus.totalSynced} issues from GitHub`);
+        const message = `Successfully synced ${result.syncStatus.totalSynced} issues from GitHub`;
+        showToast(message);
+        if (result.syncStatus.lastSyncAt) {
+          setLastSyncInfo({
+            lastSyncAt: result.syncStatus.lastSyncAt,
+            totalSynced: result.syncStatus.totalSynced
+          });
+        }
       }
     } catch (error) {
       console.error('Error syncing with GitHub:', error);
@@ -336,7 +396,15 @@ export default function Home() {
           />
         )}
       </div>
-      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
+      <ToastContainer toasts={toasts} onClose={removeToast} />
+      
+      {/* Add last sync info display */}
+      {lastSyncInfo && (
+        <div className="text-sm text-gray-500 dark:text-gray-400 mt-2 mb-4">
+          Last synced: {new Date(lastSyncInfo.lastSyncAt).toLocaleString()} 
+          ({lastSyncInfo.totalSynced} issues)
+        </div>
+      )}
     </PageLayout>
   );
 }

@@ -27,6 +27,33 @@ export interface Database {
           updated_at?: string
         }
       }
+      sync_history: {
+        Row: {
+          id: number
+          owner: string
+          repo: string
+          last_sync_at: string
+          issues_synced: number
+          status: 'success' | 'failed'
+          error_message?: string
+          created_at: string
+        }
+        Insert: {
+          owner: string
+          repo: string
+          last_sync_at: string
+          issues_synced: number
+          status: 'success' | 'failed'
+          error_message?: string
+          created_at?: string
+        }
+        Update: {
+          last_sync_at?: string
+          issues_synced?: number
+          status?: 'success' | 'failed'
+          error_message?: string
+        }
+      }
       issues: {
         Row: {
           id: number

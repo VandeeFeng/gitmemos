@@ -292,6 +292,13 @@ export async function syncIssuesData(owner: string, repo: string, issues: Issue[
   console.log(`Starting sync of ${issues.length} issues to database for ${owner}/${repo}`);
   
   try {
+    // 先检查是否真的需要同步
+    const shouldSyncResult = await shouldSync(owner, repo);
+    if (!shouldSyncResult) {
+      console.log('Sync not needed, skipping...');
+      return;
+    }
+
     for (const issue of issues) {
       console.log(`Syncing issue #${issue.number}: ${issue.title}`);
       await saveIssue(owner, repo, issue);
@@ -302,9 +309,103 @@ export async function syncIssuesData(owner: string, repo: string, issues: Issue[
         await saveLabel(owner, repo, label);
       }
     }
+    
+    // 记录成功的同步历史
+    await recordSyncHistory(owner, repo, 'success', issues.length);
     console.log('Sync completed successfully');
   } catch (error) {
+    // 记录失败的同步历史
+    await recordSyncHistory(
+      owner,
+      repo,
+      'failed',
+      0,
+      error instanceof Error ? error.message : 'Unknown error during sync'
+    );
     console.error('Failed to sync issues:', error);
     throw error;
   }
+}
+
+// 同步历史相关操作
+export async function getLastSyncHistory(owner: string, repo: string): Promise<{
+  last_sync_at: string;
+  issues_synced: number;
+  status: 'success' | 'failed';
+} | null> {
+  const { data, error } = await supabase
+    .from('sync_history')
+    .select('*')
+    .eq('owner', owner)
+    .eq('repo', repo)
+    .eq('status', 'success')
+    .order('last_sync_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return {
+    last_sync_at: data.last_sync_at,
+    issues_synced: data.issues_synced,
+    status: data.status
+  };
+}
+
+export async function recordSyncHistory(
+  owner: string,
+  repo: string,
+  status: 'success' | 'failed',
+  issuesSynced: number = 0,
+  errorMessage?: string
+) {
+  const { error } = await supabase
+    .from('sync_history')
+    .insert({
+      owner,
+      repo,
+      last_sync_at: new Date().toISOString(),
+      issues_synced: issuesSynced,
+      status,
+      error_message: errorMessage
+    });
+
+  if (error) {
+    console.error('Error recording sync history:', error);
+  }
+}
+
+// 检查是否需要同步
+export async function shouldSync(owner: string, repo: string): Promise<boolean> {
+  // 1. 首先检查数据库中是否有数据
+  const { count, error: issuesError } = await supabase
+    .from('issues')
+    .select('*', { count: 'exact', head: true })
+    .eq('owner', owner)
+    .eq('repo', repo);
+
+  // 如果查询出错或没有数据，需要同步
+  if (issuesError || !count || count === 0) {
+    console.log('No issues in database, sync needed');
+    return true;
+  }
+
+  // 2. 然后检查最后同步时间
+  const lastSync = await getLastSyncHistory(owner, repo);
+  
+  if (!lastSync) {
+    console.log('No sync history, sync needed');
+    return true;
+  }
+
+  const now = new Date();
+  const lastSyncDate = new Date(lastSync.last_sync_at);
+  const hoursSinceLastSync = (now.getTime() - lastSyncDate.getTime()) / (1000 * 60 * 60);
+  
+  // 如果距离上次同步超过24小时，则需要同步
+  const needsSync = hoursSinceLastSync >= 24;
+  console.log(`Last sync was ${hoursSinceLastSync.toFixed(2)} hours ago, sync ${needsSync ? 'needed' : 'not needed'}`);
+  return needsSync;
 } 

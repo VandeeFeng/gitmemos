@@ -1,6 +1,16 @@
 import { Octokit } from "octokit";
 import { GitHubConfig, Issue as GitHubIssue, Label } from '@/types/github';
-import { getConfig, saveConfig, getIssuesFromDb, saveIssue, getLabelsFromDb, saveLabel, syncIssuesData } from './db';
+import { 
+  getConfig, 
+  saveConfig, 
+  getIssuesFromDb, 
+  saveIssue, 
+  getLabelsFromDb, 
+  saveLabel, 
+  syncIssuesData,
+  shouldSync,
+  getLastSyncHistory
+} from './db';
 
 let config: GitHubConfig | null = null;
 
@@ -64,33 +74,24 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
   const config = await getGitHubConfig();
   console.log('Getting issues:', { page, labels, forceSync });
 
-  // 检查缓存是否有效
-  const now = Date.now();
-  const isCacheValid = issuesCache && 
-    issuesCache.owner === config.owner && 
-    issuesCache.repo === config.repo && 
-    (now - issuesCache.timestamp) < CACHE_DURATION;
+  // 1. 首先从数据库获取数据
+  const issues = await getIssuesFromDb(config.owner, config.repo, page, labels ? [labels] : undefined);
+  const lastSync = await getLastSyncHistory(config.owner, config.repo);
 
-  // 如果缓存有效且不是强制同步，直接使用缓存
-  if (isCacheValid && !forceSync && issuesCache) {
-    console.log('Using cached issues data');
-    const start = (page - 1) * (config.issuesPerPage || 10);
-    const end = start + (config.issuesPerPage || 10);
-    const filteredIssues = labels 
-      ? issuesCache.data.filter(issue => 
-          issue.labels.some(label => label.name === labels)
-        )
-      : issuesCache.data;
-    return { 
-      issues: filteredIssues.slice(start, end),
-      syncStatus: null
-    };
-  }
-
-  // 如果是强制同步，从 GitHub API 获取所有 issues 和 labels 并同步到数据库
-  if (forceSync) {
+  // 2. 检查是否需要同步
+  const shouldSyncResult = !lastSync || await shouldSync(config.owner, config.repo);
+  const needsSync = forceSync || shouldSyncResult;
+  console.log('Sync check:', { 
+    forceSync, 
+    shouldSyncResult, 
+    needsSync,
+    lastSync: lastSync ? new Date(lastSync.last_sync_at).toISOString() : null 
+  });
+  
+  // 3. 如果需要同步，从 GitHub API 获取数据
+  if (needsSync) {
     try {
-      console.log('Fetching all issues and labels from GitHub API');
+      console.log('Starting GitHub sync...');
       const client = await getOctokit();
       
       // 首先获取并同步所有 labels
@@ -98,106 +99,102 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
         owner: config.owner,
         repo: config.repo,
       });
-      
+
       // 同步 labels 到数据库
       for (const label of labelsData) {
         await saveLabel(config.owner, config.repo, label);
       }
       
-      try {
-        // 获取所有 issues
-        let allIssues: GitHubIssue[] = [];
-        let currentPage = 1;
-        let hasMore = true;
+      // 获取所有 issues
+      let allIssues: GitHubIssue[] = [];
+      let currentPage = 1;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const { data } = await client.rest.issues.listForRepo({
+          owner: config.owner,
+          repo: config.repo,
+          state: 'all',
+          per_page: 100,
+          page: currentPage,
+          sort: 'created',
+          direction: 'desc',
+          labels: labels || undefined
+        });
+
+        if (data.length === 0) {
+          hasMore = false;
+        } else {
+          const issuesData = data.map(issue => ({
+            number: issue.number,
+            title: issue.title,
+            body: issue.body || '',
+            created_at: issue.created_at,
+            state: issue.state,
+            labels: issue.labels
+              .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
+                typeof label === 'object' && label !== null)
+              .map(label => ({
+                id: label.id,
+                name: label.name,
+                color: label.color,
+                description: label.description,
+              })),
+          }));
+
+          allIssues = [...allIssues, ...issuesData];
+          currentPage++;
+        }
+      }
+
+      console.log(`Fetched ${allIssues.length} total issues from GitHub API`);
+
+      // 同步到数据库
+      if (allIssues.length > 0) {
+        console.log('Syncing all issues to database');
+        await syncIssuesData(config.owner, config.repo, allIssues);
         
-        while (hasMore) {
-          const { data } = await client.rest.issues.listForRepo({
-            owner: config.owner,
-            repo: config.repo,
-            state: 'all',
-            per_page: 100,
-            page: currentPage,
-            sort: 'created',
-            direction: 'desc',
-            labels: labels || undefined
-          });
-
-          if (data.length === 0) {
-            hasMore = false;
-          } else {
-            const issuesData = data.map(issue => ({
-              number: issue.number,
-              title: issue.title,
-              body: issue.body || '',
-              created_at: issue.created_at,
-              state: issue.state,
-              labels: issue.labels
-                .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
-                  typeof label === 'object' && label !== null)
-                .map(label => ({
-                  id: label.id,
-                  name: label.name,
-                  color: label.color,
-                  description: label.description,
-                })),
-            }));
-
-            allIssues = [...allIssues, ...issuesData];
-            currentPage++;
-          }
-        }
-
-        console.log(`Fetched ${allIssues.length} total issues from GitHub API`);
-
-        // 同步到数据库
-        if (allIssues.length > 0) {
-          console.log('Syncing all issues to database');
-          await syncIssuesData(config.owner, config.repo, allIssues);
-          console.log('Database sync completed');
-
-          // 更新缓存
-          issuesCache = {
-            data: allIssues,
-            timestamp: Date.now(),
-            owner: config.owner,
-            repo: config.repo
-          };
-        }
-
-        // 返回请求的页面的数据
-        const start = (page - 1) * (config.issuesPerPage || 10);
-        const end = start + (config.issuesPerPage || 10);
+        // 重新获取最新的同步记录
+        const newLastSync = await getLastSyncHistory(config.owner, config.repo);
+        
+        // 返回最新的数据
         return {
-          issues: allIssues.slice(start, end),
-          syncStatus: {
+          issues: allIssues.slice((page - 1) * (config.issuesPerPage || 10), page * (config.issuesPerPage || 10)),
+          syncStatus: newLastSync ? {
             success: true,
-            totalSynced: allIssues.length
-          }
+            totalSynced: newLastSync.issues_synced,
+            lastSyncAt: newLastSync.last_sync_at
+          } : null
         };
-      } catch (apiError: unknown) {
-        console.error('Failed to fetch issues:', apiError instanceof Error ? apiError.message : apiError);
-        throw apiError;
       }
     } catch (error) {
       console.error('Error during sync:', error);
+      // 如果同步失败但数据库有数据，返回数据库中的数据
+      if (issues.length > 0) {
+        console.log('Sync failed but returning database data');
+        return { 
+          issues,
+          syncStatus: lastSync ? {
+            success: true,
+            totalSynced: lastSync.issues_synced,
+            lastSyncAt: lastSync.last_sync_at
+          } : null
+        };
+      }
       throw error;
     }
   }
 
-  // 从数据库获取分页数据
-  const issues = await getIssuesFromDb(config.owner, config.repo, page, labels ? [labels] : undefined);
-  
-  // 更新缓存
-  if (issues.length > 0) {
-    issuesCache = {
-      data: issues,
-      timestamp: Date.now(),
-      owner: config.owner,
-      repo: config.repo
-    };
-  }
-  
-  return { issues, syncStatus: null };
+  console.log('Using database data without sync');
+  // 4. 返回数据库中的数据
+  return { 
+    issues,
+    syncStatus: lastSync ? {
+      success: true,
+      totalSynced: lastSync.issues_synced,
+      lastSyncAt: lastSync.last_sync_at
+    } : null
+  };
 }
 
 export async function getIssue(issueNumber: number, forceSync: boolean = false) {

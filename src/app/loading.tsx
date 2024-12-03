@@ -8,8 +8,8 @@ interface Props {
 export default function GlobalLoadingPage({ text = "Loading..." }: Props) {
   return (
     <PageLayout showSearchAndNew={false}>
-      <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
-        <Loading size="lg" text={text} />
+      <div className="min-h-[calc(100vh-200px)]">
+        <Loading text={text} />
       </div>
     </PageLayout>
   )

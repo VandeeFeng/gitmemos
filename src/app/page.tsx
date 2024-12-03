@@ -1,9 +1,15 @@
 import { Suspense } from 'react';
 import { ClientPage } from '@/components/client-page';
+import { PageLayout } from '@/components/layouts/page-layout';
+import { Loading } from '@/components/ui/loading';
 
 export default function Home() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={
+      <PageLayout showSearchAndNew={false}>
+        <Loading />
+      </PageLayout>
+    }>
       <ClientPage />
     </Suspense>
   );

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { getLabels } from '@/lib/github';
 import { Label } from '@/types/github';
+import { Loading } from './ui/loading';
 
 interface LabelFilterProps {
   selectedLabel: string | null;
@@ -89,8 +90,8 @@ export function LabelFilter({ selectedLabel, onLabelSelect }: LabelFilterProps) 
         <div className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-gray-200 dark:border-[#373e47] bg-white dark:bg-[#2d333b] shadow-lg">
           <div className="max-h-96 overflow-y-auto py-1">
             {loading ? (
-              <div className="px-3 py-2 text-center text-sm text-[#57606a] dark:text-[#768390]">
-                Loading labels...
+              <div className="px-3 py-2">
+                <Loading className="!p-0" />
               </div>
             ) : labels.length === 0 ? (
               <div className="px-3 py-2 text-center text-sm text-[#57606a] dark:text-[#768390]">

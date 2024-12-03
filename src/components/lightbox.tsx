@@ -127,7 +127,7 @@ export function Lightbox({ src, alt = '', className = '', width, height }: Light
           >
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <Loading size="default" />
+                <Loading text="Loading image..." />
               </div>
             )}
             <img

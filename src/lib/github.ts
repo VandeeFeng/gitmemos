@@ -63,26 +63,37 @@ export async function getOctokit(): Promise<Octokit> {
 let lastSyncCheck: {
   timestamp: number;
   needsSync: boolean;
+  isInitialLoad: boolean;
 } | null = null;
 
 const SYNC_CHECK_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 async function checkNeedsSync(owner: string, repo: string, forceSync: boolean): Promise<boolean> {
-  // 如果强制同步，直接返回 true
+  // If force sync is requested, return true
   if (forceSync) return true;
 
-  // 检查内存缓存
-  if (lastSyncCheck && Date.now() - lastSyncCheck.timestamp < SYNC_CHECK_CACHE_DURATION) {
+  // If this is the first load, always check sync status
+  if (!lastSyncCheck || lastSyncCheck.isInitialLoad) {
+    const needsSync = await shouldSync(owner, repo);
+    lastSyncCheck = {
+      timestamp: Date.now(),
+      needsSync,
+      isInitialLoad: false
+    };
+    return needsSync;
+  }
+
+  // For subsequent checks, use cache if available and fresh
+  if (Date.now() - lastSyncCheck.timestamp < SYNC_CHECK_CACHE_DURATION) {
     return lastSyncCheck.needsSync;
   }
 
-  // 执行实际的同步检查
+  // Cache expired, perform actual sync check
   const needsSync = await shouldSync(owner, repo);
-  
-  // 更新内存缓存
   lastSyncCheck = {
     timestamp: Date.now(),
-    needsSync
+    needsSync,
+    isInitialLoad: false
   };
 
   return needsSync;
@@ -113,6 +124,7 @@ function getIssuesFromCache(owner: string, repo: string, page: number, labels?: 
   const cached = issuesCache[key];
   
   if (cached && Date.now() - cached.timestamp < ISSUES_CACHE_DURATION) {
+    console.log('Using cached issues data');
     return cached.data;
   }
   
@@ -127,8 +139,48 @@ function setIssuesCache(owner: string, repo: string, page: number, labels: strin
   };
 }
 
+// 添加请求追踪
+interface RequestTracker {
+  promise: Promise<any>;
+  timestamp: number;
+  requestId: string;
+}
+
+const requestLocks: Record<string, RequestTracker> = {};
+const REQUEST_TIMEOUT = 10000; // 10 seconds
+
+function getRequestLockKey(owner: string, repo: string, page: number, labels?: string) {
+  return `${owner}:${repo}:${page}:${labels || ''}`;
+}
+
+function cleanupStaleRequests() {
+  const now = Date.now();
+  Object.entries(requestLocks).forEach(([key, tracker]) => {
+    if (now - tracker.timestamp > REQUEST_TIMEOUT) {
+      console.log(`Cleaning up stale request ${tracker.requestId}`);
+      delete requestLocks[key];
+    }
+  });
+}
+
+let requestCounter = 0;
+function getNextRequestId() {
+  return `req_${++requestCounter}`;
+}
+
 export async function getIssues(page: number = 1, labels?: string, forceSync: boolean = false) {
   const config = await getGitHubConfig();
+  const lockKey = getRequestLockKey(config.owner, config.repo, page, labels);
+
+  // Clean up any stale requests
+  cleanupStaleRequests();
+
+  // 检查是否有正在进行的有效请求
+  const existingRequest = requestLocks[lockKey];
+  if (existingRequest && Date.now() - existingRequest.timestamp < REQUEST_TIMEOUT) {
+    console.log(`Reusing existing request ${existingRequest.requestId} for page ${page}`);
+    return existingRequest.promise;
+  }
 
   // 如果不是强制同步，先检查缓存
   if (!forceSync) {
@@ -138,105 +190,126 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
     }
   }
 
-  // 使用新的检查函数
-  const needsGitHubSync = await checkNeedsSync(config.owner, config.repo, forceSync);
+  // 创建新的请求
+  const requestId = getNextRequestId();
+  console.log(`Creating new request ${requestId} for page ${page}`);
 
-  // 如果需要从 GitHub 同步
-  if (needsGitHubSync) {
+  const promise = (async () => {
     try {
-      console.log('Starting GitHub sync...');
-      const client = await getOctokit();
-      
-      // 获取所有 issues
-      let allIssues: Issue[] = [];
-      let currentPage = 1;
-      let hasMore = true;
-      
-      while (hasMore) {
-        const { data } = await client.rest.issues.listForRepo({
-          owner: config.owner,
-          repo: config.repo,
-          state: 'all',
-          per_page: 100,
-          page: currentPage,
-          sort: 'created',
-          direction: 'desc',
-          labels: labels || undefined
-        });
+      // 使用新的检查函数
+      const needsGitHubSync = await checkNeedsSync(config.owner, config.repo, forceSync);
 
-        if (data.length === 0) {
-          hasMore = false;
-        } else {
-          const issuesData = data.map(issue => ({
-            number: issue.number,
-            title: issue.title,
-            body: issue.body || '',
-            created_at: issue.created_at,
-            state: issue.state,
-            labels: issue.labels
-              .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
-                typeof label === 'object' && label !== null)
-              .map(label => ({
-                id: label.id,
-                name: label.name,
-                color: label.color,
-                description: label.description,
-              })),
-          }));
+      // 如果需要从 GitHub 同步
+      if (needsGitHubSync) {
+        try {
+          console.log(`[${requestId}] Starting GitHub sync...`);
+          const client = await getOctokit();
+          
+          // 获取所有 issues
+          let allIssues: Issue[] = [];
+          let currentPage = 1;
+          let hasMore = true;
+          
+          while (hasMore) {
+            const { data } = await client.rest.issues.listForRepo({
+              owner: config.owner,
+              repo: config.repo,
+              state: 'all',
+              per_page: 100,
+              page: currentPage,
+              sort: 'created',
+              direction: 'desc',
+              labels: labels || undefined
+            });
 
-          allIssues = [...allIssues, ...issuesData];
-          currentPage++;
+            if (data.length === 0) {
+              hasMore = false;
+            } else {
+              const issuesData = data.map(issue => ({
+                number: issue.number,
+                title: issue.title,
+                body: issue.body || '',
+                created_at: issue.created_at,
+                state: issue.state,
+                labels: issue.labels
+                  .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
+                    typeof label === 'object' && label !== null)
+                  .map(label => ({
+                    id: label.id,
+                    name: label.name,
+                    color: label.color,
+                    description: label.description,
+                  })),
+              }));
+
+              allIssues = [...allIssues, ...issuesData];
+              currentPage++;
+            }
+          }
+
+          console.log(`[${requestId}] Fetched ${allIssues.length} issues from GitHub API`);
+
+          // 同步到数据库
+          if (allIssues.length > 0) {
+            // 首先同步 labels
+            const { data: labelsData } = await client.rest.issues.listLabelsForRepo({
+              owner: config.owner,
+              repo: config.repo,
+            });
+
+            for (const label of labelsData) {
+              await saveLabel(config.owner, config.repo, label);
+            }
+
+            // 然后同步 issues
+            await syncIssuesData(config.owner, config.repo, allIssues);
+          }
+        } catch (error) {
+          console.error(`[${requestId}] GitHub sync failed:`, error);
         }
       }
 
-      console.log(`Fetched ${allIssues.length} issues from GitHub API`);
-
-      // 同步到数据库
-      if (allIssues.length > 0) {
-        // 首先同步 labels
-        const { data: labelsData } = await client.rest.issues.listLabelsForRepo({
-          owner: config.owner,
-          repo: config.repo,
-        });
-
-        for (const label of labelsData) {
-          await saveLabel(config.owner, config.repo, label);
-        }
-
-        // 然后同步 issues
-        await syncIssuesData(config.owner, config.repo, allIssues);
+      // 从数据库获取分页数据
+      console.log(`[${requestId}] Loading data from database...`);
+      const issues = await getIssuesFromDb(config.owner, config.repo, page, labels ? [labels] : undefined);
+      const lastSync = await getLastSyncHistory(config.owner, config.repo);
+      
+      if (issues.length === 0) {
+        console.log(`[${requestId}] No issues found in database`);
+      } else {
+        console.log(`[${requestId}] Loaded ${issues.length} issues from database`);
       }
-    } catch (error) {
-      console.error('GitHub sync failed:', error);
+
+      const result = { 
+        issues,
+        syncStatus: lastSync ? {
+          success: true,
+          totalSynced: lastSync.issues_synced,
+          lastSyncAt: lastSync.last_sync_at
+        } : null
+      };
+
+      // 缓存结果
+      if (!forceSync) {
+        setIssuesCache(config.owner, config.repo, page, labels, result);
+      }
+
+      return result;
+    } finally {
+      // 请求完成后删除锁
+      console.log(`[${requestId}] Request completed, cleaning up lock`);
+      delete requestLocks[lockKey];
     }
-  }
+  })();
 
-  // 从数据库获取分页数据
-  console.log('Loading data from database...');
-  const issues = await getIssuesFromDb(config.owner, config.repo, page, labels ? [labels] : undefined);
-  const lastSync = await getLastSyncHistory(config.owner, config.repo);
-  
-  if (issues.length === 0) {
-    console.log('No issues found in database');
-  } else {
-    console.log(`Loaded ${issues.length} issues from database`);
-  }
-
-  const result = { 
-    issues,
-    syncStatus: lastSync ? {
-      success: true,
-      totalSynced: lastSync.issues_synced,
-      lastSyncAt: lastSync.last_sync_at
-    } : null
+  // 保存请求锁
+  requestLocks[lockKey] = {
+    promise,
+    timestamp: Date.now(),
+    requestId
   };
 
-  // 缓存结果
-  if (!forceSync) {
-    setIssuesCache(config.owner, config.repo, page, labels, result);
-  }
-
-  return result;
+  return promise;
 }
 
 export async function getIssue(issueNumber: number, forceSync: boolean = false) {

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { getIssues } from '@/lib/github';
 import { Issue } from '@/types/github';
 import { Button } from './ui/button';
@@ -33,21 +33,84 @@ function getCurrentYearMonth() {
 
 export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = [] }: TimelineProps) {
   const [localIssues, setLocalIssues] = useState<Issue[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [{ year, month }, setYearMonth] = useState(() => getCurrentYearMonth());
   const sidebarRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const isFirstRender = useRef(true);
+  const loadMoreRef = useRef<NodeJS.Timeout>();
 
-  // 当外部 issues 改变时更新本地 issues
+  // Update local issues only when external issues change
   useEffect(() => {
-    setLocalIssues(issues);
-    setHasMore(issues.length >= 10);
-    setCurrentPage(1);
-    setLoading(false);
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      setLocalIssues(issues);
+      setHasMore(issues.length >= 10);
+      return;
+    }
+
+    // Debounce updates to prevent rapid re-renders
+    const timer = setTimeout(() => {
+      setLocalIssues(issues);
+      setHasMore(issues.length >= 10);
+      setCurrentPage(1);
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [issues]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    
+    // Clear any pending load more requests
+    if (loadMoreRef.current) {
+      clearTimeout(loadMoreRef.current);
+    }
+
+    // Debounce the load more request
+    loadMoreRef.current = setTimeout(async () => {
+      setLoadingMore(true);
+      try {
+        const nextPage = currentPage + 1;
+        const result = await getIssues(nextPage, selectedLabel || undefined, false);
+        
+        if (!result.issues || result.issues.length === 0) {
+          setHasMore(false);
+          return;
+        }
+
+        // Ensure no duplicate issues
+        const existingIssueNumbers = new Set(localIssues.map(issue => issue.number));
+        const newIssues = result.issues.filter((issue: Issue) => !existingIssueNumbers.has(issue.number));
+        
+        if (newIssues.length > 0) {
+          setLocalIssues(prev => [...prev, ...newIssues]);
+          setHasMore(result.issues.length === 10);
+          setCurrentPage(nextPage);
+        } else {
+          setHasMore(false);
+        }
+      } catch (error) {
+        console.error('Error loading more issues:', error);
+        setHasMore(false);
+      } finally {
+        setLoadingMore(false);
+        loadMoreRef.current = undefined;
+      }
+    }, 100);
+  }, [loadingMore, hasMore, currentPage, selectedLabel, localIssues]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (loadMoreRef.current) {
+        clearTimeout(loadMoreRef.current);
+      }
+    };
+  }, []);
 
   // 添加日期点击处理函数
   const handleDateClick = (dateKey: string) => {
@@ -69,31 +132,6 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
         });
       }
     });
-  };
-
-  const loadMore = async () => {
-    if (loadingMore || !hasMore) return;
-    setLoadingMore(true);
-    try {
-      const nextPage = currentPage + 1;
-      const result = await getIssues(nextPage, selectedLabel || undefined, false);
-      
-      // Ensure no duplicate issues by checking issue numbers
-      const existingIssueNumbers = new Set(localIssues.map(issue => issue.number));
-      const newIssues = (result.issues || []).filter(issue => !existingIssueNumbers.has(issue.number));
-      
-      if (newIssues.length > 0) {
-        setLocalIssues(prev => [...prev, ...newIssues]);
-        setHasMore(result.issues.length === 10);
-        setCurrentPage(nextPage);
-      } else {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error('Error loading more issues:', error);
-    } finally {
-      setLoadingMore(false);
-    }
   };
 
   const handleMonthChange = (newYear: number, newMonth: number) => {

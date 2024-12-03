@@ -168,18 +168,28 @@ export async function getConfig(): Promise<GitHubConfig | null> {
       issuesPerPage: 10
     };
 
-    // 保存环境变量配置到数据库
-    const { error: saveError } = await supabase
+    // 检查是否已存在相同的配置
+    const { data: existingConfig } = await supabase
       .from('configs')
-      .insert({
-        owner,
-        repo,
-        token,
-        issues_per_page: 10
-      });
+      .select('*')
+      .eq('owner', owner)
+      .eq('repo', repo)
+      .single();
 
-    if (saveError) {
-      console.error('Error saving env config to database:', saveError);
+    // 只有在不存在相同配置时才保存
+    if (!existingConfig) {
+      const { error: saveError } = await supabase
+        .from('configs')
+        .insert({
+          owner,
+          repo,
+          token,
+          issues_per_page: 10
+        });
+
+      if (saveError) {
+        console.error('Error saving env config to database:', saveError);
+      }
     }
 
     return envConfig;
@@ -189,18 +199,45 @@ export async function getConfig(): Promise<GitHubConfig | null> {
 }
 
 export async function saveConfig(config: GitHubConfig) {
-  const { error } = await supabase
+  // 先检查是否已存在相同的配置
+  const { data: existingConfig } = await supabase
     .from('configs')
-    .insert({
-      owner: config.owner,
-      repo: config.repo,
-      token: config.token,
-      issues_per_page: config.issuesPerPage
-    });
+    .select('*')
+    .eq('owner', config.owner)
+    .eq('repo', config.repo)
+    .single();
 
-  if (error) {
-    console.error('Error saving config:', error);
-    throw error;
+  if (existingConfig) {
+    // 如果存在，则更新配置
+    const { error } = await supabase
+      .from('configs')
+      .update({
+        token: config.token,
+        issues_per_page: config.issuesPerPage,
+        updated_at: new Date().toISOString()
+      })
+      .eq('owner', config.owner)
+      .eq('repo', config.repo);
+
+    if (error) {
+      console.error('Error updating config:', error);
+      throw error;
+    }
+  } else {
+    // 如果不存在，则插入新配置
+    const { error } = await supabase
+      .from('configs')
+      .insert({
+        owner: config.owner,
+        repo: config.repo,
+        token: config.token,
+        issues_per_page: config.issuesPerPage
+      });
+
+    if (error) {
+      console.error('Error saving config:', error);
+      throw error;
+    }
   }
 }
 
@@ -387,7 +424,8 @@ export async function syncIssuesData(owner: string, repo: string, issues: Issue[
         owner,
         repo,
         last_sync_at: new Date().toISOString(),
-        issues_synced: issues.length
+        issues_synced: issues.length,
+        status: 'success'
       });
 
     if (error) {
@@ -443,33 +481,40 @@ export async function recordSyncHistory(
 
 // 检查是否需要同步
 export async function shouldSync(owner: string, repo: string): Promise<boolean> {
-  // 1. 首先检查数据库中是否有数据
-  const { count, error: issuesError } = await supabase
-    .from('issues')
-    .select('*', { count: 'exact', head: true })
-    .eq('owner', owner)
-    .eq('repo', repo);
+  try {
+    // 1. First check if there are any issues in the database
+    const { data: issues, error: issuesError } = await supabase
+      .from('issues')
+      .select('issue_number')
+      .eq('owner', owner)
+      .eq('repo', repo)
+      .limit(1);
 
-  // 如果查询出错或没有数据，需要同步
-  if (issuesError || !count || count === 0) {
-    console.log('No issues in database, sync needed');
+    // If query failed or no issues found, sync is needed
+    if (issuesError || !issues || issues.length === 0) {
+      console.log('No issues in database, sync needed');
+      return true;
+    }
+
+    // 2. Then check the last sync time
+    const lastSync = await getLastSyncHistory(owner, repo);
+    
+    if (!lastSync) {
+      console.log('No sync history, sync needed');
+      return true;
+    }
+
+    const now = new Date();
+    const lastSyncDate = new Date(lastSync.last_sync_at);
+    const hoursSinceLastSync = (now.getTime() - lastSyncDate.getTime()) / (1000 * 60 * 60);
+    
+    // If last sync was more than 24 hours ago, sync is needed
+    const needsSync = hoursSinceLastSync >= 24;
+    console.log(`Last sync was ${hoursSinceLastSync.toFixed(2)} hours ago, sync ${needsSync ? 'needed' : 'not needed'}`);
+    return needsSync;
+  } catch (error) {
+    console.error('Error checking sync status:', error);
+    // If there's an error checking sync status, assume sync is needed
     return true;
   }
-
-  // 2. 然后检查最后同步时间
-  const lastSync = await getLastSyncHistory(owner, repo);
-  
-  if (!lastSync) {
-    console.log('No sync history, sync needed');
-    return true;
-  }
-
-  const now = new Date();
-  const lastSyncDate = new Date(lastSync.last_sync_at);
-  const hoursSinceLastSync = (now.getTime() - lastSyncDate.getTime()) / (1000 * 60 * 60);
-  
-  // 如果距离上次同步超过24小时，则需要同步
-  const needsSync = hoursSinceLastSync >= 24;
-  console.log(`Last sync was ${hoursSinceLastSync.toFixed(2)} hours ago, sync ${needsSync ? 'needed' : 'not needed'}`);
-  return needsSync;
 } 

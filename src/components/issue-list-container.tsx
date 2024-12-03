@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { IssueList } from './issue-list';
 import { PageLayout } from './layouts/page-layout';
 import { GitHubConfig, Issue } from '@/types/github';
 import { getIssues } from '@/lib/github';
+import { useIssues } from '@/lib/contexts/issue-context';
 
 interface IssueListContainerProps {
   initialIssues: Issue[];
@@ -24,20 +25,27 @@ interface LoadMoreResult {
 const loadMoreCache: Record<string, Promise<boolean> | undefined> = {};
 
 export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
-  const [issues, setIssues] = useState(initialIssues);
+  const { issues: contextIssues, loading: contextLoading, syncIssues } = useIssues();
+  const [issues, setIssues] = useState<Issue[]>(contextIssues.length > 0 ? contextIssues : initialIssues);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Update local issues when context issues change
+  useEffect(() => {
+    if (contextIssues.length > 0) {
+      setIssues(contextIssues);
+    }
+  }, [contextIssues]);
+
   const handleSync = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await getIssues(1, undefined, true);
-      setIssues(result.issues);
+      await syncIssues();
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [syncIssues]);
 
   const handleLoadMore = useCallback(async (page: number) => {
     const cacheKey = `${page}:${selectedLabel || ''}`;
@@ -53,11 +61,11 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
       // 创建新的请求并缓存
       loadMoreCache[cacheKey] = getIssues(page, selectedLabel || undefined, false)
         .then((result: LoadMoreResult) => {
-          const existingIssueNumbers = new Set(issues.map(issue => issue.number));
-          const newIssues = result.issues.filter(issue => !existingIssueNumbers.has(issue.number));
+          const existingIssueNumbers = new Set(issues.map((issue: Issue) => issue.number));
+          const newIssues = result.issues.filter((issue: Issue) => !existingIssueNumbers.has(issue.number));
           
           if (newIssues.length > 0) {
-            setIssues(prev => [...prev, ...newIssues]);
+            setIssues((prev: Issue[]) => [...prev, ...newIssues]);
           }
           
           return result.issues.length === 10;
@@ -84,8 +92,8 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
     setSearchQuery(query);
   }, []);
 
-  const filteredIssues = issues.filter(issue => {
-    if (selectedLabel && !issue.labels.some(label => label.name === selectedLabel)) {
+  const filteredIssues = issues.filter((issue: Issue) => {
+    if (selectedLabel && !issue.labels.some((label: { name: string }) => label.name === selectedLabel)) {
       return false;
     }
     
@@ -93,7 +101,7 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
       const searchLower = searchQuery.toLowerCase();
       const titleMatch = issue.title.toLowerCase().includes(searchLower);
       const bodyMatch = (issue.body || '').toLowerCase().includes(searchLower);
-      const labelsMatch = issue.labels.some(label => 
+      const labelsMatch = issue.labels.some((label: { name: string; description: string | null }) => 
         label.name.toLowerCase().includes(searchLower) ||
         (label.description || '').toLowerCase().includes(searchLower)
       );
@@ -119,7 +127,7 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
           onLabelClick={(label) => setSelectedLabel(label === selectedLabel ? null : label)}
           searchQuery={searchQuery}
           onLoadMore={handleLoadMore}
-          loading={loading}
+          loading={loading || contextLoading}
         />
       </div>
     </PageLayout>

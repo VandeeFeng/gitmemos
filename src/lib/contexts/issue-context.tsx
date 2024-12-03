@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { Issue, GitHubConfig } from '@/types/github';
 import { getIssues, getGitHubConfig } from '@/lib/github';
 
@@ -9,6 +9,7 @@ interface IssueContextType {
   config: GitHubConfig | null;
   loading: boolean;
   initialized: boolean;
+  isInitializing: boolean;
   syncIssues: () => Promise<void>;
   updateIssues: (newIssues: Issue[]) => void;
 }
@@ -18,6 +19,7 @@ const IssueContext = createContext<IssueContextType>({
   config: null,
   loading: true,
   initialized: false,
+  isInitializing: false,
   syncIssues: async () => {},
   updateIssues: () => {}
 });
@@ -65,13 +67,16 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     config: null,
     loading: true,
     initialized: false,
+    isInitializing: false,
     syncIssues: async () => {},
     updateIssues: () => {}
   });
 
   const initializingRef = useRef(false);
+  const initializePromiseRef = useRef<Promise<void>>();
 
-  const syncIssues = async () => {
+  // Memoize these functions to prevent unnecessary re-renders
+  const syncIssues = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true }));
     try {
       const result = await getIssues(1, undefined, true);
@@ -93,9 +98,9 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       console.error('Error syncing issues:', error);
       setState(prev => ({ ...prev, loading: false }));
     }
-  };
+  }, [state.config]);
 
-  const updateIssues = (newIssues: Issue[]) => {
+  const updateIssues = useCallback((newIssues: Issue[]) => {
     if (!state.config) return;
     
     const newState = {
@@ -106,51 +111,91 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, issues: newIssues }));
     setCache(newState);
     memoryCache = newState;
-  };
+  }, [state.config]);
 
   useEffect(() => {
+    let mounted = true;
+    
     async function initializeData() {
       if (state.initialized || initializingRef.current) return;
       initializingRef.current = true;
 
-      // 首先检查内存缓存
-      if (memoryCache?.issues && memoryCache?.config) {
-        setState(prev => ({
-          ...prev,
-          issues: memoryCache!.issues,
-          config: memoryCache!.config,
-          loading: false,
-          initialized: true,
-          syncIssues,
-          updateIssues
-        }));
-        return;
-      }
-
-      // 然后检查 localStorage 缓存
-      const cached = getCache();
-      if (cached?.issues && cached?.config) {
-        setState(prev => ({
-          ...prev,
-          issues: cached.issues,
-          config: cached.config,
-          loading: false,
-          initialized: true,
-          syncIssues,
-          updateIssues
-        }));
-        memoryCache = cached;
-        return;
-      }
-
-      // 最后从服务器获取
       try {
-        const [config, issuesResult] = await Promise.all([
-          getGitHubConfig(),
-          getIssues(1, undefined, false)
-        ]);
+        // First check memory cache
+        if (memoryCache?.issues && memoryCache?.config) {
+          if (mounted) {
+            setState(prev => ({
+              ...prev,
+              issues: memoryCache!.issues,
+              config: memoryCache!.config,
+              loading: false,
+              initialized: true,
+              syncIssues,
+              updateIssues
+            }));
+          }
+          return;
+        }
 
+        // Then check localStorage cache
+        const cached = getCache();
+        if (cached?.issues && cached?.config) {
+          if (mounted) {
+            setState(prev => ({
+              ...prev,
+              issues: cached.issues,
+              config: cached.config,
+              loading: false,
+              initialized: true,
+              syncIssues,
+              updateIssues
+            }));
+            memoryCache = cached;
+          }
+          return;
+        }
+
+        // Finally fetch from server
+        const config = await getGitHubConfig();
+        
         if (!config) {
+          if (mounted) {
+            setState(prev => ({ 
+              ...prev, 
+              loading: false, 
+              initialized: true,
+              syncIssues,
+              updateIssues
+            }));
+          }
+          return;
+        }
+
+        const issuesResult = await getIssues(1, undefined, false);
+        
+        if (mounted) {
+          const newState = {
+            issues: issuesResult.issues,
+            config,
+            timestamp: Date.now()
+          };
+
+          setState(prev => ({
+            ...prev,
+            issues: issuesResult.issues,
+            config,
+            loading: false,
+            initialized: true,
+            syncIssues,
+            updateIssues
+          }));
+
+          setCache(newState);
+          memoryCache = newState;
+        }
+      } catch (error) {
+        console.error('Error initializing data:', error);
+        if (mounted) {
           setState(prev => ({ 
             ...prev, 
             loading: false, 
@@ -158,44 +203,37 @@ export function IssueProvider({ children }: { children: ReactNode }) {
             syncIssues,
             updateIssues
           }));
-          return;
         }
-
-        const newState = {
-          issues: issuesResult.issues,
-          config,
-          timestamp: Date.now()
-        };
-
-        setState(prev => ({
-          ...prev,
-          issues: issuesResult.issues,
-          config,
-          loading: false,
-          initialized: true,
-          syncIssues,
-          updateIssues
-        }));
-
-        setCache(newState);
-        memoryCache = newState;
-      } catch (error) {
-        console.error('Error initializing data:', error);
-        setState(prev => ({ 
-          ...prev, 
-          loading: false, 
-          initialized: true,
-          syncIssues,
-          updateIssues
-        }));
+      } finally {
+        initializingRef.current = false;
       }
     }
 
-    initializeData();
-  }, [state.initialized]);
+    // Create or reuse the initialization promise
+    if (!initializePromiseRef.current) {
+      initializePromiseRef.current = initializeData();
+    }
+
+    // Wait for initialization to complete
+    initializePromiseRef.current.finally(() => {
+      if (!mounted) return;
+      initializePromiseRef.current = undefined;
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [state.initialized, syncIssues, updateIssues]);
+
+  // Expose initialization status
+  const value = {
+    ...state,
+    isInitializing: initializingRef.current,
+    initializePromise: initializePromiseRef.current
+  };
 
   return (
-    <IssueContext.Provider value={state}>
+    <IssueContext.Provider value={value}>
       {children}
     </IssueContext.Provider>
   );

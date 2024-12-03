@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from './ui/button';
+import { Loading } from "@/components/ui/loading"
 
 interface LightboxProps {
   src: string;
@@ -126,7 +127,7 @@ export function Lightbox({ src, alt = '', className = '', width, height }: Light
           >
             {loading && (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-8 h-8 border-4 border-secondary/50 border-t-secondary rounded-full animate-spin"></div>
+                <Loading size="default" />
               </div>
             )}
             <img

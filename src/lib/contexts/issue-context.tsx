@@ -28,7 +28,7 @@ const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
 
 interface CacheData {
   issues: Issue[];
-  config: GitHubConfig | null;
+  config: GitHubConfig;
   timestamp: number;
 }
 
@@ -75,6 +75,8 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, loading: true }));
     try {
       const result = await getIssues(1, undefined, true);
+      if (!state.config) return;
+
       const newState = {
         issues: result.issues,
         config: state.config,
@@ -94,6 +96,8 @@ export function IssueProvider({ children }: { children: ReactNode }) {
   };
 
   const updateIssues = (newIssues: Issue[]) => {
+    if (!state.config) return;
+    
     const newState = {
       issues: newIssues,
       config: state.config,
@@ -125,7 +129,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
 
       // 然后检查 localStorage 缓存
       const cached = getCache();
-      if (cached) {
+      if (cached?.issues && cached?.config) {
         setState(prev => ({
           ...prev,
           issues: cached.issues,
@@ -145,6 +149,17 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           getGitHubConfig(),
           getIssues(1, undefined, false)
         ]);
+
+        if (!config) {
+          setState(prev => ({ 
+            ...prev, 
+            loading: false, 
+            initialized: true,
+            syncIssues,
+            updateIssues
+          }));
+          return;
+        }
 
         const newState = {
           issues: issuesResult.issues,

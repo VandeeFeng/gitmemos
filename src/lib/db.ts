@@ -1,29 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 import { GitHubConfig, Issue, Label } from '@/types/github';
 
-// Check if we're in a browser environment
-const isBrowser = typeof window !== 'undefined';
-
-// Only create the Supabase client if the required environment variables are available
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
-
-// Helper function to check if Supabase is configured
-function checkSupabaseConfig() {
-  if (!supabase) {
-    throw new Error('Supabase configuration is missing. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY environment variables.');
-  }
-  return supabase;
-}
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+);
 
 // 测试数据库连接和表结构
 export async function testConnection() {
-  if (!supabase) return false;
-  
   try {
     // 检查 configs 表
     const { data: configsData, error: configsError } = await supabase
@@ -69,81 +53,60 @@ export async function testConnection() {
 
 // 配置相关操作
 export async function getConfig(): Promise<GitHubConfig | null> {
-  try {
-    const db = checkSupabaseConfig();
-    // 先从数据库获取配置
-    const { data } = await db
+  // 先从数据库获取配置
+  const { data } = await supabase
+    .from('configs')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  // 如果数据库有配置，直接返回
+  if (data) {
+    return {
+      owner: data.owner,
+      repo: data.repo,
+      token: data.token,
+      issuesPerPage: data.issues_per_page
+    };
+  }
+
+  // 如果数据库没有配置，尝试从环境变量获取
+  const owner = process.env.NEXT_PUBLIC_GITHUB_OWNER;
+  const repo = process.env.NEXT_PUBLIC_GITHUB_REPO;
+  const token = process.env.NEXT_PUBLIC_GITHUB_TOKEN;
+
+  // 如果环境变量有配置，保存到数据库并返回
+  if (owner && repo && token) {
+    const envConfig = {
+      owner,
+      repo,
+      token,
+      issuesPerPage: 10
+    };
+
+    // 保存环境变量配置到数据库
+    const { error: saveError } = await supabase
       .from('configs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    // 如果数据库有配置，直接返回
-    if (data) {
-      return {
-        owner: data.owner,
-        repo: data.repo,
-        token: data.token,
-        issuesPerPage: data.issues_per_page
-      };
-    }
-
-    // 如果数据库没有配置，尝试从环境变量获取
-    const owner = process.env.NEXT_PUBLIC_GITHUB_OWNER;
-    const repo = process.env.NEXT_PUBLIC_GITHUB_REPO;
-    const token = process.env.NEXT_PUBLIC_GITHUB_TOKEN;
-
-    // 如果环境变量有配置，保存到数据库并返回
-    if (owner && repo && token) {
-      const envConfig = {
+      .insert({
         owner,
         repo,
         token,
-        issuesPerPage: 10
-      };
+        issues_per_page: 10
+      });
 
-      // 保存环境变量配置到数据库
-      const { error: saveError } = await db
-        .from('configs')
-        .insert({
-          owner,
-          repo,
-          token,
-          issues_per_page: 10
-        });
-
-      if (saveError) {
-        console.error('Error saving env config to database:', saveError);
-      }
-
-      return envConfig;
+    if (saveError) {
+      console.error('Error saving env config to database:', saveError);
     }
 
-    return null;
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('Supabase configuration is missing')) {
-      // If Supabase is not configured, try to return config from environment variables
-      const owner = process.env.NEXT_PUBLIC_GITHUB_OWNER;
-      const repo = process.env.NEXT_PUBLIC_GITHUB_REPO;
-      const token = process.env.NEXT_PUBLIC_GITHUB_TOKEN;
-
-      if (owner && repo && token) {
-        return {
-          owner,
-          repo,
-          token,
-          issuesPerPage: 10
-        };
-      }
-    }
-    return null;
+    return envConfig;
   }
+
+  return null;
 }
 
 export async function saveConfig(config: GitHubConfig) {
-  const db = checkSupabaseConfig();
-  const { error } = await db
+  const { error } = await supabase
     .from('configs')
     .insert({
       owner: config.owner,
@@ -160,7 +123,6 @@ export async function saveConfig(config: GitHubConfig) {
 
 // Issues 相关操作
 export async function saveIssue(owner: string, repo: string, issue: Issue) {
-  const db = checkSupabaseConfig();
   console.log('Saving issue to database:', { 
     owner, 
     repo, 
@@ -170,7 +132,7 @@ export async function saveIssue(owner: string, repo: string, issue: Issue) {
   });
 
   try {
-    const { error } = await db
+    const { error } = await supabase
       .from('issues')
       .upsert({
         owner,
@@ -199,12 +161,11 @@ export async function saveIssue(owner: string, repo: string, issue: Issue) {
 }
 
 export async function getIssuesFromDb(owner: string, repo: string, page: number = 1, labelsFilter?: string[]): Promise<Issue[]> {
+  console.log('Getting issues from database:', { owner, repo, page, labelsFilter });
+  
   try {
-    const db = checkSupabaseConfig();
-    console.log('Getting issues from database:', { owner, repo, page, labelsFilter });
-    
     // First, get all labels for this repository
-    const { data: labelsData, error: labelsError } = await db
+    const { data: labelsData, error: labelsError } = await supabase
       .from('labels')
       .select('*')
       .eq('owner', owner)
@@ -228,7 +189,7 @@ export async function getIssuesFromDb(owner: string, repo: string, page: number 
       ])
     );
 
-    let query = db
+    let query = supabase
       .from('issues')
       .select('*')
       .eq('owner', owner)
@@ -256,6 +217,12 @@ export async function getIssuesFromDb(owner: string, repo: string, page: number 
       return [];
     }
 
+    console.log(`Found ${data.length} issues in database:`, data.map(i => ({ 
+      number: i.issue_number, 
+      title: i.title,
+      labels: i.labels 
+    })));
+
     return data.map(issue => ({
       number: issue.issue_number,
       title: issue.title,
@@ -280,8 +247,7 @@ export async function getIssuesFromDb(owner: string, repo: string, page: number 
 
 // Labels 相关操作
 export async function saveLabel(owner: string, repo: string, label: Label) {
-  const db = checkSupabaseConfig();
-  const { error } = await db
+  const { error } = await supabase
     .from('labels')
     .upsert({
       owner,
@@ -301,30 +267,24 @@ export async function saveLabel(owner: string, repo: string, label: Label) {
 }
 
 export async function getLabelsFromDb(owner: string, repo: string): Promise<Label[]> {
-  try {
-    const db = checkSupabaseConfig();
-    const { data, error } = await db
-      .from('labels')
-      .select('*')
-      .eq('owner', owner)
-      .eq('repo', repo)
-      .order('name');
+  const { data, error } = await supabase
+    .from('labels')
+    .select('*')
+    .eq('owner', owner)
+    .eq('repo', repo)
+    .order('name');
 
-    if (error) {
-      console.error('Error fetching labels:', error);
-      return [];
-    }
-
-    return data.map(label => ({
-      id: label.id,
-      name: label.name,
-      color: label.color,
-      description: label.description
-    }));
-  } catch (error) {
-    console.error('Failed to fetch labels:', error);
+  if (error) {
+    console.error('Error fetching labels:', error);
     return [];
   }
+
+  return data.map(label => ({
+    id: label.id,
+    name: label.name,
+    color: label.color,
+    description: label.description
+  }));
 }
 
 // 数据同步功能

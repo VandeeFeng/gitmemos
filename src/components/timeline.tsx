@@ -5,7 +5,6 @@ import { Button } from './ui/button';
 import { ActivityHeatmap } from './activity-heatmap';
 import { IssueCard } from './issue-card';
 import { FormattedDate } from './formatted-date';
-import { Loading } from "@/components/ui/loading"
 
 interface TimelineProps {
   searchQuery: string;

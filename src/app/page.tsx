@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { IssueList } from '@/components/issue-list';
+import { useTheme } from "next-themes";
 import { setGitHubConfig, getGitHubConfig, getIssues } from '@/lib/github';
 import { GitHubConfig, Issue } from '@/types/github';
 import { PageLayout } from '@/components/layouts/page-layout';
@@ -17,6 +18,7 @@ export default function Home() {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
+  const { theme } = useTheme();
   const [githubConfig, setGithubConfig] = useState<GitHubConfig>({
     owner: '',
     repo: '',
@@ -77,13 +79,23 @@ export default function Home() {
       <div className={animations.fade.in}>
         {showConfig ? (
           <div className="fixed inset-0 bg-black/20 dark:bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-[#f6f8fa] dark:bg-[#2d333b] rounded-lg shadow-lg max-w-2xl w-full mx-4 animate-content-show">
-              <div className="flex items-center justify-between p-4 border-b border-[#d0d7de] dark:border-[#444c56]">
-                <h2 className="text-lg font-semibold text-[#24292f] dark:text-[#adbac7]">GitHub Configuration</h2>
+            <div className={cn(
+              "rounded-lg shadow-lg max-w-2xl w-full mx-4 animate-content-show",
+              theme === 'light' ? "bg-[#f6f8fa]" : "bg-[#2d333b]"
+            )}>
+              <div className={cn(
+                "flex items-center justify-between p-4 border-b",
+                theme === 'light' ? "border-[#d0d7de]" : "border-[#444c56]"
+              )}>
+                <h2 className={theme === 'light' ? "text-lg font-semibold text-[#24292f]" : "text-lg font-semibold text-[#adbac7]"}>
+                  GitHub Configuration
+                </h2>
                 <button
                   onClick={() => setShowConfig(false)}
                   className={cn(
-                    "text-[#57606a] dark:text-[#768390] hover:text-[#24292f] dark:hover:text-[#adbac7]",
+                    theme === 'light' 
+                      ? "text-[#57606a] hover:text-[#24292f]" 
+                      : "text-[#768390] hover:text-[#adbac7]",
                     componentStates.interactive.base
                   )}
                 >
@@ -97,8 +109,11 @@ export default function Home() {
                 <form onSubmit={handleConfigSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-[#24292f] dark:text-[#adbac7] mb-1">
-                        Owner <span className="text-[#cf222e] dark:text-[#ff7b72]">*</span>
+                      <label className={cn(
+                        "block text-sm font-medium mb-1",
+                        theme === 'light' ? "text-[#24292f]" : "text-[#adbac7]"
+                      )}>
+                        Owner <span className={theme === 'light' ? "text-[#cf222e]" : "text-[#ff7b72]"}>*</span>
                       </label>
                       <input
                         type="text"
@@ -106,9 +121,9 @@ export default function Home() {
                         onChange={(e) => setGithubConfig({...githubConfig, owner: e.target.value})}
                         className={cn(
                           "w-full px-3 py-2 border rounded-lg",
-                          "bg-white dark:bg-[#22272e] text-[#24292f] dark:text-[#adbac7]",
-                          "border-[#d0d7de] dark:border-[#444c56]",
-                          "placeholder-[#6e7781] dark:placeholder-[#545d68]",
+                          theme === 'light' 
+                            ? "bg-white text-[#24292f] border-[#d0d7de] placeholder-[#6e7781]" 
+                            : "bg-[#22272e] text-[#adbac7] border-[#444c56] placeholder-[#545d68]",
                           componentStates.focus.base,
                           "focus:ring-2 focus:ring-[#0969da] dark:focus:ring-[#2f81f7] focus:border-transparent"
                         )}
@@ -117,8 +132,11 @@ export default function Home() {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-[#24292f] dark:text-[#adbac7] mb-1">
-                        Repository <span className="text-[#cf222e] dark:text-[#ff7b72]">*</span>
+                      <label className={cn(
+                        "block text-sm font-medium mb-1",
+                        theme === 'light' ? "text-[#24292f]" : "text-[#adbac7]"
+                      )}>
+                        Repository <span className={theme === 'light' ? "text-[#cf222e]" : "text-[#ff7b72]"}>*</span>
                       </label>
                       <input
                         type="text"
@@ -126,9 +144,9 @@ export default function Home() {
                         onChange={(e) => setGithubConfig({...githubConfig, repo: e.target.value})}
                         className={cn(
                           "w-full px-3 py-2 border rounded-lg",
-                          "bg-white dark:bg-[#22272e] text-[#24292f] dark:text-[#adbac7]",
-                          "border-[#d0d7de] dark:border-[#444c56]",
-                          "placeholder-[#6e7781] dark:placeholder-[#545d68]",
+                          theme === 'light' 
+                            ? "bg-white text-[#24292f] border-[#d0d7de] placeholder-[#6e7781]" 
+                            : "bg-[#22272e] text-[#adbac7] border-[#444c56] placeholder-[#545d68]",
                           componentStates.focus.base,
                           "focus:ring-2 focus:ring-[#0969da] dark:focus:ring-[#2f81f7] focus:border-transparent"
                         )}
@@ -137,8 +155,11 @@ export default function Home() {
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-[#24292f] dark:text-[#adbac7] mb-1">
-                        Token <span className="text-[#cf222e] dark:text-[#ff7b72]">*</span>
+                      <label className={cn(
+                        "block text-sm font-medium mb-1",
+                        theme === 'light' ? "text-[#24292f]" : "text-[#adbac7]"
+                      )}>
+                        Token <span className={theme === 'light' ? "text-[#cf222e]" : "text-[#ff7b72]"}>*</span>
                       </label>
                       <input
                         type="password"
@@ -146,9 +167,9 @@ export default function Home() {
                         onChange={(e) => setGithubConfig({...githubConfig, token: e.target.value})}
                         className={cn(
                           "w-full px-3 py-2 border rounded-lg",
-                          "bg-white dark:bg-[#22272e] text-[#24292f] dark:text-[#adbac7]",
-                          "border-[#d0d7de] dark:border-[#444c56]",
-                          "placeholder-[#6e7781] dark:placeholder-[#545d68]",
+                          theme === 'light' 
+                            ? "bg-white text-[#24292f] border-[#d0d7de] placeholder-[#6e7781]" 
+                            : "bg-[#22272e] text-[#adbac7] border-[#444c56] placeholder-[#545d68]",
                           componentStates.focus.base,
                           "focus:ring-2 focus:ring-[#0969da] dark:focus:ring-[#2f81f7] focus:border-transparent"
                         )}
@@ -163,10 +184,9 @@ export default function Home() {
                       variant="outline"
                       onClick={() => setShowConfig(false)}
                       className={cn(
-                        "border-[#d0d7de] dark:border-[#444c56]",
-                        "text-[#24292f] dark:text-[#adbac7]",
-                        "hover:bg-[#f3f4f6] dark:hover:bg-[#373e47]",
-                        "active:bg-[#ebecf0] dark:active:bg-[#2d333b]"
+                        theme === 'light'
+                          ? "border-[#d0d7de] text-[#24292f] hover:bg-[#f3f4f6] active:bg-[#ebecf0]"
+                          : "border-[#444c56] text-[#adbac7] hover:bg-[#373e47] active:bg-[#2d333b]"
                       )}
                     >
                       Cancel
@@ -174,8 +194,9 @@ export default function Home() {
                     <Button 
                       type="submit"
                       className={cn(
-                        "bg-[#2da44e] hover:bg-[#2c974b] active:bg-[#298e46]",
-                        "dark:bg-[#238636] dark:hover:bg-[#2ea043] dark:active:bg-[#238636]",
+                        theme === 'light'
+                          ? "bg-[#2da44e] hover:bg-[#2c974b] active:bg-[#298e46]"
+                          : "bg-[#238636] hover:bg-[#2ea043] active:bg-[#238636]",
                         "text-white border-0"
                       )}
                     >

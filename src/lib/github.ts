@@ -59,17 +59,6 @@ export async function getOctokit(): Promise<Octokit> {
   return octokit;
 }
 
-// 缓存机制
-interface IssuesCache {
-  data: GitHubIssue[];
-  timestamp: number;
-  owner: string;
-  repo: string;
-}
-
-let issuesCache: IssuesCache | null = null;
-const CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存时间
-
 export async function getIssues(page: number = 1, labels?: string, forceSync: boolean = false) {
   const config = await getGitHubConfig();
   console.log('Getting issues:', { page, labels, forceSync });

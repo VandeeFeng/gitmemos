@@ -18,9 +18,8 @@ interface Toast {
   message: string;
 }
 
-function ToastContainer({ toasts, onClose }: { 
+function ToastContainer({ toasts }: { 
   toasts: Toast[];
-  onClose: (id: string) => void;
 }) {
   const { theme } = useTheme();
 
@@ -101,16 +100,11 @@ export default function Home() {
           lastSyncAt: result.syncStatus.lastSyncAt,
           totalSynced: result.syncStatus.totalSynced
         });
-        // 显示上次同步时间的通知
-        const lastSyncDate = new Date(result.syncStatus.lastSyncAt);
-        const now = new Date();
-        const hoursSinceLastSync = (now.getTime() - lastSyncDate.getTime()) / (1000 * 60 * 60);
         
-        if (hoursSinceLastSync < 24) {
-          showToast(`Last synced ${Math.round(hoursSinceLastSync)} hours ago (${result.syncStatus.totalSynced} issues)`);
-        } else {
-          const daysAgo = Math.floor(hoursSinceLastSync / 24);
-          showToast(`Last synced ${daysAgo} days ago. Consider syncing again.`);
+        // 只在第一次加载时显示上次同步时间
+        if (!initialized) {
+          const lastSyncDate = new Date(result.syncStatus.lastSyncAt);
+          showToast(`Last synced: ${lastSyncDate.toLocaleString()} (${result.syncStatus.totalSynced} issues)`);
         }
       }
       return result.issues.length;
@@ -119,7 +113,7 @@ export default function Home() {
       showToast('Failed to load data from database');
       return 0;
     }
-  }, []);
+  }, [initialized, showToast]);
 
   // 从 GitHub 同步数据到数据库
   const syncFromGitHub = useCallback(async () => {
@@ -133,13 +127,12 @@ export default function Home() {
       setAllIssues(result.issues);
       
       if (result.syncStatus?.success) {
-        const message = `Successfully synced ${result.syncStatus.totalSynced} issues from GitHub`;
-        showToast(message);
         if (result.syncStatus.lastSyncAt) {
           setLastSyncInfo({
             lastSyncAt: result.syncStatus.lastSyncAt,
             totalSynced: result.syncStatus.totalSynced
           });
+          showToast(`Successfully synced ${result.syncStatus.totalSynced} issues from GitHub`);
         }
       }
     } catch (error) {
@@ -148,7 +141,7 @@ export default function Home() {
     } finally {
       setSyncingWithGitHub(false);
     }
-  }, [syncingWithGitHub]);
+  }, [syncingWithGitHub, showToast]);
 
   // 初始化加载
   useEffect(() => {
@@ -396,7 +389,7 @@ export default function Home() {
           />
         )}
       </div>
-      <ToastContainer toasts={toasts} onClose={removeToast} />
+      <ToastContainer toasts={toasts} />
       
       {/* Add last sync info display */}
       {lastSyncInfo && (

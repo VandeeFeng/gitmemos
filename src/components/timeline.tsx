@@ -164,12 +164,12 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
   return (
     <div className="space-y-8 h-[calc(100vh-150px)] relative">
       {/* Main Layout Container */}
-      <div className="flex flex-col sm:flex-row gap-6 sm:gap-0 h-full">
+      <div className="flex flex-col sm:flex-row h-full">
         {/* Left Sidebar Container (Calendar + Heatmap) */}
-        <div ref={scrollContainerRef} className="sm:sticky sm:w-[180px] sm:top-0 sm:pr-2 flex-shrink-0">
-          <div className="flex sm:flex sm:flex-col sm:items-center gap-4 sm:gap-0 justify-between">
+        <div ref={scrollContainerRef} className="sm:sticky sm:w-[170px] sm:top-0 flex-shrink-0">
+          <div className="flex sm:flex sm:flex-col sm:items-center gap-2 sm:gap-0 justify-between">
             {/* Calendar Container */}
-            <div className="flex-1 sm:flex-none sm:w-36">
+            <div className="flex-1 sm:flex-none sm:w-32">
               <div className="flex items-center justify-between mb-2">
                 <button
                   onClick={() => handleMonthChange(
@@ -220,11 +220,11 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
         </div>
 
         {/* Right Content Container */}
-        <div ref={scrollContainerRef} className="flex-1 sm:ml-[10px] overflow-y-auto pr-4 pb-16">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-2 pb-16">
           {/* Timeline Container */}
-          <div className="relative pl-6">
+          <div className="relative pl-4">
             {/* Timeline Line */}
-            <div className="absolute left-[11px] top-0 bottom-0 w-[2px] bg-[#444c56]"></div>
+            <div className="absolute left-[9px] top-0 bottom-0 w-[2px] bg-[#444c56]"></div>
 
             {/* Issues Container */}
             {hasIssues ? (
@@ -247,12 +247,12 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
                   return (
                     <div key={dayKey} className="relative" data-date={dayKey}>
                       <div className="relative flex items-center h-6">
-                        <div className="absolute -left-[18px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
-                        <div className="text-sm text-[#768390]">
+                        <div className="absolute -left-[12px] w-3 h-3 rounded-full bg-[#2f81f7] ring-4 ring-[#22272e]" />
+                        <div className="text-sm text-[#768390] ml-2">
                           <FormattedDate date={dayKey} />
                         </div>
                       </div>
-                      <div className="mt-3">
+                      <div className="mt-3 ml-4">
                         <div className="space-y-3">
                           {filteredDayIssues.map((issue) => (
                             <IssueCard

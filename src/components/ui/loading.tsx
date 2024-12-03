@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils"
-import { componentStates } from "@/lib/component-states"
 import { animations } from "@/lib/animations"
 
 interface LoadingProps {

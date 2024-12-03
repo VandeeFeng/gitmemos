@@ -59,15 +59,85 @@ export async function getOctokit(): Promise<Octokit> {
   return octokit;
 }
 
+// 添加内存缓存来存储上次同步检查的结果
+let lastSyncCheck: {
+  timestamp: number;
+  needsSync: boolean;
+} | null = null;
+
+const SYNC_CHECK_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+async function checkNeedsSync(owner: string, repo: string, forceSync: boolean): Promise<boolean> {
+  // 如果强制同步，直接返回 true
+  if (forceSync) return true;
+
+  // 检查内存缓存
+  if (lastSyncCheck && Date.now() - lastSyncCheck.timestamp < SYNC_CHECK_CACHE_DURATION) {
+    return lastSyncCheck.needsSync;
+  }
+
+  // 执行实际的同步检查
+  const needsSync = await shouldSync(owner, repo);
+  
+  // 更新内存缓存
+  lastSyncCheck = {
+    timestamp: Date.now(),
+    needsSync
+  };
+
+  return needsSync;
+}
+
+// 添加内存缓存
+interface IssuesCache {
+  timestamp: number;
+  data: {
+    issues: any[];
+    syncStatus: any;
+  };
+}
+
+const ISSUES_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+let issuesCache: Record<string, IssuesCache> = {};
+
+function getIssuesCacheKey(owner: string, repo: string, page: number, labels?: string) {
+  return `${owner}:${repo}:${page}:${labels || ''}`;
+}
+
+function getIssuesFromCache(owner: string, repo: string, page: number, labels?: string) {
+  const key = getIssuesCacheKey(owner, repo, page, labels);
+  const cached = issuesCache[key];
+  
+  if (cached && Date.now() - cached.timestamp < ISSUES_CACHE_DURATION) {
+    return cached.data;
+  }
+  
+  return null;
+}
+
+function setIssuesCache(owner: string, repo: string, page: number, labels: string | undefined, data: any) {
+  const key = getIssuesCacheKey(owner, repo, page, labels);
+  issuesCache[key] = {
+    timestamp: Date.now(),
+    data
+  };
+}
+
 export async function getIssues(page: number = 1, labels?: string, forceSync: boolean = false) {
   const config = await getGitHubConfig();
-  console.log('Getting issues:', { page, labels, forceSync });
 
-  // 1. 检查是否需要从 GitHub 同步
-  const needsGitHubSync = forceSync || await shouldSync(config.owner, config.repo);
-  console.log('GitHub sync check:', { forceSync, needsGitHubSync });
+  // 如果不是强制同步，先检查缓存
+  if (!forceSync) {
+    const cached = getIssuesFromCache(config.owner, config.repo, page, labels);
+    if (cached) {
+      return cached;
+    }
+  }
 
-  // 2. 如果需要从 GitHub 同步
+  // 使用新的检查函数
+  const needsGitHubSync = await checkNeedsSync(config.owner, config.repo, forceSync);
+
+  // 如果需要从 GitHub 同步
   if (needsGitHubSync) {
     try {
       console.log('Starting GitHub sync...');
@@ -137,7 +207,7 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
     }
   }
 
-  // 3. 从数据库获取分页数据
+  // 从数据库获取分页数据
   console.log('Loading data from database...');
   const issues = await getIssuesFromDb(config.owner, config.repo, page, labels ? [labels] : undefined);
   const lastSync = await getLastSyncHistory(config.owner, config.repo);
@@ -148,8 +218,7 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
     console.log(`Loaded ${issues.length} issues from database`);
   }
 
-  // 4. 返回数据库中的数据
-  return { 
+  const result = { 
     issues,
     syncStatus: lastSync ? {
       success: true,
@@ -157,6 +226,13 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
       lastSyncAt: lastSync.last_sync_at
     } : null
   };
+
+  // 缓存结果
+  if (!forceSync) {
+    setIssuesCache(config.owner, config.repo, page, labels, result);
+  }
+
+  return result;
 }
 
 export async function getIssue(issueNumber: number, forceSync: boolean = false) {

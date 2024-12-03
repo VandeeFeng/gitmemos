@@ -6,6 +6,40 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
 
+// 添加内存缓存
+interface IssueCache {
+  timestamp: number;
+  issues: any[];
+  labels: any[];
+}
+
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+let dbCache: Record<string, IssueCache> = {};
+
+function getCacheKey(owner: string, repo: string, page: number, labelsFilter?: string[]) {
+  return `${owner}:${repo}:${page}:${labelsFilter?.join(',') || ''}`;
+}
+
+function getFromCache(owner: string, repo: string, page: number, labelsFilter?: string[]) {
+  const key = getCacheKey(owner, repo, page, labelsFilter);
+  const cached = dbCache[key];
+  
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached;
+  }
+  
+  return null;
+}
+
+function setCache(owner: string, repo: string, page: number, labelsFilter: string[] | undefined, issues: any[], labels: any[]) {
+  const key = getCacheKey(owner, repo, page, labelsFilter);
+  dbCache[key] = {
+    timestamp: Date.now(),
+    issues,
+    labels
+  };
+}
+
 // 测试数据库连接和表结构
 export async function testConnection() {
   try {
@@ -160,11 +194,30 @@ export async function saveIssue(owner: string, repo: string, issue: Issue) {
   }
 }
 
-export async function getIssuesFromDb(owner: string, repo: string, page: number = 1, labelsFilter?: string[]): Promise<Issue[]> {
-  console.log('Getting issues from database:', { owner, repo, page, labelsFilter });
-  
+export async function getIssuesFromDb(owner: string, repo: string, page: number = 1, labelsFilter?: string[]) {
+  // 检查缓存
+  const cached = getFromCache(owner, repo, page, labelsFilter);
+  if (cached) {
+    return cached.issues.map(issue => ({
+      number: issue.issue_number,
+      title: issue.title,
+      body: issue.body,
+      created_at: issue.github_created_at,
+      state: issue.state,
+      labels: issue.labels.map((labelName: string) => {
+        const labelInfo = cached.labels.find((l: any) => l.name === labelName);
+        return labelInfo || {
+          id: 0,
+          name: labelName,
+          color: 'gray',
+          description: null
+        };
+      })
+    }));
+  }
+
   try {
-    // First, get all labels for this repository
+    // 获取标签数据
     const { data: labelsData, error: labelsError } = await supabase
       .from('labels')
       .select('*')
@@ -176,19 +229,7 @@ export async function getIssuesFromDb(owner: string, repo: string, page: number 
       return [];
     }
 
-    // Create a map of label names to their full information
-    const labelMap = new Map(
-      labelsData.map(label => [
-        label.name,
-        {
-          id: label.id,
-          name: label.name,
-          color: label.color,
-          description: label.description
-        }
-      ])
-    );
-
+    // 获取 issues 数据
     let query = supabase
       .from('issues')
       .select('*')
@@ -200,7 +241,6 @@ export async function getIssuesFromDb(owner: string, repo: string, page: number 
       query = query.contains('labels', labelsFilter);
     }
 
-    // 添加分页
     const pageSize = 10;
     const start = (page - 1) * pageSize;
     query = query.range(start, start + pageSize - 1);
@@ -213,16 +253,13 @@ export async function getIssuesFromDb(owner: string, repo: string, page: number 
     }
 
     if (!data || data.length === 0) {
-      console.log('No issues found in database');
       return [];
     }
 
-    console.log(`Found ${data.length} issues in database:`, data.map(i => ({ 
-      number: i.issue_number, 
-      title: i.title,
-      labels: i.labels 
-    })));
+    // 缓存结果
+    setCache(owner, repo, page, labelsFilter, data, labelsData);
 
+    // 返回处理后的数据
     return data.map(issue => ({
       number: issue.issue_number,
       title: issue.title,
@@ -230,7 +267,7 @@ export async function getIssuesFromDb(owner: string, repo: string, page: number 
       created_at: issue.github_created_at,
       state: issue.state,
       labels: issue.labels.map((labelName: string) => {
-        const labelInfo = labelMap.get(labelName);
+        const labelInfo = labelsData.find(label => label.name === labelName);
         return labelInfo || {
           id: 0,
           name: labelName,

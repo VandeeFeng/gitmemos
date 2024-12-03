@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import { ThemeProvider } from 'next-themes'
 import './globals.css'
+import { ClientLayout } from '@/components/client-layout'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -21,16 +21,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <div className="min-h-screen bg-background">
-            {children}
-          </div>
-        </ThemeProvider>
+        <ClientLayout>
+          {children}
+        </ClientLayout>
         <script
           dangerouslySetInnerHTML={{
             __html: `

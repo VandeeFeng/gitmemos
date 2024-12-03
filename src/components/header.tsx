@@ -44,7 +44,7 @@ export function Header({
   }, []);
 
   const handleNavigation = (path: string) => {
-    router.replace(path);
+    router.push(path);
   };
 
   return (

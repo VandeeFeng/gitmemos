@@ -4,12 +4,15 @@ import { useState, useEffect } from 'react';
 import { Timeline } from '@/components/timeline';
 import { getIssues } from '@/lib/github';
 import { Issue } from '@/types/github';
-import { Header } from '@/components/header';
+import { PageLayout } from '@/components/layouts/page-layout';
+import { Loading } from '@/components/ui/loading';
+import { animations } from '@/lib/animations';
 
 export default function TimelinePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchIssues() {
@@ -18,6 +21,8 @@ export default function TimelinePage() {
         setIssues(data);
       } catch (error) {
         console.error('Error fetching issues:', error);
+      } finally {
+        setLoading(false);
       }
     }
     fetchIssues();
@@ -28,22 +33,24 @@ export default function TimelinePage() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#22272e] transition-colors duration-500">
-      <Header 
-        selectedLabel={selectedLabel}
-        onLabelSelect={(label) => setSelectedLabel(label === selectedLabel ? null : label)}
-        onSearch={handleSearch}
-        issues={issues}
-      />
-      <main className="container mx-auto px-4 max-w-4xl pt-32 md:pt-40">
-        <div className="animate-fade-in">
+    <PageLayout
+      selectedLabel={selectedLabel}
+      onLabelSelect={(label) => setSelectedLabel(label === selectedLabel ? null : label)}
+      onSearch={handleSearch}
+      issues={issues}
+      showFooter={false}
+    >
+      {loading ? (
+        <Loading />
+      ) : (
+        <div className={animations.fade.in}>
           <Timeline 
             searchQuery={searchQuery} 
             selectedLabel={selectedLabel} 
             onLabelClick={(label) => setSelectedLabel(label === selectedLabel ? null : label)}
           />
         </div>
-      </main>
-    </div>
+      )}
+    </PageLayout>
   );
 } 

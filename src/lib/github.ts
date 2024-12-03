@@ -175,6 +175,46 @@ function getNextRequestId() {
   return `req_${++requestCounter}`;
 }
 
+// 添加标签筛选缓存
+interface LabelFilterCache {
+  issues: Issue[];
+  timestamp: number;
+  owner: string;
+  repo: string;
+}
+
+const labelFilterCache: Record<string, LabelFilterCache> = {};
+const LABEL_FILTER_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+function getLabelFilterCacheKey(owner: string, repo: string, label: string | undefined) {
+  return `label_filter:${owner}:${repo}:${label || ''}`;
+}
+
+function getFromLabelFilterCache(owner: string, repo: string, label: string | undefined): Issue[] | null {
+  const key = getLabelFilterCacheKey(owner, repo, label);
+  const cached = labelFilterCache[key];
+  
+  if (cached && 
+      cached.owner === owner && 
+      cached.repo === repo && 
+      Date.now() - cached.timestamp < LABEL_FILTER_CACHE_DURATION) {
+    console.log('Using label filter cached data');
+    return cached.issues;
+  }
+  
+  return null;
+}
+
+function setLabelFilterCache(owner: string, repo: string, label: string | undefined, issues: Issue[]) {
+  const key = getLabelFilterCacheKey(owner, repo, label);
+  labelFilterCache[key] = {
+    issues,
+    timestamp: Date.now(),
+    owner,
+    repo
+  };
+}
+
 export async function getIssues(page: number = 1, labels?: string, forceSync: boolean = false) {
   const config = await getGitHubConfig();
   const lockKey = getRequestLockKey(config.owner, config.repo, page, labels);
@@ -189,7 +229,18 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
     return existingRequest.promise;
   }
 
-  // 如果不是强制同步，先检查缓存
+  // 如果不是强制同步，先检查标签筛选缓存
+  if (!forceSync && page === 1) {
+    const cachedIssues = getFromLabelFilterCache(config.owner, config.repo, labels);
+    if (cachedIssues) {
+      return {
+        issues: cachedIssues,
+        syncStatus: null
+      };
+    }
+  }
+
+  // 如果不是强制同步，再检查普通缓存
   if (!forceSync) {
     const cached = getIssuesFromCache(config.owner, config.repo, page, labels);
     if (cached) {
@@ -299,6 +350,9 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
       // 缓存结果
       if (!forceSync) {
         setIssuesCache(config.owner, config.repo, page, labels, result);
+        if (page === 1) {
+          setLabelFilterCache(config.owner, config.repo, labels, issues);
+        }
       }
 
       return result;

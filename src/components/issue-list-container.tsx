@@ -6,6 +6,7 @@ import { PageLayout } from './layouts/page-layout';
 import { GitHubConfig, Issue } from '@/types/github';
 import { getIssues } from '@/lib/github';
 import { useIssues } from '@/lib/contexts/issue-context';
+import { ConfigDialog } from './config-dialog';
 
 interface IssueListContainerProps {
   initialIssues: Issue[];
@@ -30,6 +31,7 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
 
   // Update local issues when context issues change
   useEffect(() => {
@@ -112,24 +114,31 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
   });
 
   return (
-    <PageLayout
-      selectedLabel={selectedLabel}
-      onLabelSelect={(label) => setSelectedLabel(label === selectedLabel ? null : label)}
-      onSearch={handleSearch}
-      showConfig={true}
-      issues={filteredIssues}
-      onSync={handleSync}
-    >
-      <div className="animate-fade-in">
-        <IssueList 
-          issues={filteredIssues}
-          selectedLabel={selectedLabel}
-          onLabelClick={(label) => setSelectedLabel(label === selectedLabel ? null : label)}
-          searchQuery={searchQuery}
-          onLoadMore={handleLoadMore}
-          loading={loading || contextLoading}
-        />
-      </div>
-    </PageLayout>
+    <>
+      <PageLayout
+        selectedLabel={selectedLabel}
+        onLabelSelect={(label) => setSelectedLabel(label === selectedLabel ? null : label)}
+        onSearch={handleSearch}
+        showConfig={true}
+        onConfigClick={() => setShowConfig(true)}
+        issues={filteredIssues}
+        onSync={handleSync}
+      >
+        <div className="animate-fade-in">
+          <IssueList 
+            issues={filteredIssues}
+            selectedLabel={selectedLabel}
+            onLabelClick={(label) => setSelectedLabel(label === selectedLabel ? null : label)}
+            searchQuery={searchQuery}
+            onLoadMore={handleLoadMore}
+            loading={loading || contextLoading}
+          />
+        </div>
+      </PageLayout>
+      <ConfigDialog 
+        isOpen={showConfig} 
+        onClose={() => setShowConfig(false)} 
+      />
+    </>
   );
 } 

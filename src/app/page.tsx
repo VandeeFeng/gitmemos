@@ -7,7 +7,6 @@ import { useTheme } from "next-themes";
 import { setGitHubConfig, getGitHubConfig, getIssues } from '@/lib/github';
 import { GitHubConfig, Issue } from '@/types/github';
 import { PageLayout } from '@/components/layouts/page-layout';
-import { Loading } from '@/components/ui/loading';
 import { animations } from '@/lib/animations';
 import { componentStates } from '@/lib/component-states';
 import { cn } from '@/lib/utils';
@@ -88,6 +87,7 @@ export default function Home() {
 
   // 从数据库加载数据到页面
   const loadFromDatabase = useCallback(async () => {
+    setLoading(true);
     try {
       const result = await getIssues(1, undefined, false);
       setAllIssues(result.issues);
@@ -108,6 +108,8 @@ export default function Home() {
       console.error('Error loading from database:', error);
       showToast('Failed to load data from database');
       return 0;
+    } finally {
+      setLoading(false);
     }
   }, [initialized, showToast]);
 
@@ -181,6 +183,7 @@ export default function Home() {
   };
 
   const handleLoadMore = async (page: number) => {
+    setLoading(true);
     try {
       const result = await getIssues(page, selectedLabel || undefined, false);
       
@@ -196,6 +199,8 @@ export default function Home() {
     } catch (error) {
       console.error('Error loading more issues:', error);
       return false;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -370,8 +375,6 @@ export default function Home() {
               </div>
             </div>
           </div>
-        ) : loading ? (
-          <Loading />
         ) : (
           <IssueList 
             issues={filteredIssues}
@@ -379,6 +382,7 @@ export default function Home() {
             onLabelClick={(label) => setSelectedLabel(label === selectedLabel ? null : label)}
             searchQuery={searchQuery}
             onLoadMore={handleLoadMore}
+            loading={loading}
           />
         )}
       </div>

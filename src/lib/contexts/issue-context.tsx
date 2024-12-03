@@ -117,8 +117,8 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       if (memoryCache?.issues && memoryCache?.config) {
         setState(prev => ({
           ...prev,
-          issues: memoryCache.issues,
-          config: memoryCache.config,
+          issues: memoryCache!.issues,
+          config: memoryCache!.config,
           loading: false,
           initialized: true,
           syncIssues,

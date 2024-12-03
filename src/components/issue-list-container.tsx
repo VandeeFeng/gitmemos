@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect } from 'react';
 import { IssueList } from './issue-list';
 import { PageLayout } from './layouts/page-layout';
 import { GitHubConfig, Issue } from '@/types/github';
-import { getIssues } from '@/lib/github';
 import { useIssues } from '@/lib/contexts/issue-context';
 import { ConfigDialog } from './config-dialog';
 
@@ -12,18 +11,6 @@ interface IssueListContainerProps {
   initialIssues: Issue[];
   initialConfig: GitHubConfig;
 }
-
-interface LoadMoreResult {
-  issues: Issue[];
-  syncStatus: {
-    success: boolean;
-    totalSynced: number;
-    lastSyncAt: string;
-  } | null;
-}
-
-// 内存缓存
-const loadMoreCache: Record<string, Promise<boolean> | undefined> = {};
 
 export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
   const { issues: contextIssues, loading: contextLoading, syncIssues } = useIssues();

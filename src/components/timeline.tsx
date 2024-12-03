@@ -1,5 +1,4 @@
 import { useEffect, useState, useRef } from 'react';
-import { getIssues } from '@/lib/github';
 import { Issue } from '@/types/github';
 import { Button } from './ui/button';
 import { ActivityHeatmap } from './activity-heatmap';

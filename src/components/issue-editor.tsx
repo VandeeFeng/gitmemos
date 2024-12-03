@@ -64,7 +64,7 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
   }, []);
 
   const handleSave = async () => {
-    const config = getGitHubConfig(false);
+    const config = await getGitHubConfig();
     if (!config.token || !config.owner || !config.repo) {
       alert('Please configure your GitHub settings first');
       return;

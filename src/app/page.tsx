@@ -11,8 +11,6 @@ import { Loading } from '@/components/ui/loading';
 import { animations } from '@/lib/animations';
 import { componentStates } from '@/lib/component-states';
 import { cn } from '@/lib/utils';
-import { testConnection } from '@/lib/db';
-import { SyncButton } from '@/components/sync-button';
 
 // 提示组件
 function Toast({ message, onClose }: { message: string; onClose: () => void }) {

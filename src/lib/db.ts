@@ -42,6 +42,13 @@ interface SyncHistory {
   issues_synced: number;
 }
 
+interface DbError {
+  message: string;
+  details?: unknown;
+  hint?: string;
+  code?: string;
+}
+
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const dbCache: Record<string, IssueCache> = {};
 
@@ -354,41 +361,28 @@ export async function getLabelsFromDb(owner: string, repo: string): Promise<Labe
 }
 
 // 数据同步功能
-export async function syncIssuesData(owner: string, repo: string, issues: Issue[]) {
-  console.log(`Starting sync of ${issues.length} issues to database for ${owner}/${repo}`);
-  
+export async function syncIssuesData(owner: string, repo: string, issues: Issue[]): Promise<void> {
   try {
-    // 先检查是否真的需要同步
-    const shouldSyncResult = await shouldSync(owner, repo);
-    if (!shouldSyncResult) {
-      console.log('Sync not needed, skipping...');
-      return;
+    for (const issue of issues) {
+      await saveIssue(owner, repo, issue);
     }
 
-    for (const issue of issues) {
-      console.log(`Syncing issue #${issue.number}: ${issue.title}`);
-      await saveIssue(owner, repo, issue);
-      
-      // 同步标签
-      for (const label of issue.labels) {
-        console.log(`Syncing label: ${label.name}`);
-        await saveLabel(owner, repo, label);
-      }
+    // 更新同步历史
+    const { error } = await supabase
+      .from('sync_history')
+      .insert({
+        owner,
+        repo,
+        last_sync_at: new Date().toISOString(),
+        issues_synced: issues.length
+      });
+
+    if (error) {
+      throw error;
     }
-    
-    // 记录成功的同步历史
-    await recordSyncHistory(owner, repo, 'success', issues.length);
-    console.log('Sync completed successfully');
   } catch (error) {
-    // 记录失败的同步历史
-    await recordSyncHistory(
-      owner,
-      repo,
-      'failed',
-      0,
-      error instanceof Error ? error.message : 'Unknown error during sync'
-    );
-    console.error('Failed to sync issues:', error);
+    const dbError = error as DbError;
+    console.error('Error syncing issues:', dbError.message || dbError);
     throw error;
   }
 }

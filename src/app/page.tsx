@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { IssueList } from '@/components/issue-list';
 import { useTheme } from "next-themes";
@@ -57,7 +57,7 @@ export default function Home() {
   };
 
   // 获取所有 issues
-  const fetchAllIssues = async (forceSync: boolean = false) => {
+  const fetchAllIssues = useCallback(async (forceSync: boolean = false) => {
     if (!forceSync && allIssues.length > 0) {
       return;
     }
@@ -76,7 +76,7 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [allIssues.length, showToast]);
 
   const handleLoadMore = async (page: number) => {
     try {

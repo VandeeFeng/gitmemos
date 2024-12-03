@@ -1,5 +1,5 @@
 import { Octokit } from "octokit";
-import { GitHubConfig, Issue as GitHubIssue, Label as GitHubLabel } from '@/types/github';
+import { GitHubConfig, Issue as GitHubIssue } from '@/types/github';
 import { getConfig, saveConfig, getIssuesFromDb, saveIssue, getLabelsFromDb, saveLabel, syncIssuesData } from './db';
 
 let config: GitHubConfig | null = null;
@@ -10,7 +10,7 @@ export async function setGitHubConfig(newConfig: GitHubConfig) {
   await saveConfig(newConfig);
 }
 
-export async function getGitHubConfig(forApi: boolean = true): Promise<GitHubConfig> {
+export async function getGitHubConfig(): Promise<GitHubConfig> {
   // 1. 优先使用运行时配置
   if (config) {
     return config;

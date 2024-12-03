@@ -229,7 +229,7 @@ export async function getIssuesFromDb(owner: string, repo: string, page: number 
       body: issue.body,
       created_at: issue.github_created_at,
       state: issue.state,
-      labels: issue.labels.map(labelName => {
+      labels: issue.labels.map((labelName: string) => {
         const labelInfo = labelMap.get(labelName);
         return labelInfo || {
           id: 0,

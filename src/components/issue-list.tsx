@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getIssues } from '@/lib/github';
 import { Button } from './ui/button';
 import { Issue } from '@/types/github';
 import { IssueCard } from './issue-card';

@@ -13,7 +13,7 @@ export const markdownComponents: Components = {
               const issueNumber = part.substring(1);
               return (
                 <Link
-                  key={i}
+                  key={`${part}-${i}`}
                   href={`/issue/${issueNumber}`}
                   className="text-secondary no-underline hover:underline"
                 >
@@ -21,7 +21,7 @@ export const markdownComponents: Components = {
                 </Link>
               );
             }
-            return part;
+            return <span key={`text-${i}`}>{part}</span>;
           })}
         </p>
       );

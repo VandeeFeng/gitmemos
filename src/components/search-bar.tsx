@@ -5,7 +5,7 @@ import { Issue } from '@/types/github';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
-  issues: Issue[];
+  issues?: Issue[];
 }
 
 // 辅助函数：分词（支持中文和英文）
@@ -84,7 +84,7 @@ const smartTruncate = (text: string, targetLength: number, position: number): { 
   };
 };
 
-export function SearchBar({ onSearch, issues }: SearchBarProps) {
+export function SearchBar({ onSearch, issues = [] }: SearchBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -110,14 +110,23 @@ export function SearchBar({ onSearch, issues }: SearchBarProps) {
 
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setSearchQuery(e.target.value);
+    setShowPreview(true);
   };
 
-  const filteredIssues = searchQuery ? issues.filter(issue => {
+  // Ensure issues is always an array and deduplicate by issue number
+  const safeIssues = Array.isArray(issues) ? issues : [];
+  const uniqueIssues = Array.from(
+    new Map(safeIssues.filter(issue => issue && issue.number).map(issue => [issue.number, issue])).values()
+  );
+
+  const filteredIssues = searchQuery ? uniqueIssues.filter(issue => {
+    if (!issue || !issue.title) return false;
+    
     const searchTerms = searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
     const title = issue.title.toLowerCase();
     const body = (issue.body || '').toLowerCase();
-    const labelNames = issue.labels.map(label => label.name.toLowerCase());
-    const labelDescriptions = issue.labels.map(label => (label.description || '').toLowerCase());
+    const labelNames = (issue.labels || []).map(label => label.name.toLowerCase());
+    const labelDescriptions = (issue.labels || []).map(label => (label.description || '').toLowerCase());
 
     return searchTerms.some(term => 
       title.includes(term) || 
@@ -285,66 +294,63 @@ export function SearchBar({ onSearch, issues }: SearchBarProps) {
         </div>
       </form>
 
-      <div 
-        className={`absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#2d333b] rounded-lg shadow-lg border border-[#d0d7de] dark:border-[#444c56] overflow-hidden z-50 transition-all duration-200 ease-out`}
-        style={{
-          opacity: showPreview && searchQuery ? 1 : 0,
-          transform: `translateY(${showPreview && searchQuery ? '0' : '-8px'})`,
-          pointerEvents: showPreview && searchQuery ? 'auto' : 'none'
-        }}
-      >
-        {filteredIssues.length > 0 ? (
-          <div className="max-h-[400px] overflow-y-auto">
-            {filteredIssues.map((issue) => (
-              <div
-                key={issue.number}
-                className="block p-3 hover:bg-[#f6f8fa] dark:hover:bg-[#323942] border-b border-[#d0d7de] dark:border-[#444c56] last:border-0 cursor-pointer transition-colors"
-                onClick={() => {
-                  setSearchQuery(issue.title);
-                  onSearch(issue.title);
-                  setShowPreview(false);
-                }}
-              >
-                <div className="flex items-center gap-2 text-sm mb-1.5">
-                  <span className="text-[#57606a] dark:text-[#768390]">#{issue.number}</span>
-                  <h4 className="font-medium text-[#24292f] dark:text-[#adbac7]">
-                    {highlightText(issue.title, searchQuery)}
-                  </h4>
-                </div>
-                {issue.body && (
-                  <p className="text-sm text-[#57606a] dark:text-[#768390] line-clamp-2 mb-1.5">
-                    {highlightText(getPreviewContent(issue.body, searchQuery), searchQuery)}
-                  </p>
-                )}
-                {issue.labels.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {issue.labels.map(label => (
-                      <span
-                        key={label.id}
-                        className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full"
-                        style={{
-                          backgroundColor: `#${label.color}20`,
-                          color: `#${label.color}`,
-                          border: `1px solid #${label.color}40`
-                        }}
-                      >
-                        {highlightText(label.name, searchQuery)}
-                      </span>
-                    ))}
+      {showPreview && searchQuery && (
+        <div 
+          className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#2d333b] rounded-lg shadow-lg border border-[#d0d7de] dark:border-[#444c56] overflow-hidden z-50"
+        >
+          {filteredIssues.length > 0 ? (
+            <div className="max-h-[400px] overflow-y-auto">
+              {filteredIssues.map((issue) => (
+                <div
+                  key={issue.number}
+                  className="block p-3 hover:bg-[#f6f8fa] dark:hover:bg-[#323942] border-b border-[#d0d7de] dark:border-[#444c56] last:border-0 cursor-pointer transition-colors"
+                  onClick={() => {
+                    setSearchQuery(issue.title);
+                    onSearch(issue.title);
+                    setShowPreview(false);
+                  }}
+                >
+                  <div className="flex items-center gap-2 text-sm mb-1.5">
+                    <span className="text-[#57606a] dark:text-[#768390]">#{issue.number}</span>
+                    <h4 className="font-medium text-[#24292f] dark:text-[#adbac7]">
+                      {highlightText(issue.title, searchQuery)}
+                    </h4>
                   </div>
-                )}
-              </div>
-            ))}
+                  {issue.body && (
+                    <p className="text-sm text-[#57606a] dark:text-[#768390] line-clamp-2 mb-1.5">
+                      {highlightText(getPreviewContent(issue.body, searchQuery), searchQuery)}
+                    </p>
+                  )}
+                  {issue.labels && issue.labels.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {issue.labels.map(label => (
+                        <span
+                          key={label.id}
+                          className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full"
+                          style={{
+                            backgroundColor: `#${label.color}20`,
+                            color: `#${label.color}`,
+                            border: `1px solid #${label.color}40`
+                          }}
+                        >
+                          {highlightText(label.name, searchQuery)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-4 text-sm text-[#57606a] dark:text-[#768390] text-center">
+              No matching issues found
+            </div>
+          )}
+          <div className="p-2 bg-[#f6f8fa] dark:bg-[#323942] border-t border-[#d0d7de] dark:border-[#444c56] text-xs text-[#57606a] dark:text-[#768390] text-center">
+            Press Enter to search
           </div>
-        ) : (
-          <div className="p-4 text-sm text-[#57606a] dark:text-[#768390] text-center">
-            No matching issues found
-          </div>
-        )}
-        <div className="p-2 bg-[#f6f8fa] dark:bg-[#323942] border-t border-[#d0d7de] dark:border-[#444c56] text-xs text-[#57606a] dark:text-[#768390] text-center">
-          Press Enter to search
         </div>
-      </div>
+      )}
     </div>
   );
 } 

@@ -6,69 +6,53 @@ import { Button } from './ui/button';
 import { Issue } from '@/types/github';
 import { IssueCard } from './issue-card';
 
-export function IssueList({ 
-  selectedLabel,
-  onLabelClick,
-  searchQuery = ''
-}: { 
+interface IssueListProps {
   selectedLabel: string | null;
   onLabelClick: (label: string) => void;
   searchQuery?: string;
-}) {
-  const [issues, setIssues] = useState<Issue[]>([]);
-  const [loading, setLoading] = useState(true);
+  issues: Issue[];
+  onLoadMore: (page: number) => Promise<boolean>;
+}
+
+export function IssueList({ 
+  selectedLabel,
+  onLabelClick,
+  searchQuery = '',
+  issues,
+  onLoadMore
+}: IssueListProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [configVersion, setConfigVersion] = useState(0);
 
   useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'github-config') {
-        setConfigVersion(prev => prev + 1);
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, []);
-
-  useEffect(() => {
-    async function fetchIssues() {
-      setLoading(true);
-      try {
-        const data = await getIssues(1, selectedLabel || undefined);
-        setIssues(data);
-        setHasMore(data.length === 10);
-        setCurrentPage(1);
-      } catch (error) {
-        console.error('Error fetching issues:', error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchIssues();
-  }, [selectedLabel, configVersion]);
+    setHasMore(issues.length === 10);
+    setCurrentPage(1);
+  }, [issues]);
 
   const loadMore = async () => {
+    if (loadingMore) return;
     setLoadingMore(true);
     try {
       const nextPage = currentPage + 1;
-      const data = await getIssues(nextPage, selectedLabel || undefined);
-      setIssues(prev => [...prev, ...data]);
-      setCurrentPage(nextPage);
-      setHasMore(data.length === 10);
+      const hasMoreIssues = await onLoadMore(nextPage);
+      
+      if (hasMoreIssues) {
+        setCurrentPage(nextPage);
+        setHasMore(true);
+      } else {
+        setHasMore(false);
+      }
     } catch (error) {
       console.error('Error loading more issues:', error);
+      setHasMore(false);
     } finally {
       setLoadingMore(false);
     }
   };
 
   const filteredIssues = issues.filter(issue => {
-    const matchesLabel = !selectedLabel || issue.labels.some(label => label.name === selectedLabel);
-    
-    if (!searchQuery) return matchesLabel;
+    if (!searchQuery) return true;
 
     const searchLower = searchQuery.toLowerCase();
     const titleMatch = issue.title.toLowerCase().includes(searchLower);
@@ -78,22 +62,8 @@ export function IssueList({
       (label.description || '').toLowerCase().includes(searchLower)
     );
 
-    return matchesLabel && (titleMatch || bodyMatch || labelsMatch);
+    return titleMatch || bodyMatch || labelsMatch;
   });
-
-  if (loading) {
-    return (
-      <div className="p-8">
-        <div className="flex flex-col items-center justify-center space-y-4">
-          <div className="relative w-16 h-16">
-            <div className="absolute inset-0 border-4 border-gray-100 dark:border-[#2d333b] rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-t-[#2da44e] dark:border-t-[#2f81f7] rounded-full animate-spin"></div>
-          </div>
-          <p className="text-sm text-[#57606a] dark:text-[#768390] animate-pulse">Loading issues...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-4">

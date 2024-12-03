@@ -16,9 +16,9 @@ export function Backlinks({ currentIssueNumber }: BacklinksProps) {
       setLoading(true);
       try {
         // 获取所有 issues
-        const allIssues = await getIssues(1);
+        const result = await getIssues(1, undefined, false);
         // 过滤出引用了当前 issue 的其他 issues
-        const linkedIssues = allIssues.filter(issue => {
+        const linkedIssues = result.issues.filter(issue => {
           const pattern = new RegExp(`#${currentIssueNumber}\\b`);
           return issue.number !== currentIssueNumber && pattern.test(issue.body || '');
         });

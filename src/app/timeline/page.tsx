@@ -17,10 +17,11 @@ export default function TimelinePage() {
   useEffect(() => {
     async function fetchIssues() {
       try {
-        const data = await getIssues(1);
-        setIssues(data);
+        const result = await getIssues(1, undefined, false);
+        setIssues(result.issues || []);
       } catch (error) {
         console.error('Error fetching issues:', error);
+        setIssues([]);
       } finally {
         setLoading(false);
       }
@@ -48,6 +49,7 @@ export default function TimelinePage() {
             searchQuery={searchQuery} 
             selectedLabel={selectedLabel} 
             onLabelClick={(label) => setSelectedLabel(label === selectedLabel ? null : label)}
+            issues={issues}
           />
         </div>
       )}

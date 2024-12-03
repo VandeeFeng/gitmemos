@@ -11,6 +11,7 @@ interface TimelineProps {
   searchQuery: string;
   selectedLabel: string | null;
   onLabelClick: (label: string) => void;
+  issues: Issue[];
 }
 
 // 格式化月份和年份，确保服务端和客户端渲染结果一致
@@ -31,14 +32,23 @@ function getCurrentYearMonth() {
   };
 }
 
-export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineProps) {
-  const [issues, setIssues] = useState<Issue[]>([]);
+export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = [] }: TimelineProps) {
+  const [localIssues, setLocalIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [{ year, month }, setYearMonth] = useState(() => getCurrentYearMonth());
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  // 当外部 issues 改变时更新本地 issues
+  useEffect(() => {
+    setLocalIssues(issues);
+    setHasMore(issues.length === 10);
+    setCurrentPage(1);
+    setLoading(false);
+  }, [issues]);
 
   // 添加日期点击处理函数
   const handleDateClick = (dateKey: string) => {
@@ -46,15 +56,15 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
     
     // 使用 requestAnimationFrame 确保在 DOM 更新后执行
     requestAnimationFrame(() => {
-      const scrollContainer = scrollContainerRef.current;
+      const contentContainer = contentRef.current;
       const dateElement = document.querySelector(`[data-date="${dateKey}"]`);
       
-      if (dateElement && scrollContainer) {
-        const containerRect = scrollContainer.getBoundingClientRect();
+      if (dateElement && contentContainer) {
+        const containerRect = contentContainer.getBoundingClientRect();
         const elementRect = dateElement.getBoundingClientRect();
-        const relativeTop = elementRect.top - containerRect.top + scrollContainer.scrollTop;
+        const relativeTop = elementRect.top - containerRect.top + contentContainer.scrollTop;
         
-        scrollContainer.scrollTo({
+        contentContainer.scrollTo({
           top: relativeTop - 20,
           behavior: "smooth"
         });
@@ -62,48 +72,24 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
     });
   };
 
-  useEffect(() => {
-    const fetchIssues = async (page: number) => {
-      try {
-        const fetchedIssues = await getIssues(page, selectedLabel || undefined);
-        // Sort issues by creation date in descending order
-        const sortedIssues = fetchedIssues.sort((a, b) => 
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
-        
-        if (page === 1) {
-          setIssues(sortedIssues);
-        } else {
-          setIssues(prev => [...prev, ...sortedIssues]);
-        }
-        
-        setHasMore(fetchedIssues.length === 10);
-        setCurrentPage(page);
-      } catch (error) {
-        console.error('Error fetching issues:', error);
-      }
-    };
-
-    const initialFetch = async () => {
-      setLoading(true);
-      await fetchIssues(1);
-      setLoading(false);
-    };
-    initialFetch();
-  }, [selectedLabel]);
-
   const loadMore = async () => {
     if (loadingMore || !hasMore) return;
     setLoadingMore(true);
     try {
       const nextPage = currentPage + 1;
-      const fetchedIssues = await getIssues(nextPage, selectedLabel || undefined);
-      const sortedIssues = fetchedIssues.sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-      setIssues(prev => [...prev, ...sortedIssues]);
-      setCurrentPage(nextPage);
-      setHasMore(fetchedIssues.length === 10);
+      const result = await getIssues(nextPage, selectedLabel || undefined, false);
+      
+      // Ensure no duplicate issues by checking issue numbers
+      const existingIssueNumbers = new Set(localIssues.map(issue => issue.number));
+      const newIssues = (result.issues || []).filter(issue => !existingIssueNumbers.has(issue.number));
+      
+      if (newIssues.length > 0) {
+        setLocalIssues(prev => [...prev, ...newIssues]);
+        setHasMore(result.issues.length === 10);
+        setCurrentPage(nextPage);
+      } else {
+        setHasMore(false);
+      }
     } catch (error) {
       console.error('Error loading more issues:', error);
     } finally {
@@ -116,7 +102,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
   };
 
   // Group issues by month and year, and then by day
-  const groupedIssues = issues.reduce((groups: Record<string, Record<string, Issue[]>>, issue) => {
+  const groupedIssues = localIssues.reduce((groups: Record<string, Record<string, Issue[]>>, issue) => {
     const date = new Date(issue.created_at);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const dayKey = date.toISOString().split('T')[0];
@@ -152,8 +138,12 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[200px]">
-        <Loading size="lg" />
+      <div className="flex flex-col items-center justify-center min-h-[300px] space-y-4">
+        <div className="relative w-16 h-16">
+          <div className="absolute inset-0 border-4 border-gray-100 dark:border-[#2d333b] rounded-full"></div>
+          <div className="absolute inset-0 border-4 border-t-[#2da44e] dark:border-t-[#2f81f7] rounded-full animate-spin"></div>
+        </div>
+        <p className="text-sm text-[#57606a] dark:text-[#768390] animate-pulse">Loading timeline...</p>
       </div>
     );
   }
@@ -161,12 +151,16 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
   const monthIssues = groupedIssues[currentMonthKey] || {};
   const hasIssues = Object.keys(monthIssues).length > 0 && filteredIssues.length > 0;
 
+  // Sort days in descending order
+  const sortedDays = Object.entries(monthIssues)
+    .sort(([dayA], [dayB]) => dayB.localeCompare(dayA));
+
   return (
     <div className="space-y-8 h-[calc(100vh-150px)] relative">
       {/* Main Layout Container */}
       <div className="flex flex-col sm:flex-row h-full">
         {/* Left Sidebar Container (Calendar + Heatmap) */}
-        <div ref={scrollContainerRef} className="sm:sticky sm:w-[170px] sm:top-0 flex-shrink-0">
+        <div ref={sidebarRef} className="sm:sticky sm:w-[170px] sm:top-0 flex-shrink-0">
           <div className="flex sm:flex sm:flex-col sm:items-center gap-2 sm:gap-0 justify-between">
             {/* Calendar Container */}
             <div className="flex-1 sm:flex-none sm:w-32">
@@ -220,7 +214,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
         </div>
 
         {/* Right Content Container */}
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pr-2 pb-16">
+        <div ref={contentRef} className="flex-1 overflow-y-auto pr-2 pb-16">
           {/* Timeline Container */}
           <div className="relative pl-4">
             {/* Timeline Line */}
@@ -229,7 +223,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
             {/* Issues Container */}
             {hasIssues ? (
               <div className="space-y-6">
-                {Object.entries(monthIssues).map(([dayKey, dayIssues]) => {
+                {sortedDays.map(([dayKey, dayIssues]) => {
                   const filteredDayIssues = dayIssues.filter(issue => {
                     if (!searchQuery) return true;
                     const searchLower = searchQuery.toLowerCase();
@@ -244,6 +238,11 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
 
                   if (filteredDayIssues.length === 0) return null;
 
+                  // Sort issues within the day by creation time in descending order
+                  const sortedIssues = [...filteredDayIssues].sort((a, b) => 
+                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                  );
+
                   return (
                     <div key={dayKey} className="relative" data-date={dayKey}>
                       <div className="relative flex items-center h-6">
@@ -254,9 +253,9 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
                       </div>
                       <div className="mt-3 ml-4">
                         <div className="space-y-3">
-                          {filteredDayIssues.map((issue) => (
+                          {sortedIssues.map((issue) => (
                             <IssueCard
-                              key={issue.number}
+                              key={`${dayKey}-${issue.number}`}
                               issue={issue}
                               selectedLabel={selectedLabel}
                               onLabelClick={onLabelClick}
@@ -299,7 +298,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
           </div>
 
           {/* Load More Button */}
-          {hasMore && filteredIssues.length >= 10 && (
+          {hasMore && issues.length >= 10 && (
             <div className="flex justify-center py-4">
               <Button
                 variant="outline"
@@ -309,7 +308,9 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick }: TimelineP
               >
                 {loadingMore ? (
                   <span className="flex items-center gap-2">
-                    <Loading size="sm" className="!w-4 !h-4" />
+                    <div className="relative w-4 h-4">
+                      <div className="absolute inset-0 border-2 border-[#444c56] border-t-[#768390] rounded-full animate-spin"></div>
+                    </div>
                     Loading...
                   </span>
                 ) : (

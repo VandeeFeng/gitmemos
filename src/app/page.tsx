@@ -4,20 +4,46 @@ import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { IssueList } from '@/components/issue-list';
 import { useTheme } from "next-themes";
-import { setGitHubConfig, getGitHubConfig, getIssues } from '@/lib/github';
+import { setGitHubConfig, getGitHubConfig, getIssues, getLabels } from '@/lib/github';
 import { GitHubConfig, Issue } from '@/types/github';
 import { PageLayout } from '@/components/layouts/page-layout';
 import { Loading } from '@/components/ui/loading';
 import { animations } from '@/lib/animations';
 import { componentStates } from '@/lib/component-states';
 import { cn } from '@/lib/utils';
+import { testConnection } from '@/lib/db';
+import { SyncButton } from '@/components/sync-button';
+
+// 提示组件
+function Toast({ message, onClose }: { message: string; onClose: () => void }) {
+  const { theme } = useTheme();
+
+  useEffect(() => {
+    const timer = setTimeout(onClose, 3000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className={cn(
+      "fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg transition-all duration-300 transform translate-y-0",
+      theme === 'light' 
+        ? "bg-[#2da44e] text-white" 
+        : "bg-[#238636] text-white",
+      animations.fade.in
+    )}>
+      {message}
+    </div>
+  );
+}
 
 export default function Home() {
   const [showConfig, setShowConfig] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
-  const [issues, setIssues] = useState<Issue[]>([]);
+  const [allIssues, setAllIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [toast, setToast] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState(false);
   const { theme } = useTheme();
   const [githubConfig, setGithubConfig] = useState<GitHubConfig>({
     owner: '',
@@ -26,46 +52,118 @@ export default function Home() {
     issuesPerPage: 10
   });
 
-  useEffect(() => {
-    const config = getGitHubConfig();
-    if (config) {
-      setGithubConfig(config);
-      fetchIssues();
-    } else {
-      setShowConfig(true);
-      setLoading(false);
-    }
-  }, []);
+  const showToast = (message: string) => {
+    setToast(message);
+  };
 
-  const fetchIssues = async () => {
+  // 获取所有 issues
+  const fetchAllIssues = async (forceSync: boolean = false) => {
+    if (!forceSync && allIssues.length > 0) {
+      return;
+    }
+    
+    setLoading(true);
     try {
-      const data = await getIssues(1);
-      setIssues(data);
+      const result = await getIssues(1, undefined, forceSync);
+      setAllIssues(result.issues);
+      
+      if (result.syncStatus?.success) {
+        showToast(`Successfully synced ${result.syncStatus.totalSynced} issues`);
+      }
     } catch (error) {
       console.error('Error fetching issues:', error);
+      showToast('Failed to fetch issues');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleLoadMore = async (page: number) => {
+    try {
+      const result = await getIssues(page, selectedLabel || undefined, false);
+      
+      // Ensure no duplicate issues by checking issue numbers
+      const existingIssueNumbers = new Set(allIssues.map(issue => issue.number));
+      const newIssues = result.issues.filter(issue => !existingIssueNumbers.has(issue.number));
+      
+      if (newIssues.length > 0) {
+        setAllIssues(prev => [...prev, ...newIssues]);
+      }
+      
+      return result.issues.length === 10;
+    } catch (error) {
+      console.error('Error loading more issues:', error);
+      return false;
+    }
+  };
+
+  const handleSync = async () => {
+    await fetchAllIssues(true);
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      if (initialized) {
+        return;
+      }
+
+      try {
+        const config = await getGitHubConfig(false);
+        setGithubConfig(config);
+        
+        if (config.token && config.owner && config.repo) {
+          // 检查是否有缓存数据
+          const result = await getIssues(1, undefined, false);
+          if (result.issues.length === 0) {
+            // 如果没有缓存数据，则强制同步
+            await fetchAllIssues(true);
+          } else {
+            // 如果有缓存数据，直接使用
+            setAllIssues(result.issues);
+            setLoading(false);
+          }
+        } else {
+          setShowConfig(true);
+          setLoading(false);
+        }
+        setInitialized(true);
+      } catch (error) {
+        console.error('Error initializing:', error);
+        setLoading(false);
+      }
+    };
+    init();
+  }, [initialized]);
+
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setGitHubConfig(githubConfig);
+    await setGitHubConfig(githubConfig);
     setShowConfig(false);
-    await fetchIssues();
+    await fetchAllIssues(true);
   };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
   };
 
-  if (loading) {
-    return (
-      <PageLayout>
-        <Loading />
-      </PageLayout>
-    );
-  }
+  const filteredIssues = allIssues.filter(issue => {
+    if (selectedLabel && !issue.labels.some(label => label.name === selectedLabel)) {
+      return false;
+    }
+    
+    if (searchQuery) {
+      const searchLower = searchQuery.toLowerCase();
+      const titleMatch = issue.title.toLowerCase().includes(searchLower);
+      const bodyMatch = (issue.body || '').toLowerCase().includes(searchLower);
+      const labelsMatch = issue.labels.some(label => 
+        label.name.toLowerCase().includes(searchLower) ||
+        (label.description || '').toLowerCase().includes(searchLower)
+      );
+      return titleMatch || bodyMatch || labelsMatch;
+    }
+    
+    return true;
+  });
 
   return (
     <PageLayout
@@ -74,7 +172,8 @@ export default function Home() {
       onSearch={handleSearch}
       showConfig={true}
       onConfigClick={() => setShowConfig(!showConfig)}
-      issues={issues}
+      issues={filteredIssues}
+      onSync={handleSync}
     >
       <div className={animations.fade.in}>
         {showConfig ? (
@@ -207,18 +306,19 @@ export default function Home() {
               </div>
             </div>
           </div>
+        ) : loading ? (
+          <Loading />
         ) : (
-          <div className={animations.fade.in}>
-            <IssueList
-              selectedLabel={selectedLabel}
-              onLabelClick={(label) => {
-                setSelectedLabel(label === selectedLabel ? null : label);
-              }}
-              searchQuery={searchQuery}
-            />
-          </div>
+          <IssueList 
+            issues={filteredIssues}
+            selectedLabel={selectedLabel}
+            onLabelClick={(label) => setSelectedLabel(label === selectedLabel ? null : label)}
+            searchQuery={searchQuery}
+            onLoadMore={handleLoadMore}
+          />
         )}
       </div>
+      {toast && <Toast message={toast} onClose={() => setToast(null)} />}
     </PageLayout>
   );
 }

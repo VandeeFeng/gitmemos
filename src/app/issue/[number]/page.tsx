@@ -29,7 +29,7 @@ export default function IssuePage({ params }: PageProps) {
       if (!resolvedParams?.number) return;
       
       try {
-        const data = await getIssue(parseInt(resolvedParams.number));
+        const data = await getIssue(parseInt(resolvedParams.number), false);
         setIssue(data);
       } catch (error) {
         console.error('Error fetching issue:', error);

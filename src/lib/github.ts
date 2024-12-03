@@ -1,210 +1,266 @@
 import { Octokit } from "octokit";
 import { GitHubConfig, Issue as GitHubIssue, Label as GitHubLabel } from '@/types/github';
-
-// 缓存接口
-interface CacheItem<T> {
-  data: T;
-  timestamp: number;
-}
-
-interface CacheStore {
-  issues: Map<string, CacheItem<GitHubIssue[]>>;
-  singleIssue: Map<number, CacheItem<GitHubIssue>>;
-  labels: CacheItem<GitHubLabel[]> | null;
-}
-
-// 缓存配置
-const CACHE_DURATION = 60 * 60 * 1000; // 1小时缓存
-const LABELS_CACHE_DURATION = 60 * 60 * 1000; // 标签缓存也设为1小时
-
-// 声明全局类型
-declare global {
-  interface Window {
-    __GITHUB_CACHE: CacheStore | undefined;
-  }
-}
-
-// 确保这是一个模块
-export {};
-
-// 创建一个在客户端和服务器端都可用的缓存存储
-const createCache = (): CacheStore => ({
-  issues: new Map(),
-  singleIssue: new Map(),
-  labels: null,
-});
-
-// 获取缓存实例
-const getCache = (): CacheStore => {
-  if (typeof window === 'undefined') {
-    // 服务器端：每个请求使用新的缓存
-    return createCache();
-  }
-  
-  // 客户端：使用全局缓存
-  if (!window.__GITHUB_CACHE) {
-    window.__GITHUB_CACHE = createCache();
-  }
-  return window.__GITHUB_CACHE || createCache();
-};
-
-// 生成缓存键
-const getCacheKey = (page: number, labels?: string): string => {
-  return `${page}-${labels || 'all'}`;
-};
-
-// 检查缓存是否有效
-const isCacheValid = <T>(cache: CacheItem<T>, duration: number = CACHE_DURATION): boolean => {
-  return Date.now() - cache.timestamp < duration;
-};
+import { getConfig, saveConfig, getIssuesFromDb, saveIssue, getLabelsFromDb, saveLabel, syncIssuesData } from './db';
 
 let config: GitHubConfig | null = null;
 
-export function setGitHubConfig(newConfig: GitHubConfig) {
+export async function setGitHubConfig(newConfig: GitHubConfig) {
   config = newConfig;
-  // 当配置改变时，清除所有缓存
-  const cache = getCache();
-  cache.issues.clear();
-  cache.singleIssue.clear();
-  cache.labels = null;
-  
-  if (typeof window !== 'undefined') {
-    localStorage.setItem('github-config', JSON.stringify(newConfig));
-  }
+  // 保存到数据库
+  await saveConfig(newConfig);
 }
 
-export const getGitHubConfig = (forApi: boolean = true): GitHubConfig => {
-  // API 调用时优先使用环境变量
-  if (forApi) {
-    const envConfig = {
-      owner: process.env.NEXT_PUBLIC_GITHUB_OWNER,
-      repo: process.env.NEXT_PUBLIC_GITHUB_REPO,
-      token: process.env.NEXT_PUBLIC_GITHUB_TOKEN,
-    };
-
-    if (envConfig.owner && envConfig.repo && envConfig.token) {
-      return {
-        owner: envConfig.owner,
-        repo: envConfig.repo,
-        token: envConfig.token,
-        issuesPerPage: 10
-      };
-    }
-  }
-
-  // 其次使用运行时配置
+export async function getGitHubConfig(forApi: boolean = true): Promise<GitHubConfig> {
+  // 1. 优先使用运行时配置
   if (config) {
     return config;
   }
 
-  // 最后尝试从 localStorage 读取（仅在客户端）
-  if (typeof window !== 'undefined') {
-    const savedConfig = localStorage.getItem('github-config');
-    if (savedConfig) {
-      const parsedConfig = JSON.parse(savedConfig);
-      config = parsedConfig;
-      return parsedConfig;
-    }
+  // 2. 从数据库获取（数据库会自动处理环境变量配置）
+  const dbConfig = await getConfig();
+  if (dbConfig) {
+    config = dbConfig;
+    return dbConfig;
   }
 
-  // 如果都没有，返回空配置
+  // 3. 如果都没有，返回空配置
   return {
     owner: '',
     repo: '',
     token: '',
     issuesPerPage: 10
   };
-};
-
-export async function getIssues(page: number = 1, labels?: string) {
-  const cache = getCache();
-  const cacheKey = getCacheKey(page, labels);
-  
-  // 检查缓存
-  const cachedData = cache.issues.get(cacheKey);
-  if (cachedData && isCacheValid(cachedData)) {
-    return cachedData.data;
-  }
-
-  const config = getGitHubConfig();
-  const octokit = new Octokit({
-    auth: config.token
-  });
-  
-  // 使用固定的每页数量，保持一致性
-  const { data } = await octokit.rest.issues.listForRepo({
-    owner: config.owner,
-    repo: config.repo,
-    state: 'all',
-    per_page: config.issuesPerPage,
-    page,
-    sort: 'created',
-    direction: 'desc',
-    labels: labels || undefined
-  });
-
-  const issuesData: GitHubIssue[] = data.map(issue => ({
-    number: issue.number,
-    title: issue.title,
-    body: issue.body || null,
-    created_at: issue.created_at,
-    state: issue.state,
-    labels: issue.labels
-      .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
-        typeof label === 'object' && label !== null)
-      .map(label => ({
-        id: label.id,
-        name: label.name,
-        color: label.color,
-        description: label.description,
-      })),
-  }));
-
-  // 更新缓存
-  cache.issues.set(cacheKey, {
-    data: issuesData,
-    timestamp: Date.now()
-  });
-
-  return issuesData;
 }
 
-export async function getIssue(issueNumber: number) {
-  const cache = getCache();
-  
-  // 先检查单个issue缓存
-  const cachedIssue = cache.singleIssue.get(issueNumber);
-  if (cachedIssue && isCacheValid(cachedIssue)) {
-    return cachedIssue.data;
+// 创建一个全局的 Octokit 实例
+let octokit: Octokit;
+
+export async function getOctokit(): Promise<Octokit> {
+  if (!octokit) {
+    const config = await getGitHubConfig();
+    if (!config.token) {
+      throw new Error('GitHub token is missing');
+    }
+
+    octokit = new Octokit({
+      auth: config.token
+    });
+  }
+  return octokit;
+}
+
+// 缓存机制
+interface IssuesCache {
+  data: GitHubIssue[];
+  timestamp: number;
+  owner: string;
+  repo: string;
+}
+
+let issuesCache: IssuesCache | null = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存时间
+
+export async function getIssues(page: number = 1, labels?: string, forceSync: boolean = false) {
+  const config = await getGitHubConfig();
+  console.log('Getting issues:', { page, labels, forceSync });
+
+  // 检查缓存是否有效
+  const now = Date.now();
+  const isCacheValid = issuesCache && 
+    issuesCache.owner === config.owner && 
+    issuesCache.repo === config.repo && 
+    (now - issuesCache.timestamp) < CACHE_DURATION;
+
+  // 如果缓存有效且不是强制同步，直接使用缓存
+  if (isCacheValid && !forceSync && issuesCache) {
+    console.log('Using cached issues data');
+    const start = (page - 1) * (config.issuesPerPage || 10);
+    const end = start + (config.issuesPerPage || 10);
+    const filteredIssues = labels 
+      ? issuesCache.data.filter(issue => 
+          issue.labels.some(label => label.name === labels)
+        )
+      : issuesCache.data;
+    return { 
+      issues: filteredIssues.slice(start, end),
+      syncStatus: null
+    };
   }
 
-  // 尝试从列表缓存中查找
-  for (const [, cachedData] of cache.issues) {
-    if (isCacheValid(cachedData)) {
-      const issueFromList = cachedData.data.find(issue => issue.number === issueNumber);
-      if (issueFromList) {
-        // 找到后，同时更新单个issue缓存
-        cache.singleIssue.set(issueNumber, {
-          data: issueFromList,
-          timestamp: Date.now()
-        });
-        return issueFromList;
+  // 如果是强制同步，从 GitHub API 获取所有 issues 和 labels 并同步到数据库
+  if (forceSync) {
+    try {
+      console.log('Fetching all issues and labels from GitHub API');
+      const client = await getOctokit();
+      
+      // 首先获取并同步所有 labels
+      const { data: labelsData } = await client.rest.issues.listLabelsForRepo({
+        owner: config.owner,
+        repo: config.repo,
+      });
+      
+      // 同步 labels 到数据库
+      for (const label of labelsData) {
+        await saveLabel(config.owner, config.repo, label);
       }
+      
+      try {
+        // 获取所有 issues
+        let allIssues: GitHubIssue[] = [];
+        let currentPage = 1;
+        let hasMore = true;
+        
+        while (hasMore) {
+          const { data } = await client.rest.issues.listForRepo({
+            owner: config.owner,
+            repo: config.repo,
+            state: 'all',
+            per_page: 100,
+            page: currentPage,
+            sort: 'created',
+            direction: 'desc',
+            labels: labels || undefined
+          });
+
+          if (data.length === 0) {
+            hasMore = false;
+          } else {
+            const issuesData = data.map(issue => ({
+              number: issue.number,
+              title: issue.title,
+              body: issue.body || '',
+              created_at: issue.created_at,
+              state: issue.state,
+              labels: issue.labels
+                .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
+                  typeof label === 'object' && label !== null)
+                .map(label => ({
+                  id: label.id,
+                  name: label.name,
+                  color: label.color,
+                  description: label.description,
+                })),
+            }));
+
+            allIssues = [...allIssues, ...issuesData];
+            currentPage++;
+          }
+        }
+
+        console.log(`Fetched ${allIssues.length} total issues from GitHub API`);
+
+        // 同步到数据库
+        if (allIssues.length > 0) {
+          console.log('Syncing all issues to database');
+          await syncIssuesData(config.owner, config.repo, allIssues);
+          console.log('Database sync completed');
+
+          // 更新缓存
+          issuesCache = {
+            data: allIssues,
+            timestamp: Date.now(),
+            owner: config.owner,
+            repo: config.repo
+          };
+        }
+
+        // 返回请求的页面的数据
+        const start = (page - 1) * (config.issuesPerPage || 10);
+        const end = start + (config.issuesPerPage || 10);
+        return {
+          issues: allIssues.slice(start, end),
+          syncStatus: {
+            success: true,
+            totalSynced: allIssues.length
+          }
+        };
+      } catch (apiError: any) {
+        console.error('Failed to fetch issues:', apiError.message);
+        throw apiError;
+      }
+    } catch (error) {
+      console.error('Error during sync:', error);
+      throw error;
     }
   }
 
-  // 如果缓存中都没有，则调用API获取
-  const config = getGitHubConfig();
-  const octokit = new Octokit({
-    auth: config.token
-  });
+  // 从数据库获取分页数据
+  const issues = await getIssuesFromDb(config.owner, config.repo, page, labels ? [labels] : undefined);
+  
+  // 更新缓存
+  if (issues.length > 0) {
+    issuesCache = {
+      data: issues,
+      timestamp: Date.now(),
+      owner: config.owner,
+      repo: config.repo
+    };
+  }
+  
+  return { issues, syncStatus: null };
+}
 
-  const { data } = await octokit.rest.issues.get({
+export async function getIssue(issueNumber: number, forceSync: boolean = false) {
+  const config = await getGitHubConfig();
+
+  // 如果是强制同步，从 GitHub API 获取并同步到数据库
+  if (forceSync) {
+    const client = await getOctokit();
+
+    const { data } = await client.rest.issues.get({
+      owner: config.owner,
+      repo: config.repo,
+      issue_number: issueNumber
+    });
+
+    const issueData: GitHubIssue = {
+      number: data.number,
+      title: data.title,
+      body: data.body || '',
+      created_at: data.created_at,
+      state: data.state,
+      labels: data.labels
+        .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
+          typeof label === 'object' && label !== null)
+        .map(label => ({
+          id: label.id,
+          name: label.name,
+          color: label.color,
+          description: label.description,
+        })),
+    };
+
+    // 同步到数据库
+    await saveIssue(config.owner, config.repo, issueData);
+    for (const label of issueData.labels) {
+      await saveLabel(config.owner, config.repo, label);
+    }
+
+    return issueData;
+  }
+
+  // 否则从数据库获取
+  const dbIssues = await getIssuesFromDb(config.owner, config.repo);
+  const dbIssue = dbIssues.find(issue => issue.number === issueNumber);
+  if (!dbIssue) {
+    throw new Error(`Issue #${issueNumber} not found in database`);
+  }
+  return dbIssue;
+}
+
+export async function createIssue(title: string, body: string, labels: string[] = []) {
+  const config = await getGitHubConfig();
+  const client = await getOctokit();
+
+  const { data } = await client.rest.issues.create({
     owner: config.owner,
     repo: config.repo,
-    issue_number: issueNumber
+    title,
+    body,
+    labels
   });
 
+  // 同步到数据库
   const issueData: GitHubIssue = {
     number: data.number,
     title: data.title,
@@ -222,42 +278,15 @@ export async function getIssue(issueNumber: number) {
       })),
   };
 
-  // 更新缓存
-  cache.singleIssue.set(issueNumber, {
-    data: issueData,
-    timestamp: Date.now()
-  });
-
-  return issueData;
-}
-
-export async function createIssue(title: string, body: string, labels: string[] = []) {
-  const config = getGitHubConfig();
-  const octokit = new Octokit({
-    auth: config.token
-  });
-
-  const { data } = await octokit.rest.issues.create({
-    owner: config.owner,
-    repo: config.repo,
-    title,
-    body,
-    labels
-  });
-
-  // 清除 issues 列表缓存，因为有新的 issue 创建
-  getCache().issues.clear();
-
+  await saveIssue(config.owner, config.repo, issueData);
   return data;
 }
 
 export async function updateIssue(issueNumber: number, title: string, body: string, labels: string[] = []) {
-  const config = getGitHubConfig();
-  const octokit = new Octokit({
-    auth: config.token
-  });
+  const config = await getGitHubConfig();
+  const client = await getOctokit();
 
-  const { data } = await octokit.rest.issues.update({
+  const { data } = await client.rest.issues.update({
     owner: config.owner,
     repo: config.repo,
     issue_number: issueNumber,
@@ -266,60 +295,89 @@ export async function updateIssue(issueNumber: number, title: string, body: stri
     labels
   });
 
-  // 清除相关缓存
-  getCache().singleIssue.delete(issueNumber);
-  getCache().issues.clear();
-
-  return data;
-}
-
-export async function getLabels() {
-  const cache = getCache();
-  // 检查标签缓存
-  if (cache.labels && isCacheValid(cache.labels, LABELS_CACHE_DURATION)) {
-    return cache.labels.data;
-  }
-
-  const config = getGitHubConfig();
-  const octokit = new Octokit({
-    auth: config.token
-  });
-
-  const { data } = await octokit.rest.issues.listLabelsForRepo({
-    owner: config.owner,
-    repo: config.repo,
-  });
-
-  // 更新缓存
-  getCache().labels = {
-    data,
-    timestamp: Date.now()
+  // 同步到数据库
+  const issueData: GitHubIssue = {
+    number: data.number,
+    title: data.title,
+    body: data.body || '',
+    created_at: data.created_at,
+    state: data.state,
+    labels: data.labels
+      .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
+        typeof label === 'object' && label !== null)
+      .map(label => ({
+        id: label.id,
+        name: label.name,
+        color: label.color,
+        description: label.description,
+      })),
   };
 
+  await saveIssue(config.owner, config.repo, issueData);
   return data;
 }
 
-export async function createLabel(name: string, color: string, description?: string) {
-  const config = getGitHubConfig();
-  const octokit = new Octokit({
-    auth: config.token
-  });
+// 添加标签缓存
+interface LabelsCache {
+  owner: string;
+  repo: string;
+  data: Label[];
+  timestamp: number;
+}
 
-  const { data } = await octokit.rest.issues.createLabel({
+let labelsCache: LabelsCache | null = null;
+
+export async function getLabels(forceSync: boolean = false) {
+  const config = await getGitHubConfig();
+
+  // 检查缓存是否有效
+  const now = Date.now();
+  const isCacheValid = labelsCache && 
+    labelsCache.owner === config.owner && 
+    labelsCache.repo === config.repo && 
+    (now - labelsCache.timestamp) < CACHE_DURATION;
+
+  // 如果缓存有效且不是强制同步，直接使用缓存
+  if (isCacheValid && !forceSync && labelsCache) {
+    console.log('Using cached labels data');
+    return labelsCache.data;
+  }
+
+  // 如果是强制同步，从 GitHub API 获取并同步到数据库
+  if (forceSync) {
+    const client = await getOctokit();
+
+    const { data } = await client.rest.issues.listLabelsForRepo({
+      owner: config.owner,
+      repo: config.repo,
+    });
+
+    // 同步到数据库
+    for (const label of data) {
+      await saveLabel(config.owner, config.repo, label);
+    }
+
+    // 更新缓存
+    labelsCache = {
+      owner: config.owner,
+      repo: config.repo,
+      data,
+      timestamp: now
+    };
+
+    return data;
+  }
+
+  // 从数据库获取
+  const labels = await getLabelsFromDb(config.owner, config.repo);
+
+  // 更新缓存
+  labelsCache = {
     owner: config.owner,
     repo: config.repo,
-    name,
-    color,
-    description
-  });
+    data: labels,
+    timestamp: now
+  };
 
-  // 清除标签缓存
-  getCache().labels = null;
-
-  return data;
+  return labels;
 }
-
-// 创建一个全局的 Octokit 实例
-export const octokit = new Octokit({
-  auth: getGitHubConfig().token,
-});

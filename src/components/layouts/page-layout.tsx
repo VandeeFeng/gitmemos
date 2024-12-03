@@ -18,6 +18,7 @@ interface PageLayoutProps {
   onConfigClick?: () => void
   showSearchAndNew?: boolean
   issues?: Issue[]
+  onSync?: () => Promise<void>
 }
 
 export function PageLayout({ 
@@ -31,10 +32,14 @@ export function PageLayout({
   showConfig,
   onConfigClick,
   showSearchAndNew = true,
-  issues = []
+  issues = [],
+  onSync
 }: PageLayoutProps) {
   const pathname = usePathname()
   const isTimelinePage = pathname === '/timeline'
+  
+  // Ensure issues is always an array
+  const safeIssues = Array.isArray(issues) ? issues : [];
 
   return (
     <div className="min-h-screen flex flex-col bg-bg-primary transition-colors duration-500">
@@ -46,7 +51,8 @@ export function PageLayout({
           showConfig={showConfig}
           onConfigClick={onConfigClick}
           showSearchAndNew={showSearchAndNew}
-          issues={issues}
+          issues={safeIssues}
+          onSync={onSync}
         />
       )}
       <main className={cn(

@@ -109,11 +109,11 @@ export function ActivityHeatmap({ issues, year, month, onDateClick }: ActivityHe
       <div className="mt-3 flex items-center justify-between text-[11px] text-[#57606a] dark:text-[#768390]">
         <span>Less</span>
         <div className="flex gap-[3px]">
-          <div className="w-2.5 h-2.5 rounded-sm bg-[#ebedf0] dark:bg-[#2d333b]" />
-          <div className="w-2.5 h-2.5 rounded-sm bg-[#0969da] dark:bg-[#2f81f7] opacity-25" />
-          <div className="w-2.5 h-2.5 rounded-sm bg-[#0969da] dark:bg-[#2f81f7] opacity-50" />
-          <div className="w-2.5 h-2.5 rounded-sm bg-[#0969da] dark:bg-[#2f81f7] opacity-75" />
-          <div className="w-2.5 h-2.5 rounded-sm bg-[#0969da] dark:bg-[#2f81f7]" />
+          <div key="empty" className="w-2.5 h-2.5 rounded-sm bg-[#ebedf0] dark:bg-[#2d333b]" />
+          <div key="level-1" className="w-2.5 h-2.5 rounded-sm bg-[#0969da] dark:bg-[#2f81f7] opacity-25" />
+          <div key="level-2" className="w-2.5 h-2.5 rounded-sm bg-[#0969da] dark:bg-[#2f81f7] opacity-50" />
+          <div key="level-3" className="w-2.5 h-2.5 rounded-sm bg-[#0969da] dark:bg-[#2f81f7] opacity-75" />
+          <div key="level-4" className="w-2.5 h-2.5 rounded-sm bg-[#0969da] dark:bg-[#2f81f7]" />
         </div>
         <span>More</span>
       </div>

@@ -312,6 +312,7 @@ interface LabelsCache {
 }
 
 let labelsCache: LabelsCache | null = null;
+const LABELS_CACHE_DURATION = 5 * 60 * 1000; // 5分钟缓存时间
 
 export async function getLabels(forceSync: boolean = false) {
   const config = await getGitHubConfig();
@@ -321,7 +322,7 @@ export async function getLabels(forceSync: boolean = false) {
   const isCacheValid = labelsCache && 
     labelsCache.owner === config.owner && 
     labelsCache.repo === config.repo && 
-    (now - labelsCache.timestamp) < CACHE_DURATION;
+    (now - labelsCache.timestamp) < LABELS_CACHE_DURATION;
 
   // 如果缓存有效且不是强制同步，直接使用缓存
   if (isCacheValid && !forceSync && labelsCache) {

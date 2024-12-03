@@ -86,10 +86,6 @@ export default function Home() {
     }, 5000);
   }, []);
 
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id));
-  }, []);
-
   // 从数据库加载数据到页面
   const loadFromDatabase = useCallback(async () => {
     try {

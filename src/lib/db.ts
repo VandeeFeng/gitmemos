@@ -1,6 +1,10 @@
-import { supabase } from './supabase';
+import { createClient } from '@supabase/supabase-js';
 import { GitHubConfig, Issue, Label } from '@/types/github';
-import { Database } from '@/types/supabase';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+);
 
 // 测试数据库连接和表结构
 export async function testConnection() {

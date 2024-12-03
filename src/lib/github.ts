@@ -174,7 +174,7 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
             totalSynced: allIssues.length
           }
         };
-      } catch (apiError: any) {
+      } catch (apiError: Error) {
         console.error('Failed to fetch issues:', apiError.message);
         throw apiError;
       }
@@ -380,4 +380,29 @@ export async function getLabels(forceSync: boolean = false) {
   };
 
   return labels;
+}
+
+export async function createLabel(name: string, color: string, description?: string): Promise<Label> {
+  const config = await getGitHubConfig();
+  const client = await getOctokit();
+
+  const { data } = await client.rest.issues.createLabel({
+    owner: config.owner,
+    repo: config.repo,
+    name,
+    color,
+    description
+  });
+
+  const label: Label = {
+    id: data.id,
+    name: data.name,
+    color: data.color,
+    description: data.description || null
+  };
+
+  // 保存到数据库
+  await saveLabel(config.owner, config.repo, label);
+
+  return label;
 }

@@ -133,7 +133,7 @@ export default function Home() {
       }
     };
     init();
-  }, [initialized]);
+  }, [initialized, fetchAllIssues]);
 
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

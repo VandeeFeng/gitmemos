@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 import { GitHubConfig, Issue, Label } from '@/types/github';
-import { SupabaseClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -28,6 +27,14 @@ interface DbLabel {
   repo: string;
 }
 
+interface DbConfig {
+  owner: string;
+  repo: string;
+  token: string;
+  issues_per_page: number;
+  created_at: string;
+}
+
 interface IssueCache {
   timestamp: number;
   issues: DbIssue[];
@@ -40,6 +47,8 @@ interface SyncHistory {
   repo: string;
   last_sync_at: string;
   issues_synced: number;
+  status: 'success' | 'failed';
+  error_message?: string;
 }
 
 interface DbError {
@@ -77,12 +86,14 @@ function setCache(owner: string, repo: string, page: number, labelsFilter: strin
 }
 
 // 测试数据库连接和表结构
-export async function testConnection() {
+export async function testConnection(): Promise<boolean> {
   try {
+    type CountResult = { count: number };
+
     // 检查 configs 表
     const { data: configsData, error: configsError } = await supabase
       .from('configs')
-      .select('count');
+      .select('count') as { data: CountResult | null; error: DbError | null };
     
     if (configsError) {
       console.error('Error checking configs table:', configsError);
@@ -92,7 +103,7 @@ export async function testConnection() {
     // 检查 issues 表
     const { data: issuesData, error: issuesError } = await supabase
       .from('issues')
-      .select('count');
+      .select('count') as { data: CountResult | null; error: DbError | null };
     
     if (issuesError) {
       console.error('Error checking issues table:', issuesError);
@@ -102,7 +113,7 @@ export async function testConnection() {
     // 检查 labels 表
     const { data: labelsData, error: labelsError } = await supabase
       .from('labels')
-      .select('count');
+      .select('count') as { data: CountResult | null; error: DbError | null };
     
     if (labelsError) {
       console.error('Error checking labels table:', labelsError);
@@ -116,7 +127,8 @@ export async function testConnection() {
     });
     return true;
   } catch (error) {
-    console.error('Database connection or tables check failed:', error);
+    const dbError = error as DbError;
+    console.error('Database connection or tables check failed:', dbError.message || dbError);
     return false;
   }
 }
@@ -133,11 +145,12 @@ export async function getConfig(): Promise<GitHubConfig | null> {
 
   // 如果数据库有配置，直接返回
   if (data) {
+    const dbConfig = data as DbConfig;
     return {
-      owner: data.owner,
-      repo: data.repo,
-      token: data.token,
-      issuesPerPage: data.issues_per_page
+      owner: dbConfig.owner,
+      repo: dbConfig.repo,
+      token: dbConfig.token,
+      issuesPerPage: dbConfig.issues_per_page
     };
   }
 
@@ -241,7 +254,7 @@ export async function getIssuesFromDb(owner: string, repo: string, page: number 
       created_at: issue.github_created_at,
       state: issue.state,
       labels: issue.labels.map((labelName: string) => {
-        const labelInfo = cached.labels.find((l: any) => l.name === labelName);
+        const labelInfo = cached.labels.find((l: DbLabel) => l.name === labelName);
         return labelInfo || {
           id: 0,
           name: labelName,

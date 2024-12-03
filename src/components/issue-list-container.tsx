@@ -11,10 +11,19 @@ interface IssueListContainerProps {
   initialConfig: GitHubConfig;
 }
 
-// 内存缓存
-const loadMoreCache: Record<string, Promise<any> | undefined> = {};
+interface LoadMoreResult {
+  issues: Issue[];
+  syncStatus: {
+    success: boolean;
+    totalSynced: number;
+    lastSyncAt: string;
+  } | null;
+}
 
-export function IssueListContainer({ initialIssues, initialConfig }: IssueListContainerProps) {
+// 内存缓存
+const loadMoreCache: Record<string, Promise<boolean> | undefined> = {};
+
+export function IssueListContainer({ initialIssues, initialConfig: _ }: IssueListContainerProps) {
   const [issues, setIssues] = useState(initialIssues);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
@@ -43,7 +52,7 @@ export function IssueListContainer({ initialIssues, initialConfig }: IssueListCo
     try {
       // 创建新的请求并缓存
       loadMoreCache[cacheKey] = getIssues(page, selectedLabel || undefined, false)
-        .then(result => {
+        .then((result: LoadMoreResult) => {
           const existingIssueNumbers = new Set(issues.map(issue => issue.number));
           const newIssues = result.issues.filter(issue => !existingIssueNumbers.has(issue.number));
           
@@ -53,7 +62,7 @@ export function IssueListContainer({ initialIssues, initialConfig }: IssueListCo
           
           return result.issues.length === 10;
         })
-        .catch(error => {
+        .catch((error: Error) => {
           console.error('Error loading more issues:', error);
           return false;
         })
@@ -65,7 +74,7 @@ export function IssueListContainer({ initialIssues, initialConfig }: IssueListCo
 
       return loadMoreCache[cacheKey];
     } catch (error) {
-      console.error('Error loading more issues:', error);
+      console.error('Error loading more issues:', error instanceof Error ? error.message : String(error));
       setLoading(false);
       return false;
     }

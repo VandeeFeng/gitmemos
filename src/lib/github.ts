@@ -92,13 +92,17 @@ async function checkNeedsSync(owner: string, repo: string, forceSync: boolean): 
 interface IssuesCache {
   timestamp: number;
   data: {
-    issues: any[];
-    syncStatus: any;
+    issues: Issue[];
+    syncStatus: {
+      success: boolean;
+      totalSynced: number;
+      lastSyncAt: string;
+    } | null;
   };
 }
 
 const ISSUES_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-let issuesCache: Record<string, IssuesCache> = {};
+const issuesCache: Record<string, IssuesCache> = {};
 
 function getIssuesCacheKey(owner: string, repo: string, page: number, labels?: string) {
   return `${owner}:${repo}:${page}:${labels || ''}`;
@@ -115,7 +119,7 @@ function getIssuesFromCache(owner: string, repo: string, page: number, labels?: 
   return null;
 }
 
-function setIssuesCache(owner: string, repo: string, page: number, labels: string | undefined, data: any) {
+function setIssuesCache(owner: string, repo: string, page: number, labels: string | undefined, data: IssuesCache['data']) {
   const key = getIssuesCacheKey(owner, repo, page, labels);
   issuesCache[key] = {
     timestamp: Date.now(),

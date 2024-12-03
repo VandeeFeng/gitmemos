@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { GitHubConfig, Issue, Label } from '@/types/github';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -33,6 +34,14 @@ interface IssueCache {
   labels: DbLabel[];
 }
 
+interface SyncHistory {
+  id: number;
+  owner: string;
+  repo: string;
+  last_sync_at: string;
+  issues_synced: number;
+}
+
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const dbCache: Record<string, IssueCache> = {};
 
@@ -51,7 +60,7 @@ function getFromCache(owner: string, repo: string, page: number, labelsFilter?: 
   return null;
 }
 
-function setCache(owner: string, repo: string, page: number, labelsFilter: string[] | undefined, issues: any[], labels: any[]) {
+function setCache(owner: string, repo: string, page: number, labelsFilter: string[] | undefined, issues: DbIssue[], labels: DbLabel[]) {
   const key = getCacheKey(owner, repo, page, labelsFilter);
   dbCache[key] = {
     timestamp: Date.now(),
@@ -385,17 +394,12 @@ export async function syncIssuesData(owner: string, repo: string, issues: Issue[
 }
 
 // 同步历史相关操作
-export async function getLastSyncHistory(owner: string, repo: string): Promise<{
-  last_sync_at: string;
-  issues_synced: number;
-  status: 'success' | 'failed';
-} | null> {
+export async function getLastSyncHistory(owner: string, repo: string): Promise<SyncHistory | null> {
   const { data, error } = await supabase
     .from('sync_history')
     .select('*')
     .eq('owner', owner)
     .eq('repo', repo)
-    .eq('status', 'success')
     .order('last_sync_at', { ascending: false })
     .limit(1)
     .single();
@@ -404,11 +408,7 @@ export async function getLastSyncHistory(owner: string, repo: string): Promise<{
     return null;
   }
 
-  return {
-    last_sync_at: data.last_sync_at,
-    issues_synced: data.issues_synced,
-    status: data.status
-  };
+  return data as SyncHistory;
 }
 
 export async function recordSyncHistory(

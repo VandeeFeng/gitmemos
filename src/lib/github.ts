@@ -1,5 +1,5 @@
 import { Octokit } from "octokit";
-import { GitHubConfig, Issue } from '@/types/github';
+import { GitHubConfig, Issue, Label } from '@/types/github';
 import { 
   getConfig, 
   saveConfig, 
@@ -438,11 +438,10 @@ export async function createLabel(name: string, color: string, description?: str
     id: data.id,
     name: data.name,
     color: data.color,
-    description: data.description || null
+    description: data.description
   };
 
-  // 保存到数据库
+  // 同步到数据库
   await saveLabel(config.owner, config.repo, label);
-
   return label;
 }

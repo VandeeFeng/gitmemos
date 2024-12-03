@@ -65,10 +65,6 @@ export default function Home() {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [syncingWithGitHub, setSyncingWithGitHub] = useState(false);
-  const [lastSyncInfo, setLastSyncInfo] = useState<{
-    lastSyncAt: string;
-    totalSynced: number;
-  } | null>(null);
   const { theme } = useTheme();
   const [githubConfig, setGithubConfig] = useState<GitHubConfig>({
     owner: '',
@@ -91,17 +87,9 @@ export default function Home() {
     try {
       const result = await getIssues(1, undefined, false);
       setAllIssues(result.issues);
-      if (result.syncStatus?.lastSyncAt) {
-        setLastSyncInfo({
-          lastSyncAt: result.syncStatus.lastSyncAt,
-          totalSynced: result.syncStatus.totalSynced
-        });
-        
-        // 只在第一次加载时显示上次同步时间
-        if (!initialized) {
-          const lastSyncDate = new Date(result.syncStatus.lastSyncAt);
-          showToast(`Last synced: ${lastSyncDate.toLocaleString()} (${result.syncStatus.totalSynced} issues)`);
-        }
+      if (result.syncStatus?.lastSyncAt && !initialized) {
+        const lastSyncDate = new Date(result.syncStatus.lastSyncAt);
+        showToast(`Last synced: ${lastSyncDate.toLocaleString()} (${result.syncStatus.totalSynced} issues)`);
       }
       return result.issues.length;
     } catch (error) {
@@ -124,14 +112,8 @@ export default function Home() {
       const result = await getIssues(1, undefined, true);
       setAllIssues(result.issues);
       
-      if (result.syncStatus?.success) {
-        if (result.syncStatus.lastSyncAt) {
-          setLastSyncInfo({
-            lastSyncAt: result.syncStatus.lastSyncAt,
-            totalSynced: result.syncStatus.totalSynced
-          });
-          showToast(`Successfully synced ${result.syncStatus.totalSynced} issues from GitHub`);
-        }
+      if (result.syncStatus?.success && result.syncStatus?.lastSyncAt) {
+        showToast(`Successfully synced ${result.syncStatus.totalSynced} issues from GitHub`);
       }
     } catch (error) {
       console.error('Error syncing with GitHub:', error);

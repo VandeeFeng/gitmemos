@@ -1,5 +1,5 @@
 import { Octokit } from "octokit";
-import { GitHubConfig, Issue as GitHubIssue } from '@/types/github';
+import { GitHubConfig, Issue as GitHubIssue, Label } from '@/types/github';
 import { getConfig, saveConfig, getIssuesFromDb, saveIssue, getLabelsFromDb, saveLabel, syncIssuesData } from './db';
 
 let config: GitHubConfig | null = null;
@@ -174,8 +174,8 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
             totalSynced: allIssues.length
           }
         };
-      } catch (apiError: Error) {
-        console.error('Failed to fetch issues:', apiError.message);
+      } catch (apiError: unknown) {
+        console.error('Failed to fetch issues:', apiError instanceof Error ? apiError.message : apiError);
         throw apiError;
       }
     } catch (error) {

@@ -54,7 +54,7 @@ export async function testConnection() {
 // 配置相关操作
 export async function getConfig(): Promise<GitHubConfig | null> {
   // 先从数据库获取配置
-  const { data, error } = await supabase
+  const { data } = await supabase
     .from('configs')
     .select('*')
     .order('created_at', { ascending: false })

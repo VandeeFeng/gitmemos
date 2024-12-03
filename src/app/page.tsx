@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { IssueList } from '@/components/issue-list';
 import { useTheme } from "next-themes";
-import { setGitHubConfig, getGitHubConfig, getIssues, getLabels } from '@/lib/github';
+import { setGitHubConfig, getGitHubConfig, getIssues } from '@/lib/github';
 import { GitHubConfig, Issue } from '@/types/github';
 import { PageLayout } from '@/components/layouts/page-layout';
 import { Loading } from '@/components/ui/loading';
@@ -108,7 +108,7 @@ export default function Home() {
       }
 
       try {
-        const config = await getGitHubConfig(false);
+        const config = await getGitHubConfig();
         setGithubConfig(config);
         
         if (config.token && config.owner && config.repo) {

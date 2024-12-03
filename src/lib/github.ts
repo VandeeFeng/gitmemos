@@ -63,50 +63,15 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
   const config = await getGitHubConfig();
   console.log('Getting issues:', { page, labels, forceSync });
 
-  // 1. 首先从数据库获取数据
-  const issues = await getIssuesFromDb(config.owner, config.repo, page, labels ? [labels] : undefined);
-  const lastSync = await getLastSyncHistory(config.owner, config.repo);
+  // 1. 检查是否需要从 GitHub 同步
+  const needsGitHubSync = forceSync || await shouldSync(config.owner, config.repo);
+  console.log('GitHub sync check:', { forceSync, needsGitHubSync });
 
-  // 2. 检查是否需要同步
-  const shouldSyncResult = !lastSync || await shouldSync(config.owner, config.repo);
-  const needsSync = forceSync || shouldSyncResult;
-  console.log('Sync check:', { 
-    forceSync, 
-    shouldSyncResult, 
-    needsSync,
-    lastSync: lastSync ? new Date(lastSync.last_sync_at).toISOString() : null 
-  });
-  
-  // 3. 如果需要同步，从 GitHub API 获取数据
-  if (needsSync) {
+  // 2. 如果需要从 GitHub 同步
+  if (needsGitHubSync) {
     try {
       console.log('Starting GitHub sync...');
       const client = await getOctokit();
-
-      // 先检查是否真的需要同步（再次确认，避免重复同步）
-      const reallyNeedsSync = await shouldSync(config.owner, config.repo);
-      if (!forceSync && !reallyNeedsSync) {
-        console.log('Sync not needed after recheck, using database data');
-        return {
-          issues,
-          syncStatus: lastSync ? {
-            success: true,
-            totalSynced: lastSync.issues_synced,
-            lastSyncAt: lastSync.last_sync_at
-          } : null
-        };
-      }
-      
-      // 首先获取并同步所有 labels
-      const { data: labelsData } = await client.rest.issues.listLabelsForRepo({
-        owner: config.owner,
-        repo: config.repo,
-      });
-
-      // 同步 labels 到数据库
-      for (const label of labelsData) {
-        await saveLabel(config.owner, config.repo, label);
-      }
       
       // 获取所有 issues
       let allIssues: GitHubIssue[] = [];
@@ -150,45 +115,39 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
         }
       }
 
-      console.log(`Fetched ${allIssues.length} total issues from GitHub API`);
+      console.log(`Fetched ${allIssues.length} issues from GitHub API`);
 
       // 同步到数据库
       if (allIssues.length > 0) {
-        console.log('Syncing all issues to database');
+        // 首先同步 labels
+        const { data: labelsData } = await client.rest.issues.listLabelsForRepo({
+          owner: config.owner,
+          repo: config.repo,
+        });
+
+        for (const label of labelsData) {
+          await saveLabel(config.owner, config.repo, label);
+        }
+
+        // 然后同步 issues
         await syncIssuesData(config.owner, config.repo, allIssues);
-        
-        // 重新获取最新的同步记录
-        const newLastSync = await getLastSyncHistory(config.owner, config.repo);
-        
-        // 返回最新的数据
-        return {
-          issues: allIssues.slice((page - 1) * (config.issuesPerPage || 10), page * (config.issuesPerPage || 10)),
-          syncStatus: newLastSync ? {
-            success: true,
-            totalSynced: newLastSync.issues_synced,
-            lastSyncAt: newLastSync.last_sync_at
-          } : null
-        };
       }
     } catch (error) {
-      console.error('Error during sync:', error);
-      // 如果同步失败但数据库有数据，返回数据库中的数据
-      if (issues.length > 0) {
-        console.log('Sync failed but returning database data');
-        return { 
-          issues,
-          syncStatus: lastSync ? {
-            success: true,
-            totalSynced: lastSync.issues_synced,
-            lastSyncAt: lastSync.last_sync_at
-          } : null
-        };
-      }
-      throw error;
+      console.error('GitHub sync failed:', error);
     }
   }
 
-  console.log('Using database data without sync');
+  // 3. 从数据库获取分页数据
+  console.log('Loading data from database...');
+  const issues = await getIssuesFromDb(config.owner, config.repo, page, labels ? [labels] : undefined);
+  const lastSync = await getLastSyncHistory(config.owner, config.repo);
+  
+  if (issues.length === 0) {
+    console.log('No issues found in database');
+  } else {
+    console.log(`Loaded ${issues.length} issues from database`);
+  }
+
   // 4. 返回数据库中的数据
   return { 
     issues,

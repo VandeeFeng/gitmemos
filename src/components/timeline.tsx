@@ -73,9 +73,10 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
 
   // Cleanup on unmount
   useEffect(() => {
+    const currentRef = loadMoreRef.current;
     return () => {
-      if (loadMoreRef.current) {
-        clearTimeout(loadMoreRef.current);
+      if (currentRef) {
+        clearTimeout(currentRef);
       }
     };
   }, []);

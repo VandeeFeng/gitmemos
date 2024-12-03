@@ -33,7 +33,6 @@ function getCurrentYearMonth() {
 
 export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = [] }: TimelineProps) {
   const [localIssues, setLocalIssues] = useState<Issue[]>([]);
-  const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -173,7 +172,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
     return titleMatch || bodyMatch || labelsMatch;
   });
 
-  if (loading) {
+  if (loadingMore) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px] space-y-4">
         <div className="relative w-16 h-16">

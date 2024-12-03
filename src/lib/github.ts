@@ -141,7 +141,14 @@ function setIssuesCache(owner: string, repo: string, page: number, labels: strin
 
 // 添加请求追踪
 interface RequestTracker {
-  promise: Promise<any>;
+  promise: Promise<{
+    issues: Issue[];
+    syncStatus: {
+      success: boolean;
+      totalSynced: number;
+      lastSyncAt: string;
+    } | null;
+  }>;
   timestamp: number;
   requestId: string;
 }

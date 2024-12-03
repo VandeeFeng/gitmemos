@@ -142,19 +142,6 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
     return titleMatch || bodyMatch || labelsMatch;
   });
 
-  // 计算已显示的 issues 数量
-  const displayedIssuesCount = Object.values(groupedIssues)
-    .flatMap(monthGroup => Object.values(monthGroup))
-    .flat()
-    .filter(issue => {
-      const date = new Date(issue.created_at);
-      const issueMonth = date.getMonth();
-      const issueYear = date.getFullYear();
-      // 只统计当前月份及之前月份的 issues
-      return (issueYear < year) || (issueYear === year && issueMonth <= month);
-    })
-    .length;
-
   const monthIssues = groupedIssues[currentMonthKey] || {};
   const hasIssues = Object.keys(monthIssues).length > 0 && filteredIssues.length > 0;
 

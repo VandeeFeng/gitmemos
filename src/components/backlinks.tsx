@@ -9,7 +9,7 @@ interface BacklinksProps {
 
 export function Backlinks({ currentIssueNumber }: BacklinksProps) {
   const [backlinks, setBacklinks] = useState<Issue[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     async function fetchBacklinks() {
@@ -31,18 +31,6 @@ export function Backlinks({ currentIssueNumber }: BacklinksProps) {
     }
     fetchBacklinks();
   }, [currentIssueNumber]);
-
-  if (loading) {
-    return (
-      <div className="animate-pulse">
-        <div className="h-4 bg-gray-200 dark:bg-[#2d333b] rounded w-24 mb-3"></div>
-        <div className="space-y-2">
-          <div className="h-10 bg-gray-200 dark:bg-[#2d333b] rounded"></div>
-          <div className="h-10 bg-gray-200 dark:bg-[#2d333b] rounded"></div>
-        </div>
-      </div>
-    );
-  }
 
   if (backlinks.length === 0) {
     return null;

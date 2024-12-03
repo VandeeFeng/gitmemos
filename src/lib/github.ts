@@ -82,6 +82,20 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
     try {
       console.log('Starting GitHub sync...');
       const client = await getOctokit();
+
+      // 先检查是否真的需要同步（再次确认，避免重复同步）
+      const reallyNeedsSync = await shouldSync(config.owner, config.repo);
+      if (!forceSync && !reallyNeedsSync) {
+        console.log('Sync not needed after recheck, using database data');
+        return {
+          issues,
+          syncStatus: lastSync ? {
+            success: true,
+            totalSynced: lastSync.issues_synced,
+            lastSyncAt: lastSync.last_sync_at
+          } : null
+        };
+      }
       
       // 首先获取并同步所有 labels
       const { data: labelsData } = await client.rest.issues.listLabelsForRepo({

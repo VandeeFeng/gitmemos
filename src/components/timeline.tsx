@@ -33,9 +33,8 @@ function getCurrentYearMonth() {
 }
 
 export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = [] }: TimelineProps) {
+  const [displayCount, setDisplayCount] = useState(10);  // 初始显示10条
   const [localIssues, setLocalIssues] = useState<Issue[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [{ year, month }, setYearMonth] = useState(() => getCurrentYearMonth());
   const sidebarRef = useRef<HTMLDivElement>(null);
@@ -48,53 +47,27 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
     if (isFirstRender.current) {
       isFirstRender.current = false;
       setLocalIssues(issues);
-      setHasMore(issues.length >= 10);
       return;
     }
 
     // Debounce updates to prevent rapid re-renders
     const timer = setTimeout(() => {
       setLocalIssues(issues);
-      setHasMore(issues.length >= 10);
-      setCurrentPage(1);
+      setDisplayCount(10);  // 重置显示数量
     }, 100);
 
     return () => clearTimeout(timer);
   }, [issues]);
 
-  const loadMore = async () => {
-    if (loadingMore || !hasMore) return;
+  const loadMore = () => {
+    if (loadingMore) return;
     
-    if (loadMoreRef.current) {
-      clearTimeout(loadMoreRef.current);
-    }
-
     setLoadingMore(true);
     try {
-      const nextPage = currentPage + 1;
-      const result = await getIssues(nextPage, selectedLabel || undefined, false);
-      
-      if (!result.issues || result.issues.length === 0) {
-        setHasMore(false);
-        return;
-      }
-
-      const existingIssueNumbers = new Set(localIssues.map(issue => issue.number));
-      const newIssues = result.issues.filter((issue: Issue) => !existingIssueNumbers.has(issue.number));
-      
-      if (newIssues.length > 0) {
-        setLocalIssues(prev => [...prev, ...newIssues]);
-        setHasMore(result.issues.length === 10);
-        setCurrentPage(nextPage);
-      } else {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error('Error loading more issues:', error);
-      setHasMore(false);
+      // 增加显示数量
+      setDisplayCount(prev => prev + 10);
     } finally {
       setLoadingMore(false);
-      loadMoreRef.current = undefined;
     }
   };
 
@@ -131,6 +104,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
 
   const handleMonthChange = (newYear: number, newMonth: number) => {
     setYearMonth({ year: newYear, month: newMonth });
+    setDisplayCount(10);  // 切换月份时重置显示数量
   };
 
   // Group issues by month and year, and then by day
@@ -189,9 +163,10 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
     return <Loading text="Loading timeline..." />;
   }
 
-  // Sort days in descending order
+  // Sort days in descending order and limit the number of issues shown
   const sortedDays = Object.entries(monthIssues)
-    .sort(([dayA], [dayB]) => dayB.localeCompare(dayA));
+    .sort(([dayA], [dayB]) => dayB.localeCompare(dayA))
+    .slice(0, displayCount);  // 限制显示数量
 
   return (
     <div className="space-y-8 h-[calc(100vh-150px)] relative">
@@ -338,7 +313,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
           </div>
 
           {/* Load More Button */}
-          {hasMore && displayedIssuesCount < localIssues.length && (
+          {hasIssues && sortedDays.length < Object.keys(monthIssues).length && (
             <div className="flex justify-center py-4">
               <Button
                 variant="outline"

@@ -327,10 +327,6 @@ export async function getIssuesFromDb(owner: string, repo: string, page: number 
       query = query.contains('labels', labelsFilter);
     }
 
-    const pageSize = 10;
-    const start = (page - 1) * pageSize;
-    query = query.range(start, start + pageSize - 1);
-
     const { data, error } = await query;
 
     if (error) {

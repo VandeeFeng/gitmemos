@@ -11,8 +11,10 @@ interface IssueListProps {
   onLabelClick: (label: string) => void;
   searchQuery?: string;
   issues: Issue[];
-  onLoadMore: (page: number) => Promise<boolean>;
+  onLoadMore: () => Promise<void>;
   loading?: boolean;
+  hasMore?: boolean;
+  loadingMore?: boolean;
 }
 
 export function IssueList({ 
@@ -21,57 +23,15 @@ export function IssueList({
   searchQuery = '',
   issues,
   onLoadMore,
-  loading = false
+  loading = false,
+  hasMore = false,
+  loadingMore = false
 }: IssueListProps) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-
-  useEffect(() => {
-    setHasMore(issues.length === 10);
-    setCurrentPage(1);
-  }, [issues]);
-
-  const loadMore = async () => {
-    if (loadingMore) return;
-    setLoadingMore(true);
-    try {
-      const nextPage = currentPage + 1;
-      const hasMoreIssues = await onLoadMore(nextPage);
-      
-      if (hasMoreIssues) {
-        setCurrentPage(nextPage);
-        setHasMore(true);
-      } else {
-        setHasMore(false);
-      }
-    } catch (error) {
-      console.error('Error loading more issues:', error);
-      setHasMore(false);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
-
-  const filteredIssues = issues.filter(issue => {
-    if (!searchQuery) return true;
-
-    const searchLower = searchQuery.toLowerCase();
-    const titleMatch = issue.title.toLowerCase().includes(searchLower);
-    const bodyMatch = (issue.body || '').toLowerCase().includes(searchLower);
-    const labelsMatch = issue.labels.some(label => 
-      label.name.toLowerCase().includes(searchLower) ||
-      (label.description || '').toLowerCase().includes(searchLower)
-    );
-
-    return titleMatch || bodyMatch || labelsMatch;
-  });
-
   if (loading && !loadingMore) {
     return <Loading />;
   }
 
-  if (filteredIssues.length === 0) {
+  if (issues.length === 0) {
     return (
       <div className="text-center py-8">
         <div className="text-text-secondary">
@@ -88,7 +48,7 @@ export function IssueList({
 
   return (
     <div className="space-y-4">
-      {filteredIssues.map((issue) => (
+      {issues.map((issue) => (
         <div key={issue.number}>
           <IssueCard
             issue={issue}
@@ -97,11 +57,11 @@ export function IssueList({
           />
         </div>
       ))}
-      {hasMore && filteredIssues.length >= 10 && (
+      {hasMore && (
         <div className="flex justify-center mt-6">
           <Button
             variant="outline"
-            onClick={loadMore}
+            onClick={onLoadMore}
             disabled={loadingMore}
             className="text-text-secondary border-default hover:bg-bg-secondary dark:hover:bg-bg-tertiary hover:text-text-primary shadow-card dark:shadow-card-dark px-4"
           >

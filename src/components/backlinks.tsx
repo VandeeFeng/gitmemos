@@ -32,6 +32,16 @@ export function Backlinks({ currentIssueNumber }: BacklinksProps) {
     fetchBacklinks();
   }, [currentIssueNumber]);
 
+  if (loading) {
+    return (
+      <div className="border-t border-gray-200 dark:border-[#373e47] mt-8 pt-6">
+        <div className="animate-pulse flex space-x-4">
+          <div className="h-4 bg-gray-200 dark:bg-[#373e47] rounded w-24"></div>
+        </div>
+      </div>
+    );
+  }
+
   if (backlinks.length === 0) {
     return null;
   }

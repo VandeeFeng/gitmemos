@@ -42,6 +42,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [syncingWithGitHub, setSyncingWithGitHub] = useState(false);
   const { theme } = useTheme();
   const [githubConfig, setGithubConfig] = useState<GitHubConfig>({
     owner: '',
@@ -54,27 +55,84 @@ export default function Home() {
     setToast(message);
   };
 
-  // 获取所有 issues
-  const fetchAllIssues = useCallback(async (forceSync: boolean = false) => {
-    if (!forceSync && allIssues.length > 0) {
-      return;
-    }
-    
-    setLoading(true);
+  // 从数据库加载数据到页面
+  const loadFromDatabase = useCallback(async () => {
     try {
-      const result = await getIssues(1, undefined, forceSync);
+      const result = await getIssues(1, undefined, false);
+      setAllIssues(result.issues);
+      return result.issues.length;
+    } catch (error) {
+      console.error('Error loading from database:', error);
+      showToast('Failed to load data from database');
+      return 0;
+    }
+  }, []);
+
+  // 从 GitHub 同步数据到数据库
+  const syncFromGitHub = useCallback(async () => {
+    if (syncingWithGitHub) return;
+    
+    setSyncingWithGitHub(true);
+    showToast('Syncing with GitHub...');
+    
+    try {
+      const result = await getIssues(1, undefined, true);
       setAllIssues(result.issues);
       
       if (result.syncStatus?.success) {
-        showToast(`Successfully synced ${result.syncStatus.totalSynced} issues`);
+        showToast(`Successfully synced ${result.syncStatus.totalSynced} issues from GitHub`);
       }
     } catch (error) {
-      console.error('Error fetching issues:', error);
-      showToast('Failed to fetch issues');
+      console.error('Error syncing with GitHub:', error);
+      showToast('Failed to sync with GitHub');
     } finally {
-      setLoading(false);
+      setSyncingWithGitHub(false);
     }
-  }, [allIssues.length, showToast]);
+  }, [syncingWithGitHub]);
+
+  // 初始化加载
+  useEffect(() => {
+    const init = async () => {
+      if (initialized) {
+        return;
+      }
+
+      try {
+        const config = await getGitHubConfig();
+        setGithubConfig(config);
+        
+        if (config.token && config.owner && config.repo) {
+          setLoading(true);
+          
+          // 1. 首先从数据库加载数据到页面
+          const issuesCount = await loadFromDatabase();
+          setLoading(false);
+          
+          // 2. 然后在后台从 GitHub 同步到数据库
+          if (issuesCount === 0) {
+            // 如果数据库没有数据，立即同步
+            syncFromGitHub();
+          } else {
+            // 如果有数据，延迟同步以优先保证页面响应
+            setTimeout(syncFromGitHub, 1000);
+          }
+        } else {
+          setShowConfig(true);
+          setLoading(false);
+        }
+        setInitialized(true);
+      } catch (error) {
+        console.error('Error initializing:', error);
+        setLoading(false);
+      }
+    };
+    init();
+  }, [initialized, loadFromDatabase, syncFromGitHub]);
+
+  // 手动同步按钮处理函数
+  const handleSync = async () => {
+    await syncFromGitHub();
+  };
 
   const handleLoadMore = async (page: number) => {
     try {
@@ -95,49 +153,11 @@ export default function Home() {
     }
   };
 
-  const handleSync = async () => {
-    await fetchAllIssues(true);
-  };
-
-  useEffect(() => {
-    const init = async () => {
-      if (initialized) {
-        return;
-      }
-
-      try {
-        const config = await getGitHubConfig();
-        setGithubConfig(config);
-        
-        if (config.token && config.owner && config.repo) {
-          // 检查是否有缓存数据
-          const result = await getIssues(1, undefined, false);
-          if (result.issues.length === 0) {
-            // 如果没有缓存数据，则强制同步
-            await fetchAllIssues(true);
-          } else {
-            // 如果有缓存数据，直接使用
-            setAllIssues(result.issues);
-            setLoading(false);
-          }
-        } else {
-          setShowConfig(true);
-          setLoading(false);
-        }
-        setInitialized(true);
-      } catch (error) {
-        console.error('Error initializing:', error);
-        setLoading(false);
-      }
-    };
-    init();
-  }, [initialized, fetchAllIssues]);
-
   const handleConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     await setGitHubConfig(githubConfig);
     setShowConfig(false);
-    await fetchAllIssues(true);
+    await syncFromGitHub();
   };
 
   const handleSearch = (query: string) => {

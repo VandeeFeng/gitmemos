@@ -23,7 +23,7 @@ interface LoadMoreResult {
 // 内存缓存
 const loadMoreCache: Record<string, Promise<boolean> | undefined> = {};
 
-export function IssueListContainer({ initialIssues, initialConfig: _ }: IssueListContainerProps) {
+export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
   const [issues, setIssues] = useState(initialIssues);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);

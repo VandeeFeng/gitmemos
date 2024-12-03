@@ -1,5 +1,5 @@
 import { Octokit } from "octokit";
-import { GitHubConfig, Issue as GitHubIssue, Label } from '@/types/github';
+import { GitHubConfig, Issue } from '@/types/github';
 import { 
   getConfig, 
   saveConfig, 
@@ -148,7 +148,7 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
       const client = await getOctokit();
       
       // 获取所有 issues
-      let allIssues: GitHubIssue[] = [];
+      let allIssues: Issue[] = [];
       let currentPage = 1;
       let hasMore = true;
       
@@ -252,7 +252,7 @@ export async function getIssue(issueNumber: number, forceSync: boolean = false) 
       issue_number: issueNumber
     });
 
-    const issueData: GitHubIssue = {
+    const issueData: Issue = {
       number: data.number,
       title: data.title,
       body: data.body || '',
@@ -300,7 +300,7 @@ export async function createIssue(title: string, body: string, labels: string[] 
   });
 
   // 同步到数据库
-  const issueData: GitHubIssue = {
+  const issueData: Issue = {
     number: data.number,
     title: data.title,
     body: data.body || '',
@@ -335,7 +335,7 @@ export async function updateIssue(issueNumber: number, title: string, body: stri
   });
 
   // 同步到数据库
-  const issueData: GitHubIssue = {
+  const issueData: Issue = {
     number: data.number,
     title: data.title,
     body: data.body || '',

@@ -6,15 +6,35 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 );
 
-// 添加内存缓存
+interface DbIssue {
+  owner: string;
+  repo: string;
+  issue_number: number;
+  title: string;
+  body: string;
+  state: string;
+  labels: string[];
+  github_created_at: string;
+  updated_at: string;
+}
+
+interface DbLabel {
+  id: number;
+  name: string;
+  color: string;
+  description: string | null;
+  owner: string;
+  repo: string;
+}
+
 interface IssueCache {
   timestamp: number;
-  issues: any[];
-  labels: any[];
+  issues: DbIssue[];
+  labels: DbLabel[];
 }
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-let dbCache: Record<string, IssueCache> = {};
+const dbCache: Record<string, IssueCache> = {};
 
 function getCacheKey(owner: string, repo: string, page: number, labelsFilter?: string[]) {
   return `${owner}:${repo}:${page}:${labelsFilter?.join(',') || ''}`;
@@ -194,7 +214,7 @@ export async function saveIssue(owner: string, repo: string, issue: Issue) {
   }
 }
 
-export async function getIssuesFromDb(owner: string, repo: string, page: number = 1, labelsFilter?: string[]) {
+export async function getIssuesFromDb(owner: string, repo: string, page: number = 1, labelsFilter?: string[]): Promise<Issue[]> {
   // 检查缓存
   const cached = getFromCache(owner, repo, page, labelsFilter);
   if (cached) {
@@ -257,17 +277,17 @@ export async function getIssuesFromDb(owner: string, repo: string, page: number 
     }
 
     // 缓存结果
-    setCache(owner, repo, page, labelsFilter, data, labelsData);
+    setCache(owner, repo, page, labelsFilter, data as DbIssue[], labelsData as DbLabel[]);
 
     // 返回处理后的数据
-    return data.map(issue => ({
+    return data.map((issue: DbIssue) => ({
       number: issue.issue_number,
       title: issue.title,
       body: issue.body,
       created_at: issue.github_created_at,
       state: issue.state,
       labels: issue.labels.map((labelName: string) => {
-        const labelInfo = labelsData.find(label => label.name === labelName);
+        const labelInfo = labelsData.find((label: DbLabel) => label.name === labelName);
         return labelInfo || {
           id: 0,
           name: labelName,

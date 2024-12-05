@@ -19,7 +19,7 @@ export const CACHE_EXPIRY = {
   ISSUES: 15 * 60 * 1000, // 15 minutes
   LABELS: 15 * 60 * 1000, // 15 minutes
   CONFIG: 15 * 60 * 1000, // 15 minutes
-  PASSWORD: 15 * 60 * 1000, // 15 minutes
+  PASSWORD: 24 * 60 * 60 * 1000, // 24 hours
 } as const;
 
 // 创建缓存管理器实例

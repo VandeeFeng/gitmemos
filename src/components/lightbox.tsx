@@ -70,16 +70,18 @@ export function Lightbox({ src, alt = '', className = '', width, height }: Light
     e.stopPropagation();
     if (scale === 1) {
       setScale(1.5);
-      // 如果有鼠标位置，则以鼠标位置为中心放大
+      // 计算图片中心点相对于视口的位置
       if (imageRef.current) {
         const bounds = imageRef.current.getBoundingClientRect();
-        const mouseX = e.clientX - bounds.left;
-        const mouseY = e.clientY - bounds.top;
-        const centerX = bounds.width / 2;
-        const centerY = bounds.height / 2;
+        const viewportCenterX = window.innerWidth / 2;
+        const viewportCenterY = window.innerHeight / 2;
+        const imageCenterX = bounds.left + bounds.width / 2;
+        const imageCenterY = bounds.top + bounds.height / 2;
+        
+        // 计算需要的偏移量以使图片居中
         setPosition({
-          x: (centerX - mouseX) * 0.5,
-          y: (centerY - mouseY) * 0.5
+          x: (viewportCenterX - imageCenterX) / 1.5,
+          y: (viewportCenterY - imageCenterY) / 1.5
         });
       }
     } else {

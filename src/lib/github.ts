@@ -557,12 +557,9 @@ export async function createIssue(title: string, body: string, labels: string[])
 
 export async function updateIssue(
   issueNumber: number,
-  updates: {
-    title?: string;
-    body?: string;
-    state?: 'open' | 'closed';
-    labels?: string[];
-  }
+  title: string,
+  body: string,
+  labels: string[]
 ): Promise<Issue> {
   const config = await getGitHubConfig();
   const client = await getOctokit();
@@ -572,7 +569,9 @@ export async function updateIssue(
       owner: config.owner,
       repo: config.repo,
       issue_number: issueNumber,
-      ...updates
+      title,
+      body,
+      labels
     });
 
     const issue: Issue = {

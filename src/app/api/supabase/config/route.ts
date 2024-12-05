@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
+import { PostgrestError } from '@supabase/supabase-js';
 
 export async function GET() {
   try {
     const { data, error } = await supabaseServer
       .from('configs')
       .select('*')
-      .order('created_at', { ascending: false })
       .limit(1)
       .single();
 
@@ -15,9 +15,10 @@ export async function GET() {
     }
 
     return NextResponse.json(data);
-  } catch (error) {
+  } catch (error: unknown) {
+    const err = error as Error;
     return NextResponse.json(
-      { error: 'Failed to fetch config' },
+      { error: err.message || 'Failed to fetch config' },
       { status: 500 }
     );
   }
@@ -37,9 +38,10 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json(data);
-  } catch (error) {
+  } catch (error: unknown) {
+    const err = error as Error;
     return NextResponse.json(
-      { error: 'Failed to save config' },
+      { error: err.message || 'Failed to save config' },
       { status: 500 }
     );
   }

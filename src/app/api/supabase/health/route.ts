@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
+import { PostgrestError } from '@supabase/supabase-js';
 
 export async function GET() {
   try {
@@ -8,7 +9,7 @@ export async function GET() {
     // 检查 configs 表
     const { data: configsData, error: configsError } = await supabaseServer
       .from('configs')
-      .select('count') as { data: CountResult | null; error: any };
+      .select('count') as { data: CountResult | null; error: PostgrestError | null };
     
     if (configsError) {
       return NextResponse.json(
@@ -20,7 +21,7 @@ export async function GET() {
     // 检查 issues 表
     const { data: issuesData, error: issuesError } = await supabaseServer
       .from('issues')
-      .select('count') as { data: CountResult | null; error: any };
+      .select('count') as { data: CountResult | null; error: PostgrestError | null };
     
     if (issuesError) {
       return NextResponse.json(
@@ -32,7 +33,7 @@ export async function GET() {
     // 检查 labels 表
     const { data: labelsData, error: labelsError } = await supabaseServer
       .from('labels')
-      .select('count') as { data: CountResult | null; error: any };
+      .select('count') as { data: CountResult | null; error: PostgrestError | null };
     
     if (labelsError) {
       return NextResponse.json(

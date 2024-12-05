@@ -84,14 +84,14 @@ export async function GET() {
       }
 
       return NextResponse.json(labels);
-    } catch (error: any) {
+    } catch (error: Error & { response?: { data?: { message?: string }, status?: number } }) {
       console.error('GitHub API error:', error.response?.data || error);
       return NextResponse.json(
         { error: error.response?.data?.message || 'Failed to fetch labels from GitHub' },
         { status: error.response?.status || 500 }
       );
     }
-  } catch (error: any) {
+  } catch (error: Error) {
     console.error('Error in labels route:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to fetch labels' },
@@ -150,14 +150,14 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json(label);
-    } catch (error: any) {
+    } catch (error: Error & { response?: { data?: { message?: string }, status?: number } }) {
       console.error('GitHub API error:', error.response?.data || error);
       return NextResponse.json(
         { error: error.response?.data?.message || 'Failed to create label on GitHub' },
         { status: error.response?.status || 500 }
       );
     }
-  } catch (error: any) {
+  } catch (error: Error) {
     console.error('Error in create label route:', error);
     return NextResponse.json(
       { error: error.message || 'Failed to create label' },

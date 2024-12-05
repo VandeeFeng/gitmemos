@@ -66,31 +66,13 @@ export async function getGitHubConfig(): Promise<GitHubConfig> {
   };
 }
 
-interface SyncCheckData {
-  needsSync: boolean;
-  isInitialLoad: boolean;
-}
-
 export async function checkNeedsSync(owner: string, repo: string, forceSync: boolean): Promise<boolean> {
   // If force sync is requested, return true
   if (forceSync) return true;
 
-  const cacheKey = CACHE_KEYS.SYNC_CHECK(owner, repo);
-  const cached = cacheManager?.get<SyncCheckData>(cacheKey);
-
-  // If this is the first load or no cache, check sync status
-  if (!cached || cached.isInitialLoad) {
-    const syncStatus = await checkSyncStatus(owner, repo);
-    const needsSync = syncStatus?.needsSync ?? true;
-    const data: SyncCheckData = {
-      needsSync,
-      isInitialLoad: false
-    };
-    cacheManager?.set(cacheKey, data, { expiry: CACHE_EXPIRY.SYNC_CHECK });
-    return needsSync;
-  }
-
-  return cached.needsSync;
+  // Check sync status directly from the database
+  const syncStatus = await checkSyncStatus(owner, repo);
+  return syncStatus?.needsSync ?? true;
 }
 
 // Request tracking

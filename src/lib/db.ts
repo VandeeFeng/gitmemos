@@ -1,30 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 import { GitHubConfig, Issue, Label } from '@/types/github';
+import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
+import { supabase } from './supabase';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
-
-interface DbIssue {
-  owner: string;
-  repo: string;
-  issue_number: number;
-  title: string;
-  body: string;
-  state: string;
-  labels: string[];
-  github_created_at: string;
-  updated_at: string;
-}
-
-interface DbLabel {
-  id: number;
-  name: string;
-  color: string;
-  description: string | null;
-  owner: string;
-  repo: string;
+interface DbError {
+  message: string;
+  details?: unknown;
+  hint?: string;
+  code?: string;
 }
 
 interface DbConfig {
@@ -36,11 +19,27 @@ interface DbConfig {
   password?: string;
 }
 
-interface DbCache {
-  timestamp: number;
-  issues: DbIssue[];
-  labels: DbLabel[];
-  total: number;
+interface DbIssue {
+  id: number;
+  owner: string;
+  repo: string;
+  issue_number: number;
+  title: string;
+  body: string | null;
+  created_at: string;
+  updated_at: string;
+  state: string;
+  labels: string[];
+  github_created_at: string;
+}
+
+interface DbLabel {
+  id: number;
+  name: string;
+  color: string;
+  description: string | null;
+  owner: string;
+  repo: string;
 }
 
 interface SyncHistory {
@@ -51,27 +50,52 @@ interface SyncHistory {
   issues_synced: number;
   status: 'success' | 'failed';
   error_message?: string;
+  created_at?: string;
 }
 
-interface DbError {
-  message: string;
-  details?: unknown;
-  hint?: string;
-  code?: string;
+interface CountResult {
+  count: number;
 }
 
 const DB_PAGE_SIZE = 50;
-const DB_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
-const dbCache: Record<string, DbCache> = {};
+// 缓存锁
+const cacheLocks = new Set<string>();
+const pendingOperations = new Map<string, Promise<any>>();
 
-const PASSWORD_VERIFIED_KEY = 'password_verified';
+async function withCacheLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
+  // 检查是否有正在进行的操作
+  const pending = pendingOperations.get(key);
+  if (pending) {
+    console.log(`Waiting for pending operation on key: ${key}`);
+    return pending as Promise<T>;
+  }
 
-function getDbCacheKey(owner: string, repo: string, page: number, labelsFilter?: string[]) {
-  return `db:${owner}:${repo}:${page}:${labelsFilter?.sort().join(',') || ''}`;
+  if (cacheLocks.has(key)) {
+    console.log(`Cache lock exists for key: ${key}, waiting...`);
+    // 等待一段时间后重试
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return withCacheLock(key, operation);
+  }
+
+  try {
+    cacheLocks.add(key);
+    console.log(`Acquired cache lock for key: ${key}`);
+    
+    // 创建并存储操作的 Promise
+    const operationPromise = operation();
+    pendingOperations.set(key, operationPromise);
+
+    const result = await operationPromise;
+    return result;
+  } finally {
+    cacheLocks.delete(key);
+    pendingOperations.delete(key);
+    console.log(`Released cache lock for key: ${key}`);
+  }
 }
 
-// 测试数据库连接和表结构
+// 测试数据库接和表结构
 export async function testConnection(): Promise<boolean> {
   try {
     type CountResult = { count: number };
@@ -130,9 +154,21 @@ export async function verifyPassword(password: string): Promise<boolean> {
 
   const isValid = !!(data && data.password && data.password === password);
   if (isValid) {
-    setPasswordVerified(true);
+    cacheManager?.set(CACHE_KEYS.PASSWORD_VERIFIED, true, { expiry: CACHE_EXPIRY.PASSWORD });
   }
   return isValid;
+}
+
+export function setPasswordVerified(verified: boolean) {
+  if (verified) {
+    cacheManager?.set(CACHE_KEYS.PASSWORD_VERIFIED, true, { expiry: CACHE_EXPIRY.PASSWORD });
+  } else {
+    cacheManager?.remove(CACHE_KEYS.PASSWORD_VERIFIED);
+  }
+}
+
+export function isPasswordVerified(): boolean {
+  return !!cacheManager?.get<boolean>(CACHE_KEYS.PASSWORD_VERIFIED);
 }
 
 export async function getConfig(): Promise<GitHubConfig | null> {
@@ -155,7 +191,7 @@ export async function getConfig(): Promise<GitHubConfig | null> {
     };
   }
 
-  // 如果数��库没配置，尝试从环境变量获取
+  // 如果据库没配置，尝试从环境变量获取
   const owner = process.env.NEXT_PUBLIC_GITHUB_OWNER;
   const repo = process.env.NEXT_PUBLIC_GITHUB_REPO;
   const token = process.env.NEXT_PUBLIC_GITHUB_TOKEN;
@@ -200,7 +236,7 @@ export async function getConfig(): Promise<GitHubConfig | null> {
 }
 
 export async function saveConfig(config: GitHubConfig) {
-  // 先检查是否已存在相同的配置
+  // 先检查否已存相同的配
   const { data: existingConfig } = await supabase
     .from('configs')
     .select('*')
@@ -209,7 +245,7 @@ export async function saveConfig(config: GitHubConfig) {
     .single();
 
   if (existingConfig) {
-    // 如果���在，则更新配置
+    // 如果存在，则更新配置
     const { error } = await supabase
       .from('configs')
       .update({
@@ -289,112 +325,79 @@ export async function getIssuesFromDb(
   page: number = 1,
   labelsFilter?: string[]
 ): Promise<Issue[]> {
-  const cacheKey = getDbCacheKey(owner, repo, page, labelsFilter);
-  const cached = dbCache[cacheKey];
+  const cacheKey = CACHE_KEYS.ISSUES(owner, repo, page, labelsFilter?.join(',') || '');
   
-  if (cached && Date.now() - cached.timestamp < DB_CACHE_DURATION) {
-    return cached.issues.map(issue => ({
-      number: issue.issue_number,
-      title: issue.title,
-      body: issue.body,
-      created_at: issue.github_created_at,
-      state: issue.state,
-      labels: issue.labels.map((labelName: string) => {
-        const labelInfo = cached.labels.find((l: DbLabel) => l.name === labelName);
-        return labelInfo || {
-          id: 0,
-          name: labelName,
-          color: 'gray',
-          description: null
-        };
-      })
-    }));
-  }
+  return withCacheLock(cacheKey, async () => {
+    // 先检查缓存
+    const cached = cacheManager?.get<Issue[]>(cacheKey);
+    if (cached) {
+      console.log(`Using cached data for key: ${cacheKey}`);
+      return cached;
+    }
 
-  try {
-    // 获取标签数据
-    const { data: labelsData, error: labelsError } = await supabase
-      .from('labels')
-      .select('*')
-      .eq('owner', owner)
-      .eq('repo', repo);
+    console.log(`Fetching data from database for key: ${cacheKey}`);
+    try {
+      // 计算分页范围
+      const from = (page - 1) * DB_PAGE_SIZE;
+      const to = from + DB_PAGE_SIZE - 1;
 
-    if (labelsError) {
-      console.error('Error fetching labels:', labelsError);
+      // 构建查询
+      let query = supabase
+        .from('issues')
+        .select('*', { count: 'exact' })
+        .eq('owner', owner)
+        .eq('repo', repo)
+        .order('github_created_at', { ascending: false })
+        .range(from, to);
+
+      // 如果有标签过滤，���加过滤条件
+      if (labelsFilter && labelsFilter.length > 0) {
+        query = query.contains('labels', labelsFilter);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching issues:', error);
+        return [];
+      }
+
+      // 获取标签数据
+      const { data: labelsData } = await supabase
+        .from('labels')
+        .select('*')
+        .eq('owner', owner)
+        .eq('repo', repo);
+
+      // 转换数据格式
+      const issues = data.map((issue: DbIssue) => ({
+        number: issue.issue_number,
+        title: issue.title,
+        body: issue.body || '',
+        created_at: issue.github_created_at,
+        state: issue.state,
+        labels: issue.labels.map(labelName => {
+          const labelInfo = labelsData?.find((l: DbLabel) => l.name === labelName);
+          return labelInfo || {
+            id: 0,
+            name: labelName,
+            color: 'gray',
+            description: null
+          };
+        })
+      }));
+
+      // 存入缓存
+      console.log(`Setting cache for key: ${cacheKey}`);
+      cacheManager?.set(cacheKey, issues, { expiry: CACHE_EXPIRY.ISSUES });
+
+      return issues;
+    } catch (error) {
+      console.error('Error fetching issues:', error);
       return [];
-    }
-
-    // 计算分页范围
-    const from = (page - 1) * DB_PAGE_SIZE;
-    const to = from + DB_PAGE_SIZE - 1;
-
-    // 构建查询
-    let query = supabase
-      .from('issues')
-      .select('*', { count: 'exact' })
-      .eq('owner', owner)
-      .eq('repo', repo)
-      .order('github_created_at', { ascending: false })
-      .range(from, to);
-
-    if (labelsFilter && labelsFilter.length > 0) {
-      query = query.contains('labels', labelsFilter);
-    }
-
-    const { data, error, count } = await query;
-
-    if (error) {
-      console.error('Error fetching issues from database:', error);
-      return [];
-    }
-
-    if (!data || data.length === 0) {
-      return [];
-    }
-
-    // 更新缓存
-    dbCache[cacheKey] = {
-      timestamp: Date.now(),
-      issues: data as DbIssue[],
-      labels: labelsData as DbLabel[],
-      total: count || 0
-    };
-
-    // 返回处理后的数据
-    return data.map((issue: DbIssue) => ({
-      number: issue.issue_number,
-      title: issue.title,
-      body: issue.body,
-      created_at: issue.github_created_at,
-      state: issue.state,
-      labels: issue.labels.map((labelName: string) => {
-        const labelInfo = labelsData.find((label: DbLabel) => label.name === labelName);
-        return labelInfo || {
-          id: 0,
-          name: labelName,
-          color: 'gray',
-          description: null
-        };
-      })
-    }));
-  } catch (error) {
-    console.error('Failed to fetch issues from database:', error);
-    return [];
-  }
-}
-
-// 清理过期的数据库缓存
-export function cleanupDbCache() {
-  const now = Date.now();
-  Object.keys(dbCache).forEach(key => {
-    if (now - dbCache[key].timestamp > DB_CACHE_DURATION) {
-      delete dbCache[key];
     }
   });
 }
-
-// 定期清理缓存
-setInterval(cleanupDbCache, DB_CACHE_DURATION);
 
 // Labels 相关操作
 export async function saveLabel(owner: string, repo: string, label: Label) {
@@ -418,24 +421,49 @@ export async function saveLabel(owner: string, repo: string, label: Label) {
 }
 
 export async function getLabelsFromDb(owner: string, repo: string): Promise<Label[]> {
-  const { data, error } = await supabase
-    .from('labels')
-    .select('*')
-    .eq('owner', owner)
-    .eq('repo', repo)
-    .order('name');
-
-  if (error) {
-    console.error('Error fetching labels:', error);
-    return [];
+  const cacheKey = CACHE_KEYS.LABELS(owner, repo);
+  const cached = cacheManager?.get<Label[]>(cacheKey);
+  
+  if (cached) {
+    return cached;
   }
 
-  return data.map(label => ({
-    id: label.id,
-    name: label.name,
-    color: label.color,
-    description: label.description
-  }));
+  return withCacheLock(cacheKey, async () => {
+    // 再次检查缓存（可能在等待锁的过程中已经被其他请求设置了）
+    const cachedAfterLock = cacheManager?.get<Label[]>(cacheKey);
+    if (cachedAfterLock) {
+      return cachedAfterLock;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('labels')
+        .select('*')
+        .eq('owner', owner)
+        .eq('repo', repo)
+        .order('name');
+
+      if (error) {
+        console.error('Error fetching labels:', error);
+        return [];
+      }
+
+      const labels = data.map(label => ({
+        id: label.id,
+        name: label.name,
+        color: label.color,
+        description: label.description
+      }));
+
+      // 存入缓存
+      cacheManager?.set(cacheKey, labels, { expiry: CACHE_EXPIRY.LABELS });
+
+      return labels;
+    } catch (error) {
+      console.error('Error fetching labels:', error);
+      return [];
+    }
+  });
 }
 
 // 数据同步功能
@@ -466,100 +494,137 @@ export async function syncIssuesData(owner: string, repo: string, issues: Issue[
   }
 }
 
-// 同步历史相关操作
-export async function getLastSyncHistory(owner: string, repo: string): Promise<SyncHistory | null> {
-  const { data, error } = await supabase
-    .from('sync_history')
-    .select('*')
-    .eq('owner', owner)
-    .eq('repo', repo)
-    .order('last_sync_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  if (error || !data) {
-    return null;
+// 检查是否需要从 GitHub API 同步
+export async function shouldSync(owner: string, repo: string, forceSync: boolean = false): Promise<boolean> {
+  // 如果强制同步，直接返回 true
+  if (forceSync) {
+    return true;
   }
 
-  return data as SyncHistory;
+  try {
+    // 获取最后一次同步录
+    const { data: lastSync, error } = await supabase
+      .from('sync_history')
+      .select('*')
+      .eq('owner', owner)
+      .eq('repo', repo)
+      .order('last_sync_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      console.error('Error checking sync history:', {
+        error,
+        owner,
+        repo,
+        context: 'shouldSync function'
+      });
+      return true; // 如果出错，建议进行同步
+    }
+
+    // 如果没有同步记录，需要同步
+    if (!lastSync) {
+      console.log('No sync history found, sync needed');
+      return true;
+    }
+
+    // 检查上次同步状态和时间
+    const lastSyncTime = new Date(lastSync.last_sync_at).getTime();
+    const now = Date.now();
+    const hoursSinceLastSync = (now - lastSyncTime) / (1000 * 60 * 60);
+
+    // 如果上次同步失败或超过24小时，需要同步
+    const needsSync = lastSync.status === 'failed' || hoursSinceLastSync >= 24;
+    
+    console.log('Sync check:', {
+      owner,
+      repo,
+      lastSyncAt: new Date(lastSyncTime).toISOString(),
+      hoursSinceLastSync: Math.round(hoursSinceLastSync),
+      lastSyncStatus: lastSync.status,
+      needsSync
+    });
+
+    return needsSync;
+  } catch (error) {
+    console.error('Error checking sync status:', error);
+    return true; // 如果出错，建议进行同步
+  }
 }
 
+// 记录同步历史
 export async function recordSyncHistory(
   owner: string,
   repo: string,
   status: 'success' | 'failed',
-  issuesSynced: number = 0,
+  issuesSynced: number,
   errorMessage?: string
-) {
-  const { error } = await supabase
+): Promise<void> {
+  const { error: dbError } = await supabase
     .from('sync_history')
     .insert({
       owner,
       repo,
-      last_sync_at: new Date().toISOString(),
-      issues_synced: issuesSynced,
       status,
-      error_message: errorMessage
+      issues_synced: issuesSynced,
+      error_message: errorMessage,
+      last_sync_at: new Date().toISOString()
     });
 
-  if (error) {
-    console.error('Error recording sync history:', error);
+  if (dbError) {
+    console.error('Failed to record sync history:', dbError);
   }
 }
 
-// 检查是否需要同步
-export async function shouldSync(owner: string, repo: string): Promise<boolean> {
+// 获取最后一次同步记录
+export async function getLastSyncHistory(owner: string, repo: string): Promise<SyncHistory | null> {
   try {
-    // 1. First check if there are any issues in the database
-    const { data: issues, error: issuesError } = await supabase
-      .from('issues')
-      .select('issue_number')
+    const { data, error } = await supabase
+      .from('sync_history')
+      .select('*')
       .eq('owner', owner)
       .eq('repo', repo)
-      .limit(1);
+      .order('last_sync_at', { ascending: false })
+      .limit(1)
+      .single();
 
-    // If query failed or no issues found, sync is needed
-    if (issuesError || !issues || issues.length === 0) {
-      console.log('No issues in database, sync needed');
-      return true;
+    if (error) {
+      console.error('Error fetching last sync history:', error);
+      return null;
     }
 
-    // 2. Then check the last sync time
-    const lastSync = await getLastSyncHistory(owner, repo);
-    
-    if (!lastSync) {
-      console.log('No sync history, sync needed');
-      return true;
-    }
-
-    const now = new Date();
-    const lastSyncDate = new Date(lastSync.last_sync_at);
-    const hoursSinceLastSync = (now.getTime() - lastSyncDate.getTime()) / (1000 * 60 * 60);
-    
-    // If last sync was more than 24 hours ago, sync is needed
-    const needsSync = hoursSinceLastSync >= 24;
-    console.log(`Last sync was ${hoursSinceLastSync.toFixed(2)} hours ago, sync ${needsSync ? 'needed' : 'not needed'}`);
-    return needsSync;
+    return data;
   } catch (error) {
-    console.error('Error checking sync status:', error);
-    // If there's an error checking sync status, assume sync is needed
-    return true;
+    console.error('Failed to get last sync history:', error);
+    return null;
   }
 }
 
-export function setPasswordVerified(verified: boolean) {
-  if (typeof window !== 'undefined') {
-    if (verified) {
-      localStorage.setItem(PASSWORD_VERIFIED_KEY, 'true');
-    } else {
-      localStorage.removeItem(PASSWORD_VERIFIED_KEY);
-    }
-  }
-}
+export async function checkSyncStatus(owner: string, repo: string) {
+  const { data: lastSync, error } = await supabase
+    .from('sync_history')
+    .select('*')
+    .eq('owner', owner)
+    .eq('repo', repo)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
 
-export function isPasswordVerified(): boolean {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem(PASSWORD_VERIFIED_KEY) === 'true';
+  if (error) {
+    console.error('Failed to check sync status:', error);
+    return { needsSync: true, lastSyncAt: null };
   }
-  return false;
+
+  if (!lastSync) {
+    return { needsSync: true, lastSyncAt: null };
+  }
+
+  const lastSyncTime = new Date(lastSync.last_sync_at).getTime();
+  const now = Date.now();
+  const syncInterval = 1000 * 60 * 60; // 1 hour
+
+  return {
+    needsSync: now - lastSyncTime > syncInterval,
+    lastSyncAt: lastSync.last_sync_at
+  };
 } 

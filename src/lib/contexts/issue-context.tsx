@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, useRef, ReactNode, useC
 import { Issue, GitHubConfig } from '@/types/github';
 import { getIssues, getGitHubConfig } from '@/lib/github';
 import { recordSyncHistory } from '@/lib/db';
+import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 
 interface IssueContextType {
   issues: Issue[];
@@ -25,42 +26,10 @@ const IssueContext = createContext<IssueContextType>({
   updateIssues: () => {}
 });
 
-// 使用 localStorage 来缓存数据
-const CACHE_KEY = 'gitmemo_cache';
-const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes
-
 interface CacheData {
   issues: Issue[];
   config: GitHubConfig;
-  timestamp: number;
 }
-
-function getCache(): CacheData | null {
-  if (typeof window === 'undefined') return null;
-  
-  try {
-    const cached = localStorage.getItem(CACHE_KEY);
-    if (!cached) return null;
-
-    const data: CacheData = JSON.parse(cached);
-    if (Date.now() - data.timestamp > CACHE_EXPIRY) {
-      localStorage.removeItem(CACHE_KEY);
-      return null;
-    }
-
-    return data;
-  } catch {
-    return null;
-  }
-}
-
-function setCache(data: CacheData) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(CACHE_KEY, JSON.stringify({ ...data, timestamp: Date.now() }));
-}
-
-// 全局内存缓
-let memoryCache: CacheData | null = null;
 
 export function IssueProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<IssueContextType>({
@@ -85,14 +54,16 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       setState(prev => {
         if (!prev.config) return prev;
 
-        const newState = {
+        const newState: CacheData = {
           issues: result.issues,
           config: prev.config,
-          timestamp: Date.now()
         };
         
-        setCache(newState);
-        memoryCache = newState;
+        cacheManager?.set(
+          CACHE_KEYS.ISSUES(prev.config.owner, prev.config.repo, 1, ''),
+          newState,
+          { expiry: CACHE_EXPIRY.ISSUES }
+        );
 
         // 记录同步历史
         recordSyncHistory(
@@ -128,14 +99,17 @@ export function IssueProvider({ children }: { children: ReactNode }) {
   const updateIssues = useCallback((newIssues: Issue[]) => {
     if (!state.config) return;
     
-    const newState = {
+    const newState: CacheData = {
       issues: newIssues,
       config: state.config,
-      timestamp: Date.now()
     };
+
     setState(prev => ({ ...prev, issues: newIssues }));
-    setCache(newState);
-    memoryCache = newState;
+    cacheManager?.set(
+      CACHE_KEYS.ISSUES(state.config.owner, state.config.repo, 1, ''),
+      newState,
+      { expiry: CACHE_EXPIRY.ISSUES }
+    );
   }, [state.config]);
 
   useEffect(() => {
@@ -146,44 +120,10 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       initializingRef.current = true;
 
       try {
-        // First check memory cache
-        if (memoryCache?.issues && memoryCache?.config) {
-          if (mounted) {
-            setState(prev => ({
-              ...prev,
-              issues: memoryCache!.issues,
-              config: memoryCache!.config,
-              loading: false,
-              initialized: true,
-              syncIssues,
-              updateIssues
-            }));
-          }
-          return;
-        }
-
-        // Then check localStorage cache
-        const cached = getCache();
-        if (cached?.issues && cached?.config) {
-          if (mounted) {
-            setState(prev => ({
-              ...prev,
-              issues: cached.issues,
-              config: cached.config,
-              loading: false,
-              initialized: true,
-              syncIssues,
-              updateIssues
-            }));
-            memoryCache = cached;
-          }
-          return;
-        }
-
-        // Finally fetch from server
+        // 获取配置
         const config = await getGitHubConfig();
         
-        if (!config) {
+        if (!config || !config.owner || !config.repo) {
           if (mounted) {
             setState(prev => ({ 
               ...prev, 
@@ -196,13 +136,32 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        // 检查缓存
+        const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');
+        const cached = cacheManager?.get<CacheData>(cacheKey);
+
+        if (cached?.issues && cached?.config) {
+          if (mounted) {
+            setState(prev => ({
+              ...prev,
+              issues: cached.issues,
+              config: cached.config,
+              loading: false,
+              initialized: true,
+              syncIssues,
+              updateIssues
+            }));
+          }
+          return;
+        }
+
+        // 从服务器获取数据
         const issuesResult = await getIssues(1, undefined, false);
         
         if (mounted) {
-          const newState = {
+          const newState: CacheData = {
             issues: issuesResult.issues,
             config,
-            timestamp: Date.now()
           };
 
           setState(prev => ({
@@ -215,8 +174,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
             updateIssues
           }));
 
-          setCache(newState);
-          memoryCache = newState;
+          cacheManager?.set(cacheKey, newState, { expiry: CACHE_EXPIRY.ISSUES });
         }
       } catch (error) {
         console.error('Error initializing data:', error);
@@ -248,17 +206,10 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [state.initialized, syncIssues, updateIssues]);
-
-  // Expose initialization status
-  const value = {
-    ...state,
-    isInitializing: initializingRef.current,
-    initializePromise: initializePromiseRef.current
-  };
+  }, [syncIssues, updateIssues]);
 
   return (
-    <IssueContext.Provider value={value}>
+    <IssueContext.Provider value={state}>
       {children}
     </IssueContext.Provider>
   );

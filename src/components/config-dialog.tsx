@@ -150,7 +150,7 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
                 onClick={handleVerifyPassword}
                 disabled={verifying}
                 variant="outline"
-                className={`min-w-[80px] ${passwordVerified ? 'bg-success/10 border-success text-success hover:bg-success/20' : ''}`}
+                className={`min-w-[80px] border-default hover:bg-bg-tertiary dark:hover:bg-bg-tertiary transition-colors ${passwordVerified ? 'bg-success/10 border-success text-success hover:bg-success/20' : ''}`}
               >
                 {verifying ? 'Verifying...' : passwordVerified ? 'Verified' : 'Verify'}
               </Button>

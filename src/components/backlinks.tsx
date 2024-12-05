@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Issue } from '@/types/github';
-import { getIssues } from '@/lib/github';
+import { getIssuesFromDb } from '@/lib/db';
+import { useIssues } from '@/lib/contexts/issue-context';
 
 interface BacklinksProps {
   currentIssueNumber: number;
@@ -10,18 +11,28 @@ interface BacklinksProps {
 export function Backlinks({ currentIssueNumber }: BacklinksProps) {
   const [backlinks, setBacklinks] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(false);
+  const { config, issues } = useIssues();
 
   useEffect(() => {
     async function fetchBacklinks() {
+      if (!config) return;
+      
       setLoading(true);
       try {
-        // 获取所有 issues
-        const result = await getIssues(1, undefined, false);
+        // 优先使用上下文中的 issues
+        let allIssues = issues;
+        
+        // 如果上下文中没有 issues，则从数据库获取
+        if (!allIssues || allIssues.length === 0) {
+          allIssues = await getIssuesFromDb(config.owner, config.repo);
+        }
+        
         // 过滤出引用了当前 issue 的其他 issues
-        const linkedIssues = result.issues.filter(issue => {
+        const linkedIssues = allIssues.filter(issue => {
           const pattern = new RegExp(`#${currentIssueNumber}\\b`);
           return issue.number !== currentIssueNumber && pattern.test(issue.body || '');
         });
+        
         setBacklinks(linkedIssues);
       } catch (error) {
         console.error('Error fetching backlinks:', error);
@@ -29,8 +40,9 @@ export function Backlinks({ currentIssueNumber }: BacklinksProps) {
         setLoading(false);
       }
     }
+
     fetchBacklinks();
-  }, [currentIssueNumber]);
+  }, [currentIssueNumber, config, issues]);
 
   if (loading) {
     return (

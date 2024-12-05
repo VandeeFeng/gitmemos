@@ -151,6 +151,7 @@ interface RequestTracker {
   }>;
   timestamp: number;
   requestId: string;
+  loggedReuse?: boolean;
 }
 
 const requestLocks: Record<string, RequestTracker> = {};
@@ -225,7 +226,10 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
   // 检查是否有正在进行的有效请求
   const existingRequest = requestLocks[lockKey];
   if (existingRequest && Date.now() - existingRequest.timestamp < REQUEST_TIMEOUT) {
-    console.log(`Reusing existing request ${existingRequest.requestId} for page ${page}`);
+    if (!existingRequest.loggedReuse) {
+      console.log(`Reusing request ${existingRequest.requestId} for page ${page} and subsequent calls`);
+      existingRequest.loggedReuse = true;
+    }
     return existingRequest.promise;
   }
 

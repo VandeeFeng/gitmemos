@@ -1,11 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
 import MDEditor from '@uiw/react-md-editor';
 import { Button } from './ui/button';
-import { Loading } from './ui/loading';
-import { EditableIssue, Label } from '@/types/github';
+import { EditableIssue } from '@/types/github';
 import { getGitHubConfig } from '@/lib/github';
 import { createIssue, updateIssue, createLabel } from '@/lib/github';
 import { LABEL_COLORS } from '@/lib/colors';
@@ -37,10 +35,9 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
   const [passwordVerified, setPasswordVerified] = useState(false);
   const labelDropdownRef = useRef<HTMLDivElement>(null);
   const labelButtonRef = useRef<HTMLButtonElement>(null);
-  const router = useRouter();
   
   // Use the LabelContext
-  const { labels: availableLabels, loading: labelsLoading, updateLabels } = useLabels();
+  const { labels: availableLabels, updateLabels } = useLabels();
 
   const { theme } = useTheme();
 

@@ -52,15 +52,11 @@ interface SyncHistory {
   created_at?: string;
 }
 
-interface CountResult {
-  count: number;
-}
-
 const DB_PAGE_SIZE = 50;
 
 // 缓存锁
 const cacheLocks = new Set<string>();
-const pendingOperations = new Map<string, Promise<any>>();
+const pendingOperations = new Map<string, Promise<unknown>>();
 
 async function withCacheLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
   // 检查是否有正在进行的操作

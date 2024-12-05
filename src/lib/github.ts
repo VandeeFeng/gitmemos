@@ -9,7 +9,8 @@ import {
   shouldSync,
   getLastSyncHistory,
   checkSyncStatus,
-  recordSyncHistory
+  recordSyncHistory,
+  saveLabel
 } from './db';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 
@@ -79,7 +80,7 @@ interface SyncCheckData {
   isInitialLoad: boolean;
 }
 
-async function checkNeedsSync(owner: string, repo: string, forceSync: boolean): Promise<boolean> {
+export async function checkNeedsSync(owner: string, repo: string, forceSync: boolean): Promise<boolean> {
   // If force sync is requested, return true
   if (forceSync) return true;
 
@@ -240,7 +241,7 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
         }
       }
 
-      // 从数据库获取数据（会自动处理缓存���
+      // 从数据库获取数据（会自动处理缓存
       console.log(`[${requestId}] Loading data from database...`);
       const issues = await getIssuesFromDb(
         config.owner,
@@ -468,6 +469,42 @@ export async function sync(config: GitHubConfig) {
     };
   } catch (error) {
     console.error('Sync failed:', error);
+    throw error;
+  }
+}
+
+export async function createLabel(name: string, color: string, description?: string): Promise<Label> {
+  const config = await getGitHubConfig();
+  const client = await getOctokit();
+
+  try {
+    const { data } = await client.rest.issues.createLabel({
+      owner: config.owner,
+      repo: config.repo,
+      name,
+      color: color.replace('#', ''), // GitHub API expects color without #
+      description
+    });
+
+    const label: Label = {
+      id: data.id,
+      name: data.name,
+      color: data.color,
+      description: data.description || null
+    };
+
+    // Save to database
+    await saveLabel(config.owner, config.repo, label);
+
+    // Update cache
+    const cacheKey = CACHE_KEYS.LABELS(config.owner, config.repo);
+    const cached = cacheManager?.get<Label[]>(cacheKey) || [];
+    cached.push(label);
+    cacheManager?.set(cacheKey, cached, { expiry: CACHE_EXPIRY.LABELS });
+
+    return label;
+  } catch (error) {
+    console.error('Failed to create label:', error);
     throw error;
   }
 }

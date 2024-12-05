@@ -4,9 +4,7 @@ import {
   getConfig, 
   saveConfig, 
   getIssuesFromDb, 
-  saveIssue, 
   getLabelsFromDb, 
-  saveLabel, 
   syncIssuesData,
   shouldSync,
   getLastSyncHistory,
@@ -242,7 +240,7 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
         }
       }
 
-      // 从数据库获取数据（会自动处理缓存）
+      // 从数据库获取数据（会自动处理缓存���
       console.log(`[${requestId}] Loading data from database...`);
       const issues = await getIssuesFromDb(
         config.owner,

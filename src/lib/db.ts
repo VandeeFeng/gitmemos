@@ -1,4 +1,3 @@
-import { createClient } from '@supabase/supabase-js';
 import { GitHubConfig, Issue, Label } from '@/types/github';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 import { supabase } from './supabase';
@@ -350,7 +349,7 @@ export async function getIssuesFromDb(
         .order('github_created_at', { ascending: false })
         .range(from, to);
 
-      // 如果有标签过滤，���加过滤条件
+      // 如果有标签过滤，加过滤条件
       if (labelsFilter && labelsFilter.length > 0) {
         query = query.contains('labels', labelsFilter);
       }

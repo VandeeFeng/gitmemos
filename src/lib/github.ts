@@ -116,7 +116,7 @@ const ISSUES_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const issuesCache: Record<string, IssuesCache> = {};
 
 function getIssuesCacheKey(owner: string, repo: string, page: number, labels?: string) {
-  return `${owner}:${repo}:${page}:${labels || ''}`;
+  return `issues:${owner}:${repo}:${page}:${labels || ''}`;
 }
 
 function getIssuesFromCache(owner: string, repo: string, page: number, labels?: string) {
@@ -216,40 +216,39 @@ function setLabelFilterCache(owner: string, repo: string, label: string | undefi
   };
 }
 
+// 添加分页缓存
+const PAGE_SIZE = 50; // 每页数量
+const issuesPageCache: Record<string, {
+  timestamp: number;
+  data: Issue[];
+}> = {};
+
+// 优化后的获取issues函数
 export async function getIssues(page: number = 1, labels?: string, forceSync: boolean = false) {
   const config = await getGitHubConfig();
   const lockKey = getRequestLockKey(config.owner, config.repo, page, labels);
 
-  // Clean up any stale requests
+  // 清理过期请求
   cleanupStaleRequests();
 
   // 检查是否有正在进行的有效请求
   const existingRequest = requestLocks[lockKey];
   if (existingRequest && Date.now() - existingRequest.timestamp < REQUEST_TIMEOUT) {
     if (!existingRequest.loggedReuse) {
-      console.log(`Reusing request ${existingRequest.requestId} for page ${page} and subsequent calls`);
+      console.log(`Reusing request ${existingRequest.requestId} for page ${page}`);
       existingRequest.loggedReuse = true;
     }
     return existingRequest.promise;
   }
 
-  // 如果不是强制同步，先检查标签筛选缓存
-  if (!forceSync && page === 1) {
-    const cachedIssues = getFromLabelFilterCache(config.owner, config.repo, labels);
-    if (cachedIssues) {
-      return {
-        issues: cachedIssues,
-        syncStatus: null
-      };
-    }
-  }
-
-  // 如果不是强制同步，再检查普通缓存
-  if (!forceSync) {
-    const cached = getIssuesFromCache(config.owner, config.repo, page, labels);
-    if (cached) {
-      return cached;
-    }
+  // 检查分页缓存
+  const cacheKey = getIssuesCacheKey(config.owner, config.repo, page, labels);
+  const cachedPage = issuesPageCache[cacheKey];
+  if (!forceSync && cachedPage && Date.now() - cachedPage.timestamp < ISSUES_CACHE_DURATION) {
+    return {
+      issues: cachedPage.data,
+      syncStatus: null
+    };
   }
 
   // 创建新的请求
@@ -258,91 +257,85 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
 
   const promise = (async () => {
     try {
-      // 使用新的检查函数
       const needsGitHubSync = await checkNeedsSync(config.owner, config.repo, forceSync);
 
-      // 如果需要从 GitHub 同步
       if (needsGitHubSync) {
         try {
           console.log(`[${requestId}] Starting GitHub sync...`);
           const client = await getOctokit();
           
-          // 获取所有 issues
-          let allIssues: Issue[] = [];
-          let currentPage = 1;
-          let hasMore = true;
-          
-          while (hasMore) {
-            const { data } = await client.rest.issues.listForRepo({
-              owner: config.owner,
-              repo: config.repo,
-              state: 'all',
-              per_page: 100,
-              page: currentPage,
-              sort: 'created',
-              direction: 'desc',
-              labels: labels || undefined
-            });
+          // 分页获取数据
+          const { data } = await client.rest.issues.listForRepo({
+            owner: config.owner,
+            repo: config.repo,
+            state: 'all',
+            per_page: PAGE_SIZE,
+            page,
+            sort: 'created',
+            direction: 'desc',
+            labels: labels || undefined
+          });
 
-            if (data.length === 0) {
-              hasMore = false;
-            } else {
-              const issuesData = data.map(issue => ({
-                number: issue.number,
-                title: issue.title,
-                body: issue.body || '',
-                created_at: issue.created_at,
-                state: issue.state,
-                labels: issue.labels
-                  .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
-                    typeof label === 'object' && label !== null)
-                  .map(label => ({
-                    id: label.id,
-                    name: label.name,
-                    color: label.color,
-                    description: label.description,
-                  })),
-              }));
-
-              allIssues = [...allIssues, ...issuesData];
-              currentPage++;
-            }
-          }
-
-          console.log(`[${requestId}] Fetched ${allIssues.length} issues from GitHub API`);
+          const issues = data.map(issue => ({
+            number: issue.number,
+            title: issue.title,
+            body: issue.body || '',
+            created_at: issue.created_at,
+            state: issue.state,
+            labels: issue.labels
+              .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
+                typeof label === 'object' && label !== null)
+              .map(label => ({
+                id: label.id,
+                name: label.name,
+                color: label.color,
+                description: label.description,
+              })),
+          }));
 
           // 同步到数据库
-          if (allIssues.length > 0) {
-            // 首先同步 labels
-            const { data: labelsData } = await client.rest.issues.listLabelsForRepo({
-              owner: config.owner,
-              repo: config.repo,
-            });
-
-            for (const label of labelsData) {
-              await saveLabel(config.owner, config.repo, label);
-            }
-
-            // 然后同步 issues
-            await syncIssuesData(config.owner, config.repo, allIssues);
+          if (issues.length > 0) {
+            await syncIssuesData(config.owner, config.repo, issues);
           }
+
+          // 更新缓存
+          issuesPageCache[cacheKey] = {
+            timestamp: Date.now(),
+            data: issues
+          };
+
+          return {
+            issues,
+            syncStatus: {
+              success: true,
+              totalSynced: issues.length,
+              lastSyncAt: new Date().toISOString()
+            }
+          };
         } catch (error) {
           console.error(`[${requestId}] GitHub sync failed:`, error);
+          throw error;
         }
       }
 
       // 从数据库获取分页数据
       console.log(`[${requestId}] Loading data from database...`);
-      const issues = await getIssuesFromDb(config.owner, config.repo, page, labels ? [labels] : undefined);
+      const issues = await getIssuesFromDb(
+        config.owner,
+        config.repo,
+        page,
+        labels ? [labels] : undefined
+      );
+
+      // 更新缓存
+      issuesPageCache[cacheKey] = {
+        timestamp: Date.now(),
+        data: issues
+      };
+
       const lastSync = await getLastSyncHistory(config.owner, config.repo);
       
-      if (issues.length === 0) {
-        console.log(`[${requestId}] No issues found in database`);
-      } else {
-        console.log(`[${requestId}] Loaded ${issues.length} issues from database`);
-      }
-
-      const result = { 
+      return { 
         issues,
         syncStatus: lastSync ? {
           success: true,
@@ -350,24 +343,11 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
           lastSyncAt: lastSync.last_sync_at
         } : null
       };
-
-      // 缓存结果
-      if (!forceSync) {
-        setIssuesCache(config.owner, config.repo, page, labels, result);
-        if (page === 1) {
-          setLabelFilterCache(config.owner, config.repo, labels, issues);
-        }
-      }
-
-      return result;
     } finally {
-      // 请求完成后删除锁
-      console.log(`[${requestId}] Request completed, cleaning up lock`);
       delete requestLocks[lockKey];
     }
   })();
 
-  // 保存请求锁
   requestLocks[lockKey] = {
     promise,
     timestamp: Date.now(),
@@ -375,6 +355,16 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
   };
 
   return promise;
+}
+
+// 清理过期的分页缓存
+export function cleanupIssuesCache() {
+  const now = Date.now();
+  Object.keys(issuesPageCache).forEach(key => {
+    if (now - issuesPageCache[key].timestamp > ISSUES_CACHE_DURATION) {
+      delete issuesPageCache[key];
+    }
+  });
 }
 
 export async function getIssue(issueNumber: number, forceSync: boolean = false) {
@@ -515,7 +505,7 @@ export async function getLabels(forceSync: boolean = false) {
     labelsCache.repo === config.repo && 
     (now - labelsCache.timestamp) < LABELS_CACHE_DURATION;
 
-  // 如果缓存有效且不是强制同步，直接使用缓存
+  // 如果缓存有��且不是强制同步，直接使用缓存
   if (isCacheValid && !forceSync && labelsCache) {
     console.log('Using cached labels data');
     return labelsCache.data;

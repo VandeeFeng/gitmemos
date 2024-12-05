@@ -4,6 +4,8 @@ import { Button } from './ui/button';
 import { Issue } from '@/types/github';
 import { IssueCard } from './issue-card';
 import { Loading } from './ui/loading';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useRef, useEffect } from 'react';
 
 interface IssueListProps {
   selectedLabel: string | null;
@@ -26,6 +28,36 @@ export function IssueList({
   hasMore = false,
   loadingMore = false
 }: IssueListProps) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: issues.length,
+    getScrollElement: () => document.documentElement,
+    estimateSize: () => 120,
+    overscan: 5
+  });
+
+  // Intersection Observer for infinite loading
+  useEffect(() => {
+    if (!hasMore || loadingMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          onLoadMore();
+        }
+      },
+      { threshold: 0.5 }
+    );
+
+    const loadMoreTrigger = document.getElementById('load-more-trigger');
+    if (loadMoreTrigger) {
+      observer.observe(loadMoreTrigger);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, onLoadMore]);
+
   if (loading && !loadingMore) {
     return <Loading />;
   }
@@ -47,17 +79,36 @@ export function IssueList({
 
   return (
     <div className="space-y-4">
-      {issues.map((issue) => (
-        <div key={issue.number}>
-          <IssueCard
-            issue={issue}
-            selectedLabel={selectedLabel}
-            onLabelClick={onLabelClick}
-          />
-        </div>
-      ))}
+      <div
+        ref={parentRef}
+        style={{
+          width: '100%',
+          position: 'relative',
+          height: `${rowVirtualizer.getTotalSize()}px`,
+        }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => (
+          <div
+            key={virtualRow.index}
+            data-index={virtualRow.index}
+            ref={rowVirtualizer.measureElement}
+            className="absolute left-0 w-full"
+            style={{
+              transform: `translateY(${virtualRow.start}px)`,
+              padding: '0.5rem 0',
+            }}
+          >
+            <IssueCard
+              issue={issues[virtualRow.index]}
+              selectedLabel={selectedLabel}
+              onLabelClick={onLabelClick}
+            />
+          </div>
+        ))}
+      </div>
+      
       {hasMore && (
-        <div className="flex justify-center mt-6">
+        <div id="load-more-trigger" className="flex justify-center py-4">
           <Button
             variant="outline"
             onClick={onLoadMore}

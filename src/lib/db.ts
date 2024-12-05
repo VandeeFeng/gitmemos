@@ -36,10 +36,11 @@ interface DbConfig {
   password?: string;
 }
 
-interface IssueCache {
+interface DbCache {
   timestamp: number;
   issues: DbIssue[];
   labels: DbLabel[];
+  total: number;
 }
 
 interface SyncHistory {
@@ -59,8 +60,10 @@ interface DbError {
   code?: string;
 }
 
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const dbCache: Record<string, IssueCache> = {};
+const DB_PAGE_SIZE = 50;
+const DB_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+const dbCache: Record<string, DbCache> = {};
 
 const PASSWORD_VERIFIED_KEY = 'password_verified';
 
@@ -86,6 +89,10 @@ function setCache(owner: string, repo: string, page: number, labelsFilter: strin
     issues,
     labels
   };
+}
+
+function getDbCacheKey(owner: string, repo: string, page: number, labelsFilter?: string[]) {
+  return `db:${owner}:${repo}:${page}:${labelsFilter?.sort().join(',') || ''}`;
 }
 
 // 测试数据库连接和表结构
@@ -300,10 +307,16 @@ export async function saveIssue(owner: string, repo: string, issue: Issue) {
   }
 }
 
-export async function getIssuesFromDb(owner: string, repo: string, page: number = 1, labelsFilter?: string[]): Promise<Issue[]> {
-  // 检查缓存
-  const cached = getFromCache(owner, repo, page, labelsFilter);
-  if (cached) {
+export async function getIssuesFromDb(
+  owner: string,
+  repo: string,
+  page: number = 1,
+  labelsFilter?: string[]
+): Promise<Issue[]> {
+  const cacheKey = getDbCacheKey(owner, repo, page, labelsFilter);
+  const cached = dbCache[cacheKey];
+  
+  if (cached && Date.now() - cached.timestamp < DB_CACHE_DURATION) {
     return cached.issues.map(issue => ({
       number: issue.issue_number,
       title: issue.title,
@@ -335,19 +348,24 @@ export async function getIssuesFromDb(owner: string, repo: string, page: number 
       return [];
     }
 
-    // 获取 issues 数据
+    // 计算分页范围
+    const from = (page - 1) * DB_PAGE_SIZE;
+    const to = from + DB_PAGE_SIZE - 1;
+
+    // 构建查询
     let query = supabase
       .from('issues')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('owner', owner)
       .eq('repo', repo)
-      .order('github_created_at', { ascending: false });
+      .order('github_created_at', { ascending: false })
+      .range(from, to);
 
     if (labelsFilter && labelsFilter.length > 0) {
       query = query.contains('labels', labelsFilter);
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query;
 
     if (error) {
       console.error('Error fetching issues from database:', error);
@@ -358,8 +376,13 @@ export async function getIssuesFromDb(owner: string, repo: string, page: number 
       return [];
     }
 
-    // 缓存结果
-    setCache(owner, repo, page, labelsFilter, data as DbIssue[], labelsData as DbLabel[]);
+    // 更新缓存
+    dbCache[cacheKey] = {
+      timestamp: Date.now(),
+      issues: data as DbIssue[],
+      labels: labelsData as DbLabel[],
+      total: count || 0
+    };
 
     // 返回处理后的数据
     return data.map((issue: DbIssue) => ({
@@ -383,6 +406,19 @@ export async function getIssuesFromDb(owner: string, repo: string, page: number 
     return [];
   }
 }
+
+// 清理过期的数据库缓存
+export function cleanupDbCache() {
+  const now = Date.now();
+  Object.keys(dbCache).forEach(key => {
+    if (now - dbCache[key].timestamp > DB_CACHE_DURATION) {
+      delete dbCache[key];
+    }
+  });
+}
+
+// 定期清理缓存
+setInterval(cleanupDbCache, DB_CACHE_DURATION);
 
 // Labels 相关操作
 export async function saveLabel(owner: string, repo: string, label: Label) {

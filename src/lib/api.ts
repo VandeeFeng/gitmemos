@@ -106,13 +106,34 @@ export async function getIssues(
   repo: string,
   page: number = 1,
   labels?: string[]
-): Promise<{ issues: Issue[]; total: number } | null> {
+): Promise<{ issues: Issue[]; total: number; lastSyncAt?: string } | null> {
   try {
     const cacheKey = CACHE_KEYS.ISSUES(owner, repo, page, labels?.join(','));
     const cached = cacheManager?.get<{ issues: Issue[]; total: number }>(cacheKey);
     
-    if (cached) {
-      return cached;
+    // 检查同步状态
+    const syncStatus = await checkSyncStatus(owner, repo);
+    const needsSync = syncStatus?.needsSync ?? true;
+    
+    // 如果需要同步（超过24小时或从未同步）
+    if (needsSync) {
+      console.log('Auto syncing due to outdated or missing sync status...');
+      // 从 GitHub API 获取数据
+      const response = await fetch('/api/github/issues');
+      if (!response.ok) {
+        throw new Error('Failed to sync with GitHub');
+      }
+      // 清除缓存
+      cacheManager?.remove(cacheKey);
+    } else if (syncStatus?.lastSyncAt) {
+      console.log('Last sync time:', new Date(syncStatus.lastSyncAt).toLocaleString());
+    }
+    
+    if (cached && !needsSync) {
+      return {
+        ...cached,
+        lastSyncAt: syncStatus?.lastSyncAt
+      };
     }
 
     const params = new URLSearchParams({
@@ -135,7 +156,10 @@ export async function getIssues(
     // 缓存结果
     cacheManager?.set(cacheKey, data, { expiry: CACHE_EXPIRY.ISSUES });
     
-    return data;
+    return {
+      ...data,
+      lastSyncAt: syncStatus?.lastSyncAt
+    };
   } catch (error) {
     console.error('Error fetching issues:', error);
     return null;

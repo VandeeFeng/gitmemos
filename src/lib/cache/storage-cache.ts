@@ -1,6 +1,6 @@
 import { CacheManager, CacheOptions, CacheItem } from './types';
 
-const DEFAULT_EXPIRY = 5 * 60 * 1000; // 5 minutes
+const DEFAULT_EXPIRY = 15 * 60 * 1000; // 15 minutes
 const DEFAULT_VERSION = '1.0';
 const CACHE_PREFIX = 'gitmemo_cache:';
 
@@ -182,7 +182,7 @@ export class StorageCache implements CacheManager {
             });
           }
         } catch {
-          // 如果解析失败，直接删除
+          // 如果解析失���，直接删除
           this.storage.removeItem(key);
           cleaned++;
           console.log(`Cleaned up invalid cache: ${key.replace(CACHE_PREFIX, '')}`);

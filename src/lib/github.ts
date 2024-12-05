@@ -1,5 +1,5 @@
 import { GitHubConfig, Issue, Label, DbConfig, GitHubApiError } from '@/types/github';
-import { getConfig, saveConfig, getIssues as getIssuesFromApi, checkSyncStatus, recordSync } from '@/lib/api';
+import { getConfig, saveConfig, getIssues as getIssuesFromApi, checkSyncStatus, recordSync, getLabels as getLabelsFromDb, saveLabel } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 import { Octokit } from 'octokit';
 
@@ -425,6 +425,20 @@ export async function getLabels(forceSync: boolean = false): Promise<Label[]> {
     if (cached) {
       return cached;
     }
+
+    // Then check database
+    try {
+      console.log('Trying to find labels in database...');
+      const dbLabels = await getLabelsFromDb(config.owner, config.repo);
+      if (dbLabels && dbLabels.length > 0) {
+        console.log('Found labels in database');
+        // Update cache
+        cacheManager?.set(cacheKey, dbLabels, { expiry: CACHE_EXPIRY.LABELS });
+        return dbLabels;
+      }
+    } catch (error) {
+      console.warn('Failed to check database for labels:', error);
+    }
   }
 
   try {
@@ -445,6 +459,11 @@ export async function getLabels(forceSync: boolean = false): Promise<Label[]> {
     // Update cache
     const cacheKey = CACHE_KEYS.LABELS(config.owner, config.repo);
     cacheManager?.set(cacheKey, labels, { expiry: CACHE_EXPIRY.LABELS });
+
+    // Save to database
+    for (const label of labels) {
+      await saveLabel(config.owner, config.repo, label);
+    }
 
     return labels;
   } catch (error) {

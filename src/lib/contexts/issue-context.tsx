@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { Issue, GitHubConfig } from '@/types/github';
 import { getIssues as getGitHubIssues, getGitHubConfig } from '@/lib/github';
-import { recordSync } from '@/lib/api';
+import { checkSyncStatus, recordSync } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 
 interface IssueContextType {
@@ -52,13 +52,25 @@ export function IssueProvider({ children }: { children: ReactNode }) {
 
     setState(prev => ({ ...prev, loading: true }));
     try {
-      const result = await getGitHubIssues(1, undefined, true, configRef.current);
+      // 从 GitHub API 获取数据并同步到数据库
+      const response = await fetch('/api/github/issues', {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to sync with GitHub');
+      }
+
+      const issues = await response.json();
+      console.log(`Synced ${issues.length} issues from GitHub to database`);
       
       setState(prev => {
         if (!prev.config) return prev;
 
         const newState: CacheData = {
-          issues: result.issues,
+          issues,
           config: prev.config,
         };
         
@@ -73,17 +85,17 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           prev.config.owner,
           prev.config.repo,
           'success',
-          result.issues.length
+          issues.length
         ).catch(console.error);
 
         return { 
-          ...prev, 
-          issues: result.issues,
+          ...prev,
+          issues,
           loading: false 
         };
       });
     } catch (error) {
-      console.error('Error syncing issues:', error);
+      console.error('Error syncing from GitHub:', error);
       setState(prev => {
         if (prev.config) {
           recordSync(
@@ -138,6 +150,40 @@ export function IssueProvider({ children }: { children: ReactNode }) {
             }));
           }
           return;
+        }
+
+        // 检查同步状态
+        const syncStatus = await checkSyncStatus(config.owner, config.repo);
+        if (syncStatus?.lastSyncAt) {
+          const lastSyncTime = new Date(syncStatus.lastSyncAt).getTime();
+          const now = Date.now();
+          const hoursSinceLastSync = Math.round((now - lastSyncTime) / (1000 * 60 * 60));
+          console.log(
+            `Last sync time: ${new Date(syncStatus.lastSyncAt).toLocaleString()} (${hoursSinceLastSync} hours ago)`
+          );
+        }
+
+        // 如果需要同步（超过24小时或从未同步），自动同步
+        const needsSync = syncStatus?.needsSync ?? true;
+        if (needsSync) {
+          console.log('Auto syncing from GitHub API to database...');
+          try {
+            // 从 GitHub API 获取数据并同步到数据库
+            const response = await fetch('/api/github/issues', {
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
+            
+            if (!response.ok) {
+              throw new Error('Failed to sync with GitHub');
+            }
+
+            const issues = await response.json();
+            console.log(`Synced ${issues.length} issues from GitHub to database`);
+          } catch (error) {
+            console.error('Error syncing from GitHub:', error);
+          }
         }
 
         // 检查缓存

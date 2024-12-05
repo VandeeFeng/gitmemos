@@ -1,16 +1,11 @@
-import { Octokit } from "octokit";
 import { GitHubConfig, Issue, Label } from '@/types/github';
 import { 
   getConfig, 
-  saveConfig, 
+  saveConfig,
   getIssuesFromDb, 
-  getLabelsFromDb, 
-  syncIssuesData,
   shouldSync,
   getLastSyncHistory,
-  checkSyncStatus,
-  recordSyncHistory,
-  saveLabel
+  recordSyncHistory
 } from './db';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 
@@ -56,23 +51,6 @@ export async function getGitHubConfig(): Promise<GitHubConfig> {
     token: '',
     issuesPerPage: 10
   };
-}
-
-// 创建一个全局的 Octokit 实例
-let octokit: Octokit;
-
-export async function getOctokit(): Promise<Octokit> {
-  if (!octokit) {
-    const config = await getGitHubConfig();
-    if (!config.token) {
-      throw new Error('GitHub token is missing');
-    }
-
-    octokit = new Octokit({
-      auth: config.token
-    });
-  }
-  return octokit;
 }
 
 interface SyncCheckData {
@@ -138,11 +116,14 @@ function getNextRequestId() {
   return `req_${++requestCounter}`;
 }
 
-const PAGE_SIZE = 50;
-
 // 优化后的获取issues函数
-export async function getIssues(page: number = 1, labels?: string, forceSync: boolean = false) {
-  const config = await getGitHubConfig();
+export async function getIssues(
+  page: number = 1, 
+  labels?: string, 
+  forceSync: boolean = false,
+  existingConfig?: GitHubConfig // 添加可选的配置参数
+) {
+  const config = existingConfig || await getGitHubConfig();
   const lockKey = getRequestLockKey(config.owner, config.repo, page, labels);
 
   // 清理过期请求
@@ -158,7 +139,7 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
     return existingRequest.promise;
   }
 
-  // 如果不是强制同步，先检查存
+  // 如果不是强制同步，先检查缓存
   if (!forceSync) {
     const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, page, labels || '');
     const cached = cacheManager?.get<Issue[]>(cacheKey);
@@ -182,42 +163,18 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
       if (needsGitHubSync) {
         try {
           console.log(`[${requestId}] Starting GitHub API sync...`);
-          const client = await getOctokit();
           
-          // 从 GitHub API 获取数据
-          const { data } = await client.rest.issues.listForRepo({
-            owner: config.owner,
-            repo: config.repo,
-            state: 'all',
-            per_page: PAGE_SIZE,
-            page,
-            sort: 'created',
-            direction: 'desc',
-            labels: labels || undefined
-          });
-
-          const issues = data.map(issue => ({
-            number: issue.number,
-            title: issue.title,
-            body: issue.body || '',
-            created_at: issue.created_at,
-            state: issue.state,
-            labels: issue.labels
-              .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
-                typeof label === 'object' && label !== null)
-              .map(label => ({
-                id: label.id,
-                name: label.name,
-                color: label.color,
-                description: label.description,
-              })),
-          }));
-
-          // 同步到数据库
-          if (issues.length > 0) {
-            await syncIssuesData(config.owner, config.repo, issues);
-            console.log(`[${requestId}] Synced ${issues.length} issues to database`);
+          // 使用新的 API 路由
+          const response = await fetch(`/api/github/issues?page=${page}${labels ? `&labels=${labels}` : ''}`);
+          if (!response.ok) {
+            throw new Error(`API request failed: ${response.statusText}`);
           }
+          
+          const issues = await response.json();
+
+          // 更新缓存
+          const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, page, labels || '');
+          cacheManager?.set(cacheKey, issues, { expiry: CACHE_EXPIRY.ISSUES });
 
           return {
             issues,
@@ -241,7 +198,7 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
         }
       }
 
-      // 从数据库获取数据（会自动处理缓存
+      // 从数据库获取数据
       console.log(`[${requestId}] Loading data from database...`);
       const issues = await getIssuesFromDb(
         config.owner,
@@ -252,6 +209,7 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
 
       const lastSync = await getLastSyncHistory(config.owner, config.repo);
       
+      // 不再设置缓存，因为 getIssuesFromDb 已经设置了缓存
       return { 
         issues,
         syncStatus: lastSync ? {
@@ -275,10 +233,159 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
   return promise;
 }
 
-export async function getLabels(forceSync: boolean = false) {
+// Add this before getIssue function
+const issueRequestLocks: Record<string, {
+  promise: Promise<Issue>;
+  timestamp: number;
+  requestId: string;
+}> = {};
+
+export async function getIssue(issueNumber: number, forceSync: boolean = false): Promise<Issue> {
   const config = await getGitHubConfig();
+  const lockKey = `issue:${config.owner}:${config.repo}:${issueNumber}`;
   
-  // 如果不是强制同步，先检查缓存
+  // Clean up stale requests
+  const now = Date.now();
+  Object.entries(issueRequestLocks).forEach(([key, lock]) => {
+    if (now - lock.timestamp > REQUEST_TIMEOUT) {
+      delete issueRequestLocks[key];
+    }
+  });
+
+  // Check for existing request
+  const existingRequest = issueRequestLocks[lockKey];
+  if (existingRequest && now - existingRequest.timestamp < REQUEST_TIMEOUT) {
+    console.log(`Reusing request ${existingRequest.requestId} for issue ${issueNumber}`);
+    return existingRequest.promise;
+  }
+
+  // If not force sync, first try to find the issue in the existing issues cache
+  if (!forceSync) {
+    // First check the issues list cache
+    const issuesListCacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');
+    const cachedData = cacheManager?.get<{ issues: Issue[] }>(issuesListCacheKey);
+    if (cachedData?.issues) {
+      console.log('Checking issues list cache:', { cachedData });
+      const issueFromList = cachedData.issues.find(issue => issue.number === issueNumber);
+      if (issueFromList) {
+        console.log('Found issue in issues list cache');
+        return issueFromList;
+      }
+    }
+
+    // Then check the individual issue cache
+    const singleIssueCacheKey = `issue:${config.owner}:${config.repo}:${issueNumber}`;
+    const cachedSingleIssue = cacheManager?.get<Issue>(singleIssueCacheKey);
+    if (cachedSingleIssue) {
+      console.log('Using cached single issue data');
+      return cachedSingleIssue;
+    }
+
+    // Try to find in database
+    try {
+      console.log('Trying to find issue in database...');
+      const issues = await getIssuesFromDb(config.owner, config.repo);
+      const issueFromDb = issues.find(issue => issue.number === issueNumber);
+      if (issueFromDb) {
+        console.log('Found issue in database');
+        // Update cache
+        const cacheKey = `issue:${config.owner}:${config.repo}:${issueNumber}`;
+        cacheManager?.set(cacheKey, issueFromDb, { expiry: CACHE_EXPIRY.ISSUES });
+        return issueFromDb;
+      }
+    } catch (error) {
+      console.warn('Failed to check database for issue:', error);
+    }
+  }
+
+  const requestId = getNextRequestId();
+  console.log(`Creating new request ${requestId} for issue ${issueNumber}`);
+
+  const promise = (async () => {
+    try {
+      const response = await fetch(`/api/github/issues?number=${issueNumber}`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch issue: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      // API 返回的可能是数组，我们需要找到匹配的 issue
+      const issue = Array.isArray(data) ? data.find(i => i.number === issueNumber) : data;
+      
+      if (!issue) {
+        throw new Error(`Issue #${issueNumber} not found`);
+      }
+
+      // Update both caches
+      const singleIssueCacheKey = `issue:${config.owner}:${config.repo}:${issueNumber}`;
+      cacheManager?.set(singleIssueCacheKey, issue, { expiry: CACHE_EXPIRY.ISSUES });
+
+      // Also update the issues list cache if it exists
+      const issuesListCacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');
+      const existingIssuesList = cacheManager?.get<{ issues: Issue[] }>(issuesListCacheKey);
+      if (existingIssuesList?.issues) {
+        const updatedIssues = existingIssuesList.issues.map(i => 
+          i.number === issue.number ? issue : i
+        );
+        cacheManager?.set(issuesListCacheKey, { issues: updatedIssues }, { expiry: CACHE_EXPIRY.ISSUES });
+      }
+
+      return issue;
+    } finally {
+      delete issueRequestLocks[lockKey];
+    }
+  })();
+
+  issueRequestLocks[lockKey] = {
+    promise,
+    timestamp: now,
+    requestId
+  };
+
+  return promise;
+}
+
+export async function createIssue(title: string, body: string, labels: string[]): Promise<Issue> {
+  const response = await fetch('/api/github/issues', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ title, body, labels }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to create issue: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function updateIssue(
+  issueNumber: number,
+  title: string,
+  body: string,
+  labels: string[]
+): Promise<Issue> {
+  const response = await fetch('/api/github/issues', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ number: issueNumber, title, body, labels }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to update issue: ${response.statusText}`);
+  }
+
+  return response.json();
+}
+
+export async function getLabels(forceSync: boolean = false): Promise<Label[]> {
+  const config = await getGitHubConfig();
+
+  // 如果强制同步，先���查缓存
   if (!forceSync) {
     const cacheKey = CACHE_KEYS.LABELS(config.owner, config.repo);
     const cached = cacheManager?.get<Label[]>(cacheKey);
@@ -288,358 +395,38 @@ export async function getLabels(forceSync: boolean = false) {
     }
   }
 
-  // 检查是否需要从 GitHub API 同步
-  const needsGitHubSync = await shouldSync(config.owner, config.repo, forceSync);
-
-  // 如果需要同步，从 GitHub API 获取并同步到数据库
-  if (needsGitHubSync) {
-    try {
-      console.log('Starting GitHub API sync for labels...');
-      const client = await getOctokit();
-
-      const { data } = await client.rest.issues.listLabelsForRepo({
-        owner: config.owner,
-        repo: config.repo,
-      });
-
-      // 同步到数据库
-      for (const label of data) {
-        await saveLabel(config.owner, config.repo, label);
-      }
-
-      console.log(`Synced ${data.length} labels to database`);
-      
-      // 记录同步成功
-      await recordSyncHistory(
-        config.owner,
-        config.repo,
-        'success',
-        data.length
-      );
-
-      return data;
-    } catch (error) {
-      console.error('GitHub API sync failed for labels:', error);
-      // 记录同步失败
-      await recordSyncHistory(
-        config.owner,
-        config.repo,
-        'failed',
-        0,
-        error instanceof Error ? error.message : 'Unknown error'
-      );
-      throw error;
-    }
-  }
-
-  // 从数据库获取（会自动处理缓存）
-  return await getLabelsFromDb(config.owner, config.repo);
-}
-
-async function fetchAllIssues(config: GitHubConfig): Promise<Issue[]> {
-  const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');
-  const cachedData = cacheManager?.get<Issue[]>(cacheKey);
-  
-  if (cachedData) {
-    console.log('Using cached issues data');
-    return cachedData;
-  }
-
   try {
-    const response = await fetch(
-      `https://api.github.com/repos/${config.owner}/${config.repo}/issues?state=all&per_page=${config.issuesPerPage}`,
-      {
-        headers: {
-          Authorization: `token ${config.token}`,
-          Accept: 'application/vnd.github.v3+json',
-        },
-      }
-    );
-
+    // 使用新的 API 路由获取标签
+    const response = await fetch('/api/github/labels');
     if (!response.ok) {
-      throw new Error(`GitHub API error: ${response.statusText}`);
+      throw new Error(`Failed to fetch labels: ${response.statusText}`);
     }
 
-    const data = await response.json();
-    cacheManager?.set(cacheKey, data);
-    return data;
-  } catch (error) {
-    console.error('Error fetching issues:', error);
-    throw error;
-  }
-}
+    const labels = await response.json();
 
-async function fetchAllLabels(config: GitHubConfig): Promise<Label[]> {
-  const cacheKey = CACHE_KEYS.LABELS(config.owner, config.repo);
-  const cachedData = cacheManager?.get<Label[]>(cacheKey);
-  
-  if (cachedData) {
-    console.log('Using cached labels data');
-    return cachedData;
-  }
+    // 更新缓存
+    const cacheKey = CACHE_KEYS.LABELS(config.owner, config.repo);
+    cacheManager?.set(cacheKey, labels, { expiry: CACHE_EXPIRY.LABELS });
 
-  try {
-    const response = await fetch(
-      `https://api.github.com/repos/${config.owner}/${config.repo}/labels`,
-      {
-        headers: {
-          Authorization: `token ${config.token}`,
-          Accept: 'application/vnd.github.v3+json',
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`GitHub API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    cacheManager?.set(cacheKey, data);
-    return data;
+    return labels;
   } catch (error) {
     console.error('Error fetching labels:', error);
     throw error;
   }
 }
 
-async function syncIssues(config: GitHubConfig) {
-  try {
-    const data = await fetchAllIssues(config);
-    await recordSyncHistory(
-      config.owner,
-      config.repo,
-      'success',
-      data.length
-    );
-    return data;
-  } catch (error) {
-    await recordSyncHistory(
-      config.owner,
-      config.repo,
-      'failed',
-      0,
-      error instanceof Error ? error.message : 'Unknown error'
-    );
-    throw error;
-  }
-}
-
-export async function syncLabels(config: GitHubConfig) {
-  try {
-    const data = await fetchAllLabels(config);
-    await recordSyncHistory(
-      config.owner,
-      config.repo,
-      'success',
-      data.length
-    );
-    return data;
-  } catch (error) {
-    await recordSyncHistory(
-      config.owner,
-      config.repo,
-      'failed',
-      0,
-      error instanceof Error ? error.message : 'Unknown error'
-    );
-    throw error;
-  }
-}
-
-export async function sync(config: GitHubConfig) {
-  try {
-    // 检查是否需要同步
-    const syncStatus = await checkSyncStatus(config.owner, config.repo);
-    console.log('Sync check:', syncStatus);
-
-    if (!syncStatus.needsSync) {
-      console.log('No sync needed');
-      return;
-    }
-
-    // 同步数据
-    const [issues, labels] = await Promise.all([
-      syncIssues(config),
-      syncLabels(config)
-    ]);
-
-    return {
-      issues,
-      labels
-    };
-  } catch (error) {
-    console.error('Sync failed:', error);
-    throw error;
-  }
-}
-
 export async function createLabel(name: string, color: string, description?: string): Promise<Label> {
-  const config = await getGitHubConfig();
-  const client = await getOctokit();
+  const response = await fetch('/api/github/labels', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ name, color, description }),
+  });
 
-  try {
-    const { data } = await client.rest.issues.createLabel({
-      owner: config.owner,
-      repo: config.repo,
-      name,
-      color: color.replace('#', ''), // GitHub API expects color without #
-      description
-    });
-
-    const label: Label = {
-      id: data.id,
-      name: data.name,
-      color: data.color,
-      description: data.description || null
-    };
-
-    // Save to database
-    await saveLabel(config.owner, config.repo, label);
-
-    // Update cache
-    const cacheKey = CACHE_KEYS.LABELS(config.owner, config.repo);
-    const cached = cacheManager?.get<Label[]>(cacheKey) || [];
-    cached.push(label);
-    cacheManager?.set(cacheKey, cached, { expiry: CACHE_EXPIRY.LABELS });
-
-    return label;
-  } catch (error) {
-    console.error('Failed to create label:', error);
-    throw error;
-  }
-}
-
-export async function createIssue(title: string, body: string, labels: string[]): Promise<Issue> {
-  const config = await getGitHubConfig();
-  const client = await getOctokit();
-
-  try {
-    const { data } = await client.rest.issues.create({
-      owner: config.owner,
-      repo: config.repo,
-      title,
-      body,
-      labels
-    });
-
-    const issue: Issue = {
-      number: data.number,
-      title: data.title,
-      body: data.body || '',
-      created_at: data.created_at,
-      state: data.state,
-      labels: data.labels
-        .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
-          typeof label === 'object' && label !== null)
-        .map(label => ({
-          id: label.id,
-          name: label.name,
-          color: label.color,
-          description: label.description,
-        }))
-    };
-
-    // Save to database
-    await syncIssuesData(config.owner, config.repo, [issue]);
-
-    // Update cache
-    const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');
-    const cached = cacheManager?.get<Issue[]>(cacheKey) || [];
-    cached.unshift(issue); // Add to beginning since it's newest
-    cacheManager?.set(cacheKey, cached, { expiry: CACHE_EXPIRY.ISSUES });
-
-    return issue;
-  } catch (error) {
-    console.error('Failed to create issue:', error);
-    throw error;
-  }
-}
-
-export async function updateIssue(
-  issueNumber: number,
-  title: string,
-  body: string,
-  labels: string[]
-): Promise<Issue> {
-  const config = await getGitHubConfig();
-  const client = await getOctokit();
-
-  try {
-    const { data } = await client.rest.issues.update({
-      owner: config.owner,
-      repo: config.repo,
-      issue_number: issueNumber,
-      title,
-      body,
-      labels
-    });
-
-    const issue: Issue = {
-      number: data.number,
-      title: data.title,
-      body: data.body || '',
-      created_at: data.created_at,
-      state: data.state,
-      labels: data.labels
-        .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
-          typeof label === 'object' && label !== null)
-        .map(label => ({
-          id: label.id,
-          name: label.name,
-          color: label.color,
-          description: label.description,
-        }))
-    };
-
-    // Save to database
-    await syncIssuesData(config.owner, config.repo, [issue]);
-
-    // Update cache
-    const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');
-    const cached = cacheManager?.get<Issue[]>(cacheKey);
-    if (cached) {
-      const updatedCache = cached.map(i => i.number === issueNumber ? issue : i);
-      cacheManager?.set(cacheKey, updatedCache, { expiry: CACHE_EXPIRY.ISSUES });
-    }
-
-    return issue;
-  } catch (error) {
-    console.error('Failed to update issue:', error);
-    throw error;
-  }
-}
-
-export async function getIssue(issueNumber: number, forceSync: boolean = false): Promise<Issue> {
-  const config = await getGitHubConfig();
-  const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');
-
-  // 如果不是强制同步，先检查缓存
-  if (!forceSync) {
-    const cached = cacheManager?.get<Issue[]>(cacheKey);
-    if (cached) {
-      const cachedIssue = cached.find(issue => issue.number === issueNumber);
-      if (cachedIssue) {
-        console.log('Using cached issue data');
-        return cachedIssue;
-      }
-    }
-  }
-  
-  // 从数据库获取数据
-  const issues = await getIssuesFromDb(config.owner, config.repo);
-  const issue = issues.find(i => i.number === issueNumber);
-  
-  if (!issue) {
-    throw new Error(`Issue #${issueNumber} not found`);
+  if (!response.ok) {
+    throw new Error(`Failed to create label: ${response.statusText}`);
   }
 
-  // 更新缓存
-  const cached = cacheManager?.get<Issue[]>(cacheKey) || [];
-  const updatedCache = cached.map(i => i.number === issueNumber ? issue : i);
-  if (!updatedCache.some(i => i.number === issueNumber)) {
-    updatedCache.push(issue);
-  }
-  cacheManager?.set(cacheKey, updatedCache, { expiry: CACHE_EXPIRY.ISSUES });
-
-  return issue;
+  return response.json();
 }

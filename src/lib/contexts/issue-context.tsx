@@ -44,12 +44,15 @@ export function IssueProvider({ children }: { children: ReactNode }) {
 
   const initializingRef = useRef(false);
   const initializePromiseRef = useRef<Promise<void>>();
+  const configRef = useRef<GitHubConfig | null>(null);
 
   // Memoize these functions to prevent unnecessary re-renders
   const syncIssues = useCallback(async () => {
+    if (!configRef.current) return;
+
     setState(prev => ({ ...prev, loading: true }));
     try {
-      const result = await getIssues(1, undefined, true);
+      const result = await getIssues(1, undefined, true, configRef.current);
       
       setState(prev => {
         if (!prev.config) return prev;
@@ -97,20 +100,20 @@ export function IssueProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateIssues = useCallback((newIssues: Issue[]) => {
-    if (!state.config) return;
+    if (!configRef.current) return;
     
     const newState: CacheData = {
       issues: newIssues,
-      config: state.config,
+      config: configRef.current,
     };
 
     setState(prev => ({ ...prev, issues: newIssues }));
     cacheManager?.set(
-      CACHE_KEYS.ISSUES(state.config.owner, state.config.repo, 1, ''),
+      CACHE_KEYS.ISSUES(configRef.current.owner, configRef.current.repo, 1, ''),
       newState,
       { expiry: CACHE_EXPIRY.ISSUES }
     );
-  }, [state.config]);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -122,6 +125,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       try {
         // 获取配置
         const config = await getGitHubConfig();
+        configRef.current = config;
         
         if (!config || !config.owner || !config.repo) {
           if (mounted) {
@@ -156,7 +160,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         }
 
         // 从服务器获取数据
-        const issuesResult = await getIssues(1, undefined, false);
+        const issuesResult = await getIssues(1, undefined, false, config);
         
         if (mounted) {
           const newState: CacheData = {

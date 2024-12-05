@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Issue } from '@/types/github';
 import { getIssuesFromDb } from '@/lib/db';
@@ -13,36 +13,38 @@ export function Backlinks({ currentIssueNumber }: BacklinksProps) {
   const [loading, setLoading] = useState(false);
   const { config, issues } = useIssues();
 
-  useEffect(() => {
-    async function fetchBacklinks() {
-      if (!config) return;
+  const fetchBacklinks = useCallback(async () => {
+    if (!config) return;
+    
+    setLoading(true);
+    try {
+      // 优先使用上下文中的 issues
+      let allIssues = issues;
       
-      setLoading(true);
-      try {
-        // 优先使用上下文中的 issues
-        let allIssues = issues;
-        
-        // 如果上下文中没有 issues，则从数据库获取
-        if (!allIssues || allIssues.length === 0) {
-          allIssues = await getIssuesFromDb(config.owner, config.repo);
-        }
-        
-        // 过滤出引用了当前 issue 的其他 issues
-        const linkedIssues = allIssues.filter(issue => {
-          const pattern = new RegExp(`#${currentIssueNumber}\\b`);
-          return issue.number !== currentIssueNumber && pattern.test(issue.body || '');
-        });
-        
-        setBacklinks(linkedIssues);
-      } catch (error) {
-        console.error('Error fetching backlinks:', error);
-      } finally {
-        setLoading(false);
+      // 如果上下文中没有 issues，则从数据库获取
+      if (!allIssues || allIssues.length === 0) {
+        allIssues = await getIssuesFromDb(config.owner, config.repo);
       }
+      
+      // 过滤出引用了当前 issue 的其他 issues
+      const linkedIssues = allIssues.filter(issue => {
+        const pattern = new RegExp(`#${currentIssueNumber}\\b`);
+        return issue.number !== currentIssueNumber && pattern.test(issue.body || '');
+      });
+      
+      setBacklinks(linkedIssues);
+    } catch (error) {
+      console.error('Error fetching backlinks:', error);
+    } finally {
+      setLoading(false);
     }
+  }, [config, issues, currentIssueNumber]);
 
-    fetchBacklinks();
-  }, [currentIssueNumber, config, issues]);
+  useEffect(() => {
+    // 使用 setTimeout 来延迟执行，避免在短时间内多次触发
+    const timer = setTimeout(fetchBacklinks, 100);
+    return () => clearTimeout(timer);
+  }, [fetchBacklinks]);
 
   if (loading) {
     return (

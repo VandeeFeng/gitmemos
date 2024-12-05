@@ -25,18 +25,27 @@ export default function IssuePage({ params }: PageProps) {
   const router = useRouter();
 
   useEffect(() => {
+    let mounted = true;
+    
     async function fetchIssue() {
       if (!resolvedParams?.number) return;
       
       try {
         const data = await getIssue(parseInt(resolvedParams.number), false);
-        setIssue(data);
+        if (mounted) {
+          setIssue(data);
+        }
       } catch (error) {
         console.error('Error fetching issue:', error);
       }
     }
+
     fetchIssue();
-  }, [resolvedParams]);
+
+    return () => {
+      mounted = false;
+    };
+  }, [resolvedParams?.number]);
 
   if (!issue) {
     return (

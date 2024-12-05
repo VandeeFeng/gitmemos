@@ -1,6 +1,6 @@
 export interface CacheOptions {
   /** 缓存过期时间（毫秒） */
-  expiry: number;
+  expiry?: number;
   /** 缓存版本，用于处理缓存更新 */
   version?: string;
 }
@@ -12,6 +12,8 @@ export interface CacheItem<T> {
   timestamp: number;
   /** 缓存版本 */
   version: string;
+  /** 缓存过期时间（毫秒） */
+  expiry: number;
 }
 
 export interface CacheManager {

@@ -1,12 +1,16 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import MDEditor from '@uiw/react-md-editor';
 import { Button } from './ui/button';
-import { createIssue, updateIssue, getLabels, createLabel, getGitHubConfig } from '@/lib/github';
-import { useTheme } from 'next-themes';
-import { Label, EditableIssue } from '@/types/github';
+import { Loading } from './ui/loading';
+import { EditableIssue, Label } from '@/types/github';
+import { getGitHubConfig } from '@/lib/github';
+import { createIssue, updateIssue, createLabel } from '@/lib/github';
 import { LABEL_COLORS } from '@/lib/colors';
+import { useLabels } from '@/lib/contexts/label-context';
+import { useTheme } from 'next-themes';
 import { isPasswordVerified } from '@/lib/db';
 
 interface IssueEditorProps {
@@ -18,10 +22,8 @@ interface IssueEditorProps {
 export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
   const [title, setTitle] = useState(issue?.title || '');
   const [content, setContent] = useState(issue?.body || '');
-  const [saving, setSaving] = useState(false);
-  const [availableLabels, setAvailableLabels] = useState<Label[]>([]);
   const [selectedLabels, setSelectedLabels] = useState<string[]>(
-    issue?.labels?.map(label => label.name) || []
+    issue?.labels.map(label => label.name) || []
   );
   const [showLabelDropdown, setShowLabelDropdown] = useState(false);
   const [showNewLabelForm, setShowNewLabelForm] = useState(false);
@@ -30,10 +32,16 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
     color: LABEL_COLORS[0].color,
     description: ''
   });
+  const [saving, setSaving] = useState(false);
   const [creatingLabel, setCreatingLabel] = useState(false);
   const [passwordVerified, setPasswordVerified] = useState(false);
   const labelDropdownRef = useRef<HTMLDivElement>(null);
   const labelButtonRef = useRef<HTMLButtonElement>(null);
+  const router = useRouter();
+  
+  // Use the LabelContext
+  const { labels: availableLabels, loading: labelsLoading, updateLabels } = useLabels();
+
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -55,18 +63,6 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
-
-  useEffect(() => {
-    const fetchLabels = async () => {
-      try {
-        const labelsData = await getLabels();
-        setAvailableLabels(labelsData);
-      } catch (error) {
-        console.error('Error fetching labels:', error);
-      }
-    };
-    fetchLabels();
   }, []);
 
   const handleSave = async () => {
@@ -110,7 +106,11 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
         newLabel.color,
         newLabel.description || undefined
       );
-      setAvailableLabels(prev => [...prev, createdLabel]);
+      
+      // Update the LabelContext
+      updateLabels([...availableLabels, createdLabel]);
+      
+      // Update local state
       setSelectedLabels(prev => [...prev, createdLabel.name]);
       setShowNewLabelForm(false);
       setNewLabel({ name: '', color: LABEL_COLORS[0].color, description: '' });

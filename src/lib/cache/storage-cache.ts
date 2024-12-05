@@ -26,6 +26,7 @@ export class StorageCache implements CacheManager {
       data,
       timestamp: Date.now(),
       version: options.version || DEFAULT_VERSION,
+      expiry: options.expiry || DEFAULT_EXPIRY,
     };
 
     try {
@@ -34,7 +35,7 @@ export class StorageCache implements CacheManager {
       console.log(`Cache set successfully: ${key}`, {
         size: new Blob([serializedData]).size,
         version: cacheItem.version,
-        expiry: options.expiry || DEFAULT_EXPIRY
+        expiry: cacheItem.expiry
       });
     } catch (error) {
       console.error(`Failed to set cache for key ${key}:`, {
@@ -50,7 +51,8 @@ export class StorageCache implements CacheManager {
         this.storage.setItem(fullKey, serializedData);
         console.log(`Cache set successfully after cleanup: ${key}`, {
           size: new Blob([serializedData]).size,
-          version: cacheItem.version
+          version: cacheItem.version,
+          expiry: cacheItem.expiry
         });
       } catch (retryError) {
         console.error(`Failed to set cache after cleanup for key ${key}:`, {
@@ -73,13 +75,14 @@ export class StorageCache implements CacheManager {
 
     try {
       const cacheItem = JSON.parse(item) as CacheItem<T>;
-      const expiry = DEFAULT_EXPIRY;
+      const expiry = cacheItem.expiry || DEFAULT_EXPIRY;
+      const age = Date.now() - cacheItem.timestamp;
 
-      if (this.isExpired(cacheItem.timestamp, expiry)) {
+      if (age > expiry) {
         console.log(`Cache expired: ${key}`, {
           timestamp: new Date(cacheItem.timestamp).toISOString(),
-          expiry: expiry,
-          age: Date.now() - cacheItem.timestamp
+          expiry,
+          age
         });
         this.remove(key);
         return null;
@@ -87,7 +90,9 @@ export class StorageCache implements CacheManager {
 
       console.log(`Cache hit: ${key}`, {
         version: cacheItem.version,
-        age: Date.now() - cacheItem.timestamp
+        age,
+        expiry,
+        isExpired: age > expiry
       });
       return cacheItem.data;
     } catch (error) {
@@ -167,14 +172,20 @@ export class StorageCache implements CacheManager {
       if (item) {
         try {
           const cacheItem = JSON.parse(item) as CacheItem<unknown>;
-          if (this.isExpired(cacheItem.timestamp, DEFAULT_EXPIRY)) {
+          const expiry = cacheItem.expiry || DEFAULT_EXPIRY;
+          if (Date.now() - cacheItem.timestamp > expiry) {
             this.storage.removeItem(key);
             cleaned++;
+            console.log(`Cleaned up expired cache: ${key.replace(CACHE_PREFIX, '')}`, {
+              age: Date.now() - cacheItem.timestamp,
+              expiry
+            });
           }
         } catch {
           // 如果解析失败，直接删除
           this.storage.removeItem(key);
           cleaned++;
+          console.log(`Cleaned up invalid cache: ${key.replace(CACHE_PREFIX, '')}`);
         }
       }
     });

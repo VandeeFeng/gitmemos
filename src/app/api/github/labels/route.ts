@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Octokit } from 'octokit';
 import { getGitHubConfig } from '@/lib/github';
-import { Label } from '@/types/github';
+import { Label, GitHubApiError } from '@/types/github';
 import { getLabels, saveLabel } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 

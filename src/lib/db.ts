@@ -67,10 +67,6 @@ const dbCache: Record<string, DbCache> = {};
 
 const PASSWORD_VERIFIED_KEY = 'password_verified';
 
-function getCacheKey(owner: string, repo: string, page: number, labelsFilter?: string[]) {
-  return `${owner}:${repo}:${page}:${labelsFilter?.join(',') || ''}`;
-}
-
 function getDbCacheKey(owner: string, repo: string, page: number, labelsFilter?: string[]) {
   return `db:${owner}:${repo}:${page}:${labelsFilter?.sort().join(',') || ''}`;
 }
@@ -159,7 +155,7 @@ export async function getConfig(): Promise<GitHubConfig | null> {
     };
   }
 
-  // 如果数据库没配置，尝试从环境变量获取
+  // 如果数��库没配置，尝试从环境变量获取
   const owner = process.env.NEXT_PUBLIC_GITHUB_OWNER;
   const repo = process.env.NEXT_PUBLIC_GITHUB_REPO;
   const token = process.env.NEXT_PUBLIC_GITHUB_TOKEN;
@@ -213,7 +209,7 @@ export async function saveConfig(config: GitHubConfig) {
     .single();
 
   if (existingConfig) {
-    // 如果存在，则更新配置
+    // 如果���在，则更新配置
     const { error } = await supabase
       .from('configs')
       .update({

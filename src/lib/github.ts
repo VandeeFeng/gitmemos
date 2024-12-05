@@ -447,10 +447,10 @@ export async function getLabels(forceSync: boolean = false): Promise<Label[]> {
     cacheManager?.set(cacheKey, labels, { expiry: CACHE_EXPIRY.LABELS });
 
     return labels;
-  } catch (error: any) {
-    console.error('GitHub API error:', error.response?.data || error);
+  } catch (error) {
+    console.error('GitHub API error:', (error as GitHubApiError).response?.data || error);
     throw new Error(
-      `Failed to fetch labels: ${error.response?.data?.message || error.message}`
+      `Failed to fetch labels: ${(error as GitHubApiError).response?.data?.message || (error as Error).message}`
     );
   }
 }

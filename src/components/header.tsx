@@ -8,6 +8,7 @@ import { Button } from './ui/button';
 import { LabelFilter } from './label-filter';
 import { Issue } from '@/types/github';
 import { SyncButton } from './sync-button';
+import { useLabels } from '@/lib/contexts/label-context';
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
@@ -35,6 +36,7 @@ export function Header({
   const pathname = usePathname();
   const router = useRouter();
   const isTimelinePage = pathname === '/timeline';
+  const { labels, loading: labelsLoading } = useLabels();
 
   // Ensure issues is always an array
   const safeIssues = Array.isArray(issues) ? issues : [];
@@ -62,6 +64,8 @@ export function Header({
               <LabelFilter
                 selectedLabel={selectedLabel || null}
                 onLabelSelect={onLabelSelect}
+                labels={labels}
+                loading={labelsLoading}
               />
             )}
             <button

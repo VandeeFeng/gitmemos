@@ -1,17 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
-import { getLabels } from '@/lib/github';
 import { Label } from '@/types/github';
 import { Loading } from './ui/loading';
 
 interface LabelFilterProps {
   selectedLabel: string | null;
   onLabelSelect: (label: string) => void;
+  labels: Label[];
+  loading?: boolean;
 }
 
-export function LabelFilter({ selectedLabel, onLabelSelect }: LabelFilterProps) {
-  const [labels, setLabels] = useState<Label[]>([]);
+export function LabelFilter({ selectedLabel, onLabelSelect, labels, loading = false }: LabelFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,27 +24,6 @@ export function LabelFilter({ selectedLabel, onLabelSelect }: LabelFilterProps) 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
-
-  useEffect(() => {
-    const fetchLabels = async () => {
-      try {
-        const labelsData = await getLabels();
-        const transformedLabels: Label[] = labelsData.map(label => ({
-          id: label.id,
-          name: label.name,
-          color: label.color,
-          description: label.description || null
-        }));
-        setLabels(transformedLabels);
-      } catch (error) {
-        console.error('Error fetching labels:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLabels();
   }, []);
 
   const selectedLabelData = selectedLabel ? labels.find(label => label.name === selectedLabel) : null;

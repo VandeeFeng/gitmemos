@@ -84,17 +84,19 @@ export async function GET() {
       }
 
       return NextResponse.json(labels);
-    } catch (error: Error & { response?: { data?: { message?: string }, status?: number } }) {
-      console.error('GitHub API error:', error.response?.data || error);
+    } catch (error: unknown) {
+      const err = error as GitHubApiError;
+      console.error('GitHub API error:', err.response?.data || error);
       return NextResponse.json(
-        { error: error.response?.data?.message || 'Failed to fetch labels from GitHub' },
-        { status: error.response?.status || 500 }
+        { error: err.response?.data?.message || 'Failed to fetch labels from GitHub' },
+        { status: err.response?.status || 500 }
       );
     }
-  } catch (error: Error) {
+  } catch (error: unknown) {
+    const err = error as Error;
     console.error('Error in labels route:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch labels' },
+      { error: err.message || 'Failed to fetch labels' },
       { status: 500 }
     );
   }
@@ -150,17 +152,19 @@ export async function POST(request: Request) {
       }
 
       return NextResponse.json(label);
-    } catch (error: Error & { response?: { data?: { message?: string }, status?: number } }) {
-      console.error('GitHub API error:', error.response?.data || error);
+    } catch (error: unknown) {
+      const err = error as GitHubApiError;
+      console.error('GitHub API error:', err.response?.data || error);
       return NextResponse.json(
-        { error: error.response?.data?.message || 'Failed to create label on GitHub' },
-        { status: error.response?.status || 500 }
+        { error: err.response?.data?.message || 'Failed to create label on GitHub' },
+        { status: err.response?.status || 500 }
       );
     }
-  } catch (error: Error) {
+  } catch (error: unknown) {
+    const err = error as Error;
     console.error('Error in create label route:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to create label' },
+      { error: err.message || 'Failed to create label' },
       { status: 500 }
     );
   }

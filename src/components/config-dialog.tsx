@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from './ui/button';
+import { Button } from '@/components/ui/button';
 import { getGitHubConfig, setGitHubConfig } from '@/lib/github';
 import { verifyPassword, isPasswordVerified } from '@/lib/db';
 import { GitHubConfig } from '@/types/github';
@@ -80,89 +80,101 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-      <div className="bg-bg-primary dark:bg-bg-secondary rounded-lg shadow-lg w-full max-w-md mx-4">
-        <div className="p-6">
-          <h2 className="text-xl font-semibold mb-4 text-text-primary">Repository Settings</h2>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
-                Repository Owner
-              </label>
-              <input
-                type="text"
-                value={config.owner}
-                onChange={(e) => setConfig(prev => ({ ...prev, owner: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-default rounded-lg bg-bg-primary dark:bg-bg-tertiary focus:outline-none focus:border-secondary dark:focus:border-secondary"
-                placeholder="e.g. octocat"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
-                Repository Name
-              </label>
-              <input
-                type="text"
-                value={config.repo}
-                onChange={(e) => setConfig(prev => ({ ...prev, repo: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-default rounded-lg bg-bg-primary dark:bg-bg-tertiary focus:outline-none focus:border-secondary dark:focus:border-secondary"
-                placeholder="e.g. hello-world"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
-                GitHub Token
-              </label>
+      <div className="bg-bg-primary dark:bg-bg-secondary rounded-lg shadow-lg w-full max-w-md mx-4 overflow-hidden">
+        {/* 标题栏 */}
+        <div className="px-6 py-4 border-b border-default bg-bg-secondary dark:bg-bg-tertiary">
+          <h2 className="text-xl font-semibold text-text-primary">Repository Settings</h2>
+        </div>
+
+        {/* 表单内容 */}
+        <div className="p-6 space-y-5">
+          {/* Repository Owner */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Repository Owner <span className="text-error">*</span>
+            </label>
+            <input
+              type="text"
+              value={config.owner}
+              onChange={(e) => setConfig(prev => ({ ...prev, owner: e.target.value }))}
+              className="w-full px-3 py-2 text-sm border border-default rounded-lg bg-bg-primary dark:bg-bg-tertiary focus:outline-none focus:ring-1 focus:ring-secondary dark:focus:ring-secondary transition-shadow"
+              placeholder="e.g. octocat"
+            />
+          </div>
+
+          {/* Repository Name */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Repository Name <span className="text-error">*</span>
+            </label>
+            <input
+              type="text"
+              value={config.repo}
+              onChange={(e) => setConfig(prev => ({ ...prev, repo: e.target.value }))}
+              className="w-full px-3 py-2 text-sm border border-default rounded-lg bg-bg-primary dark:bg-bg-tertiary focus:outline-none focus:ring-1 focus:ring-secondary dark:focus:ring-secondary transition-shadow"
+              placeholder="e.g. hello-world"
+            />
+          </div>
+
+          {/* GitHub Token */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              GitHub Token <span className="text-error">*</span>
+            </label>
+            <input
+              type="password"
+              value={config.token}
+              onChange={(e) => setConfig(prev => ({ ...prev, token: e.target.value }))}
+              className="w-full px-3 py-2 text-sm border border-default rounded-lg bg-bg-primary dark:bg-bg-tertiary focus:outline-none focus:ring-1 focus:ring-secondary dark:focus:ring-secondary transition-shadow"
+              placeholder="ghp_xxxxxxxxxxxx"
+            />
+            <p className="mt-1.5 text-xs text-text-secondary">
+              Need a token? <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-secondary hover:underline">Create one here</a>
+            </p>
+          </div>
+
+          {/* Password */}
+          <div>
+            <label className="block text-sm font-medium text-text-secondary mb-1.5">
+              Password Verification
+            </label>
+            <div className="flex gap-2">
               <input
                 type="password"
-                value={config.token}
-                onChange={(e) => setConfig(prev => ({ ...prev, token: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-default rounded-lg bg-bg-primary dark:bg-bg-tertiary focus:outline-none focus:border-secondary dark:focus:border-secondary"
-                placeholder="ghp_xxxxxxxxxxxx"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="flex-1 px-3 py-2 text-sm border border-default rounded-lg bg-bg-primary dark:bg-bg-tertiary focus:outline-none focus:ring-1 focus:ring-secondary dark:focus:ring-secondary transition-shadow"
+                placeholder="Enter password"
               />
-              <p className="mt-1 text-xs text-text-secondary">
-                Need a token? <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-secondary hover:underline">Create one here</a>
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-text-secondary mb-1">
-                Password
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="flex-1 px-3 py-2 text-sm border border-default rounded-lg bg-bg-primary dark:bg-bg-tertiary focus:outline-none focus:border-secondary dark:focus:border-secondary"
-                  placeholder="Enter password"
-                />
-                <button
-                  onClick={handleVerifyPassword}
-                  disabled={verifying}
-                  className="px-3 py-2 text-sm font-medium text-white bg-secondary hover:bg-opacity-90 rounded-lg disabled:opacity-50"
-                >
-                  {verifying ? 'Verifying...' : 'Verify'}
-                </button>
-              </div>
-              {passwordVerified && (
-                <p className="mt-1 text-xs text-success">Password verified successfully!</p>
-              )}
+              <Button
+                onClick={handleVerifyPassword}
+                disabled={verifying}
+                variant="outline"
+                className={`min-w-[80px] ${passwordVerified ? 'bg-success/10 border-success text-success hover:bg-success/20' : ''}`}
+              >
+                {verifying ? 'Verifying...' : passwordVerified ? 'Verified' : 'Verify'}
+              </Button>
             </div>
           </div>
-          <div className="mt-6 flex justify-end space-x-3">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-text-primary bg-bg-primary dark:bg-bg-tertiary border border-default rounded-lg hover:bg-bg-secondary dark:hover:bg-bg-secondary transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-white bg-secondary hover:bg-opacity-90 rounded-lg disabled:opacity-50"
-            >
-              {saving ? 'Saving...' : 'Save'}
-            </button>
-          </div>
+        </div>
+
+        {/* 底部按钮 */}
+        <div className="px-6 py-4 bg-bg-secondary dark:bg-bg-tertiary border-t border-default flex justify-end space-x-3">
+          <Button
+            variant="outline"
+            onClick={onClose}
+            className="border-default hover:bg-bg-tertiary dark:hover:bg-bg-primary transition-colors"
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="success"
+            onClick={handleSave}
+            disabled={saving}
+            className="min-w-[80px]"
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </Button>
         </div>
       </div>
     </div>

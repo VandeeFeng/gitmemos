@@ -66,7 +66,7 @@ let lastSyncCheck: {
   isInitialLoad: boolean;
 } | null = null;
 
-const SYNC_CHECK_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const SYNC_CHECK_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
 async function checkNeedsSync(owner: string, repo: string, forceSync: boolean): Promise<boolean> {
   // If force sync is requested, return true
@@ -97,46 +97,6 @@ async function checkNeedsSync(owner: string, repo: string, forceSync: boolean): 
   };
 
   return needsSync;
-}
-
-// 添加内存缓存
-interface IssuesCache {
-  timestamp: number;
-  data: {
-    issues: Issue[];
-    syncStatus: {
-      success: boolean;
-      totalSynced: number;
-      lastSyncAt: string;
-    } | null;
-  };
-}
-
-const ISSUES_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-const issuesCache: Record<string, IssuesCache> = {};
-
-function getIssuesCacheKey(owner: string, repo: string, page: number, labels?: string) {
-  return `issues:${owner}:${repo}:${page}:${labels || ''}`;
-}
-
-function getIssuesFromCache(owner: string, repo: string, page: number, labels?: string) {
-  const key = getIssuesCacheKey(owner, repo, page, labels);
-  const cached = issuesCache[key];
-  
-  if (cached && Date.now() - cached.timestamp < ISSUES_CACHE_DURATION) {
-    console.log('Using cached issues data');
-    return cached.data;
-  }
-  
-  return null;
-}
-
-function setIssuesCache(owner: string, repo: string, page: number, labels: string | undefined, data: IssuesCache['data']) {
-  const key = getIssuesCacheKey(owner, repo, page, labels);
-  issuesCache[key] = {
-    timestamp: Date.now(),
-    data
-  };
 }
 
 // 添加请求追踪
@@ -185,35 +145,10 @@ interface LabelFilterCache {
 }
 
 const labelFilterCache: Record<string, LabelFilterCache> = {};
-const LABEL_FILTER_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const LABEL_FILTER_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
 function getLabelFilterCacheKey(owner: string, repo: string, label: string | undefined) {
   return `label_filter:${owner}:${repo}:${label || ''}`;
-}
-
-function getFromLabelFilterCache(owner: string, repo: string, label: string | undefined): Issue[] | null {
-  const key = getLabelFilterCacheKey(owner, repo, label);
-  const cached = labelFilterCache[key];
-  
-  if (cached && 
-      cached.owner === owner && 
-      cached.repo === repo && 
-      Date.now() - cached.timestamp < LABEL_FILTER_CACHE_DURATION) {
-    console.log('Using label filter cached data');
-    return cached.issues;
-  }
-  
-  return null;
-}
-
-function setLabelFilterCache(owner: string, repo: string, label: string | undefined, issues: Issue[]) {
-  const key = getLabelFilterCacheKey(owner, repo, label);
-  labelFilterCache[key] = {
-    issues,
-    timestamp: Date.now(),
-    owner,
-    repo
-  };
 }
 
 // 添加分页缓存
@@ -505,7 +440,7 @@ export async function getLabels(forceSync: boolean = false) {
     labelsCache.repo === config.repo && 
     (now - labelsCache.timestamp) < LABELS_CACHE_DURATION;
 
-  // 如果缓存有��且不是强制同步，直接使用缓存
+  // 如果缓存有且不是强制同步，直接使用缓存
   if (isCacheValid && !forceSync && labelsCache) {
     console.log('Using cached labels data');
     return labelsCache.data;

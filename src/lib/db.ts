@@ -61,7 +61,7 @@ interface DbError {
 }
 
 const DB_PAGE_SIZE = 50;
-const DB_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const DB_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
 const dbCache: Record<string, DbCache> = {};
 
@@ -69,26 +69,6 @@ const PASSWORD_VERIFIED_KEY = 'password_verified';
 
 function getCacheKey(owner: string, repo: string, page: number, labelsFilter?: string[]) {
   return `${owner}:${repo}:${page}:${labelsFilter?.join(',') || ''}`;
-}
-
-function getFromCache(owner: string, repo: string, page: number, labelsFilter?: string[]) {
-  const key = getCacheKey(owner, repo, page, labelsFilter);
-  const cached = dbCache[key];
-  
-  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return cached;
-  }
-  
-  return null;
-}
-
-function setCache(owner: string, repo: string, page: number, labelsFilter: string[] | undefined, issues: DbIssue[], labels: DbLabel[]) {
-  const key = getCacheKey(owner, repo, page, labelsFilter);
-  dbCache[key] = {
-    timestamp: Date.now(),
-    issues,
-    labels
-  };
 }
 
 function getDbCacheKey(owner: string, repo: string, page: number, labelsFilter?: string[]) {
@@ -179,7 +159,7 @@ export async function getConfig(): Promise<GitHubConfig | null> {
     };
   }
 
-  // 如果数据库没有配置，尝试从环境变量获取
+  // 如果数据库没���配置，尝试从环境变量获取
   const owner = process.env.NEXT_PUBLIC_GITHUB_OWNER;
   const repo = process.env.NEXT_PUBLIC_GITHUB_REPO;
   const token = process.env.NEXT_PUBLIC_GITHUB_TOKEN;

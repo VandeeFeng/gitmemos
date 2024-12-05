@@ -81,42 +81,49 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, loading: true }));
     try {
       const result = await getIssues(1, undefined, true);
-      if (!state.config) return;
+      
+      setState(prev => {
+        if (!prev.config) return prev;
 
-      const newState = {
-        issues: result.issues,
-        config: state.config,
-        timestamp: Date.now()
-      };
-      setState(prev => ({ 
-        ...prev, 
-        issues: result.issues,
-        loading: false 
-      }));
-      setCache(newState);
-      memoryCache = newState;
+        const newState = {
+          issues: result.issues,
+          config: prev.config,
+          timestamp: Date.now()
+        };
+        
+        setCache(newState);
+        memoryCache = newState;
 
-      // 记录同步历史
-      await recordSyncHistory(
-        state.config.owner,
-        state.config.repo,
-        'success',
-        result.issues.length
-      );
+        // 记录同步历史
+        recordSyncHistory(
+          prev.config.owner,
+          prev.config.repo,
+          'success',
+          result.issues.length
+        ).catch(console.error);
+
+        return { 
+          ...prev, 
+          issues: result.issues,
+          loading: false 
+        };
+      });
     } catch (error) {
       console.error('Error syncing issues:', error);
-      setState(prev => ({ ...prev, loading: false }));
-      if (state.config) {
-        await recordSyncHistory(
-          state.config.owner,
-          state.config.repo,
-          'failed',
-          0,
-          error instanceof Error ? error.message : 'Unknown error'
-        );
-      }
+      setState(prev => {
+        if (prev.config) {
+          recordSyncHistory(
+            prev.config.owner,
+            prev.config.repo,
+            'failed',
+            0,
+            error instanceof Error ? error.message : 'Unknown error'
+          ).catch(console.error);
+        }
+        return { ...prev, loading: false };
+      });
     }
-  }, [state.config]);
+  }, []);
 
   const updateIssues = useCallback((newIssues: Issue[]) => {
     if (!state.config) return;

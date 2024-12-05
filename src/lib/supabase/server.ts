@@ -1,20 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
-import { Database } from '@/types/supabase';
 
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseServiceKey = process.env.SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase environment variables for server');
+  throw new Error('Missing Supabase environment variables');
 }
 
-export const supabaseServer = createClient<Database>(
-  supabaseUrl,
-  supabaseServiceKey,
-  {
-    auth: {
-      persistSession: false,
-      autoRefreshToken: false,
-    }
-  }
-); 
+export const supabaseServer = createClient(supabaseUrl, supabaseServiceKey); 

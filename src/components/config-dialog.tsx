@@ -62,10 +62,7 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
 
     setSaving(true);
     try {
-      await setGitHubConfig({
-        ...config,
-        password: password
-      });
+      await setGitHubConfig(config);
       onClose();
       // 刷新页面以应用新配置
       window.location.reload();

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Issue } from '@/types/github';
-import { getIssuesFromDb } from '@/lib/db';
+import { getIssues } from '@/lib/api';
 import { useIssues } from '@/lib/contexts/issue-context';
 
 interface BacklinksProps {
@@ -21,9 +21,10 @@ export function Backlinks({ currentIssueNumber }: BacklinksProps) {
       // 优先使用上下文中的 issues
       let allIssues = issues;
       
-      // 如果上下文中没有 issues，则从数据库获取
+      // 如果上下文中没有 issues，则从 API 获取
       if (!allIssues || allIssues.length === 0) {
-        allIssues = await getIssuesFromDb(config.owner, config.repo);
+        const response = await getIssues(config.owner, config.repo);
+        allIssues = response?.issues || [];
       }
       
       // 过滤出引用了当前 issue 的其他 issues

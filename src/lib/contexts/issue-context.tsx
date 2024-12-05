@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { Issue, GitHubConfig } from '@/types/github';
-import { getIssues, getGitHubConfig } from '@/lib/github';
-import { recordSyncHistory } from '@/lib/db';
+import { getIssues as getGitHubIssues, getGitHubConfig } from '@/lib/github';
+import { recordSync } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 
 interface IssueContextType {
@@ -52,7 +52,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
 
     setState(prev => ({ ...prev, loading: true }));
     try {
-      const result = await getIssues(1, undefined, true, configRef.current);
+      const result = await getGitHubIssues(1, undefined, true, configRef.current);
       
       setState(prev => {
         if (!prev.config) return prev;
@@ -69,7 +69,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         );
 
         // 记录同步历史
-        recordSyncHistory(
+        recordSync(
           prev.config.owner,
           prev.config.repo,
           'success',
@@ -86,7 +86,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       console.error('Error syncing issues:', error);
       setState(prev => {
         if (prev.config) {
-          recordSyncHistory(
+          recordSync(
             prev.config.owner,
             prev.config.repo,
             'failed',
@@ -160,7 +160,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         }
 
         // 从服务器获取数据
-        const issuesResult = await getIssues(1, undefined, false, config);
+        const issuesResult = await getGitHubIssues(1, undefined, false, config);
         
         if (mounted) {
           const newState: CacheData = {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { getGitHubConfig, setGitHubConfig } from '@/lib/github';
-import { verifyPassword, isPasswordVerified } from '@/lib/db';
+import { verifyPassword, isPasswordVerified, setPasswordVerified as setPasswordVerifiedState } from '@/lib/api';
 import { GitHubConfig } from '@/types/github';
 
 interface ConfigDialogProps {
@@ -41,6 +41,7 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
       const isValid = await verifyPassword(password);
       if (isValid) {
         setPasswordVerified(true);
+        setPasswordVerifiedState(true);
         alert('Password verified successfully!');
       } else {
         alert('Invalid password');

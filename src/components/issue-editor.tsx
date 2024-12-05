@@ -9,7 +9,7 @@ import { createIssue, updateIssue, createLabel } from '@/lib/github';
 import { LABEL_COLORS } from '@/lib/colors';
 import { useLabels } from '@/lib/contexts/label-context';
 import { useTheme } from 'next-themes';
-import { isPasswordVerified } from '@/lib/db';
+import { isPasswordVerified } from '@/lib/api';
 
 interface IssueEditorProps {
   issue?: EditableIssue;

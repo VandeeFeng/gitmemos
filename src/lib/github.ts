@@ -1,21 +1,33 @@
 import { GitHubConfig, Issue, Label } from '@/types/github';
-import { 
-  getConfig, 
-  saveConfig,
-  getIssuesFromDb, 
-  shouldSync,
-  getLastSyncHistory,
-  recordSyncHistory
-} from './db';
+import { getConfig, saveConfig, getIssues as getIssuesFromApi, checkSyncStatus, recordSync } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
+import { Octokit } from 'octokit';
 
 let config: GitHubConfig | null = null;
 
+function convertDbConfigToGitHubConfig(dbConfig: any): GitHubConfig {
+  return {
+    owner: dbConfig.owner,
+    repo: dbConfig.repo,
+    token: dbConfig.token,
+    issuesPerPage: dbConfig.issues_per_page
+  };
+}
+
+function convertGitHubConfigToDbConfig(githubConfig: GitHubConfig): any {
+  return {
+    owner: githubConfig.owner,
+    repo: githubConfig.repo,
+    token: githubConfig.token,
+    issues_per_page: githubConfig.issuesPerPage
+  };
+}
+
 export async function setGitHubConfig(newConfig: GitHubConfig) {
   config = newConfig;
-  // 保存到数据库
-  await saveConfig(newConfig);
-  // 更新缓存
+  // Save to database via API
+  await saveConfig(convertGitHubConfigToDbConfig(newConfig));
+  // Update cache
   cacheManager?.set(
     CACHE_KEYS.CONFIG(newConfig.owner, newConfig.repo),
     newConfig,
@@ -24,12 +36,12 @@ export async function setGitHubConfig(newConfig: GitHubConfig) {
 }
 
 export async function getGitHubConfig(): Promise<GitHubConfig> {
-  // 1. 优先使用运行时配置
+  // 1. Use runtime config first
   if (config) {
     return config;
   }
 
-  // 2. 从缓存获取
+  // 2. Get from cache/API
   const dbConfig = await getConfig();
   if (dbConfig) {
     const cacheKey = CACHE_KEYS.CONFIG(dbConfig.owner, dbConfig.repo);
@@ -39,12 +51,13 @@ export async function getGitHubConfig(): Promise<GitHubConfig> {
       return cached;
     }
     
-    config = dbConfig;
-    cacheManager?.set(cacheKey, dbConfig, { expiry: CACHE_EXPIRY.CONFIG });
-    return dbConfig;
+    const githubConfig = convertDbConfigToGitHubConfig(dbConfig);
+    config = githubConfig;
+    cacheManager?.set(cacheKey, githubConfig, { expiry: CACHE_EXPIRY.CONFIG });
+    return githubConfig;
   }
 
-  // 3. 如果都没有，返回空配置
+  // 3. Return empty config if none found
   return {
     owner: '',
     repo: '',
@@ -67,7 +80,8 @@ export async function checkNeedsSync(owner: string, repo: string, forceSync: boo
 
   // If this is the first load or no cache, check sync status
   if (!cached || cached.isInitialLoad) {
-    const needsSync = await shouldSync(owner, repo);
+    const syncStatus = await checkSyncStatus(owner, repo);
+    const needsSync = syncStatus?.needsSync ?? true;
     const data: SyncCheckData = {
       needsSync,
       isInitialLoad: false
@@ -79,7 +93,7 @@ export async function checkNeedsSync(owner: string, repo: string, forceSync: boo
   return cached.needsSync;
 }
 
-// 添加请求追踪
+// Request tracking
 interface RequestTracker {
   promise: Promise<{
     issues: Issue[];
@@ -116,20 +130,29 @@ function getNextRequestId() {
   return `req_${++requestCounter}`;
 }
 
-// 优化后的获取issues函数
+// Optimized getIssues function
 export async function getIssues(
   page: number = 1, 
   labels?: string, 
   forceSync: boolean = false,
-  existingConfig?: GitHubConfig // 添加可选的配置参数
+  existingConfig?: GitHubConfig
 ) {
   const config = existingConfig || await getGitHubConfig();
+
+  if (!config.owner || !config.repo) {
+    throw new Error('Missing owner or repo in config');
+  }
+
+  if (!config.token) {
+    throw new Error('GitHub token is missing');
+  }
+
   const lockKey = getRequestLockKey(config.owner, config.repo, page, labels);
 
-  // 清理过期请求
+  // Clean up stale requests
   cleanupStaleRequests();
 
-  // 检查是否有正在进行的有效请求
+  // Check for existing valid request
   const existingRequest = requestLocks[lockKey];
   if (existingRequest && Date.now() - existingRequest.timestamp < REQUEST_TIMEOUT) {
     if (!existingRequest.loggedReuse) {
@@ -139,7 +162,7 @@ export async function getIssues(
     return existingRequest.promise;
   }
 
-  // 如果不是强制同步，先检查缓存
+  // If not force sync, check cache
   if (!forceSync) {
     const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, page, labels || '');
     const cached = cacheManager?.get<Issue[]>(cacheKey);
@@ -151,30 +174,55 @@ export async function getIssues(
     }
   }
 
-  // 创建新的请求
+  // Create new request
   const requestId = getNextRequestId();
   console.log(`Creating new request ${requestId} for page ${page}`);
 
   const promise = (async () => {
     try {
-      // 检查是否需要从 GitHub API 同步
-      const needsGitHubSync = await shouldSync(config.owner, config.repo, forceSync);
+      // Check if GitHub API sync is needed
+      const needsGitHubSync = await checkNeedsSync(config.owner, config.repo, forceSync);
 
       if (needsGitHubSync) {
         try {
           console.log(`[${requestId}] Starting GitHub API sync...`);
           
-          // 使用新的 API 路由
-          const response = await fetch(`/api/github/issues?page=${page}${labels ? `&labels=${labels}` : ''}`);
-          if (!response.ok) {
-            throw new Error(`API request failed: ${response.statusText}`);
-          }
-          
-          const issues = await response.json();
+          // Use Octokit for GitHub API calls
+          const octokit = new Octokit({ auth: config.token });
+          const { data } = await octokit.rest.issues.listForRepo({
+            owner: config.owner,
+            repo: config.repo,
+            state: 'all',
+            per_page: config.issuesPerPage || 50,
+            page,
+            sort: 'created',
+            direction: 'desc',
+            labels: labels || undefined
+          });
 
-          // 更新缓存
+          const issues = data.map(issue => ({
+            number: issue.number,
+            title: issue.title,
+            body: issue.body || '',
+            created_at: issue.created_at,
+            state: issue.state,
+            labels: issue.labels
+              .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
+                typeof label === 'object' && label !== null)
+              .map(label => ({
+                id: label.id,
+                name: label.name,
+                color: label.color,
+                description: label.description,
+              }))
+          }));
+
+          // Update cache
           const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, page, labels || '');
           cacheManager?.set(cacheKey, issues, { expiry: CACHE_EXPIRY.ISSUES });
+
+          // Record successful sync
+          await recordSync(config.owner, config.repo, 'success', issues.length);
 
           return {
             issues,
@@ -184,38 +232,36 @@ export async function getIssues(
               lastSyncAt: new Date().toISOString()
             }
           };
-        } catch (error) {
-          console.error(`[${requestId}] GitHub API sync failed:`, error);
-          // 记录同步失败
-          await recordSyncHistory(
-            config.owner,
-            config.repo,
+        } catch (error: any) {
+          console.error(`[${requestId}] GitHub API sync failed:`, error.response?.data || error);
+          
+          // Record failed sync
+          await recordSync(
+            config.owner, 
+            config.repo, 
             'failed',
             0,
-            error instanceof Error ? error.message : 'Unknown error'
+            error.response?.data?.message || error.message
           );
-          throw error;
+          
+          throw new Error(
+            `GitHub API sync failed: ${error.response?.data?.message || error.message}`
+          );
         }
       }
 
-      // 从数据库获取数据
+      // Get data from database via API
       console.log(`[${requestId}] Loading data from database...`);
-      const issues = await getIssuesFromDb(
-        config.owner,
-        config.repo,
-        page,
-        labels ? [labels] : undefined
-      );
-
-      const lastSync = await getLastSyncHistory(config.owner, config.repo);
+      const response = await getIssuesFromApi(config.owner, config.repo, page, labels ? [labels] : undefined);
+      const issues = response?.issues || [];
+      const syncStatus = await checkSyncStatus(config.owner, config.repo);
       
-      // 不再设置缓存，因为 getIssuesFromDb 已经设置了缓存
       return { 
         issues,
-        syncStatus: lastSync ? {
+        syncStatus: syncStatus ? {
           success: true,
-          totalSynced: lastSync.issues_synced,
-          lastSyncAt: lastSync.last_sync_at
+          totalSynced: syncStatus.issuesSynced || 0,
+          lastSyncAt: syncStatus.lastSyncAt || new Date().toISOString()
         } : null
       };
     } finally {
@@ -223,7 +269,7 @@ export async function getIssues(
     }
   })();
 
-  // 记录请求
+  // Record request
   requestLocks[lockKey] = {
     promise,
     timestamp: Date.now(),
@@ -240,9 +286,13 @@ const issueRequestLocks: Record<string, {
   requestId: string;
 }> = {};
 
+function getSingleIssueCacheKey(owner: string, repo: string, issueNumber: number): string {
+  return `issue:${owner}:${repo}:${issueNumber}`;
+}
+
 export async function getIssue(issueNumber: number, forceSync: boolean = false): Promise<Issue> {
   const config = await getGitHubConfig();
-  const lockKey = `issue:${config.owner}:${config.repo}:${issueNumber}`;
+  const lockKey = getSingleIssueCacheKey(config.owner, config.repo, issueNumber);
   
   // Clean up stale requests
   const now = Date.now();
@@ -252,90 +302,65 @@ export async function getIssue(issueNumber: number, forceSync: boolean = false):
     }
   });
 
-  // Check for existing request
+  // Check for existing valid request
   const existingRequest = issueRequestLocks[lockKey];
   if (existingRequest && now - existingRequest.timestamp < REQUEST_TIMEOUT) {
-    console.log(`Reusing request ${existingRequest.requestId} for issue ${issueNumber}`);
     return existingRequest.promise;
   }
 
-  // If not force sync, first try to find the issue in the existing issues cache
-  if (!forceSync) {
-    // First check the issues list cache
-    const issuesListCacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');
-    const cachedData = cacheManager?.get<{ issues: Issue[] }>(issuesListCacheKey);
-    if (cachedData?.issues) {
-      console.log('Checking issues list cache:', { cachedData });
-      const issueFromList = cachedData.issues.find(issue => issue.number === issueNumber);
-      if (issueFromList) {
-        console.log('Found issue in issues list cache');
-        return issueFromList;
-      }
-    }
-
-    // Then check the individual issue cache
-    const singleIssueCacheKey = `issue:${config.owner}:${config.repo}:${issueNumber}`;
-    const cachedSingleIssue = cacheManager?.get<Issue>(singleIssueCacheKey);
-    if (cachedSingleIssue) {
-      console.log('Using cached single issue data');
-      return cachedSingleIssue;
-    }
-
-    // Try to find in database
-    try {
-      console.log('Trying to find issue in database...');
-      const issues = await getIssuesFromDb(config.owner, config.repo);
-      const issueFromDb = issues.find(issue => issue.number === issueNumber);
-      if (issueFromDb) {
-        console.log('Found issue in database');
-        // Update cache
-        const cacheKey = `issue:${config.owner}:${config.repo}:${issueNumber}`;
-        cacheManager?.set(cacheKey, issueFromDb, { expiry: CACHE_EXPIRY.ISSUES });
-        return issueFromDb;
-      }
-    } catch (error) {
-      console.warn('Failed to check database for issue:', error);
-    }
-  }
-
   const requestId = getNextRequestId();
-  console.log(`Creating new request ${requestId} for issue ${issueNumber}`);
+  console.log(`[${requestId}] Getting issue #${issueNumber}`);
 
   const promise = (async () => {
     try {
-      const response = await fetch(`/api/github/issues?number=${issueNumber}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch issue: ${response.statusText}`);
+      // Check cache first if not forcing sync
+      if (!forceSync) {
+        const cached = cacheManager?.get<Issue>(lockKey);
+        if (cached) {
+          return cached;
+        }
       }
 
-      const data = await response.json();
-      // API 返回的可能是数组，我们需要找到匹配的 issue
-      const issue = Array.isArray(data) ? data.find(i => i.number === issueNumber) : data;
+      // Try to get from database first
+      console.log('Trying to find issue in database...');
+      const response = await getIssuesFromApi(config.owner, config.repo);
+      const issues = response?.issues || [];
+      const issueFromDb = issues.find((issue: Issue) => issue.number === issueNumber);
       
-      if (!issue) {
-        throw new Error(`Issue #${issueNumber} not found`);
+      if (issueFromDb) {
+        console.log('Found issue in database');
+        // Update cache
+        cacheManager?.set(lockKey, issueFromDb, { expiry: CACHE_EXPIRY.ISSUES });
+        return issueFromDb;
       }
 
-      // Update both caches
-      const singleIssueCacheKey = `issue:${config.owner}:${config.repo}:${issueNumber}`;
-      cacheManager?.set(singleIssueCacheKey, issue, { expiry: CACHE_EXPIRY.ISSUES });
-
-      // Also update the issues list cache if it exists
-      const issuesListCacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');
-      const existingIssuesList = cacheManager?.get<{ issues: Issue[] }>(issuesListCacheKey);
-      if (existingIssuesList?.issues) {
-        const updatedIssues = existingIssuesList.issues.map(i => 
-          i.number === issue.number ? issue : i
+      // If not in database or force sync, get from GitHub API
+      console.log('Getting issue from GitHub API...');
+      const apiResponse = await fetch(`/api/github/issues/${issueNumber}`);
+      if (!apiResponse.ok) {
+        const errorData = await apiResponse.json().catch(() => ({}));
+        throw new Error(
+          `GitHub API request failed: ${apiResponse.statusText}${
+            errorData.error ? ` - ${errorData.error}` : ''
+          }`
         );
-        cacheManager?.set(issuesListCacheKey, { issues: updatedIssues }, { expiry: CACHE_EXPIRY.ISSUES });
       }
-
+      
+      const issue = await apiResponse.json();
+      
+      // Update cache
+      cacheManager?.set(lockKey, issue, { expiry: CACHE_EXPIRY.ISSUES });
+      
       return issue;
+    } catch (error) {
+      console.error(`[${requestId}] Failed to get issue:`, error);
+      throw error;
     } finally {
       delete issueRequestLocks[lockKey];
     }
   })();
 
+  // Record request
   issueRequestLocks[lockKey] = {
     promise,
     timestamp: now,
@@ -385,32 +410,44 @@ export async function updateIssue(
 export async function getLabels(forceSync: boolean = false): Promise<Label[]> {
   const config = await getGitHubConfig();
 
-  // 如果强制同步，先���查缓存
+  if (!config.owner || !config.repo) {
+    throw new Error('Missing owner or repo in config');
+  }
+
+  if (!config.token) {
+    throw new Error('GitHub token is missing');
+  }
+
+  // If not force sync, check cache first
   if (!forceSync) {
     const cacheKey = CACHE_KEYS.LABELS(config.owner, config.repo);
     const cached = cacheManager?.get<Label[]>(cacheKey);
     if (cached) {
-      console.log('Using cached labels data');
       return cached;
     }
   }
 
   try {
-    // 使用新的 API 路由获取标签
-    const response = await fetch('/api/github/labels');
+    console.log('Fetching labels from GitHub API...');
+    const response = await fetch(`/api/github/labels${forceSync ? '?force=true' : ''}`);
     if (!response.ok) {
-      throw new Error(`Failed to fetch labels: ${response.statusText}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `Failed to fetch labels: ${response.statusText}${
+          errorData.error ? ` - ${errorData.error}` : ''
+        }`
+      );
     }
 
     const labels = await response.json();
-
-    // 更新缓存
+    
+    // Update cache
     const cacheKey = CACHE_KEYS.LABELS(config.owner, config.repo);
     cacheManager?.set(cacheKey, labels, { expiry: CACHE_EXPIRY.LABELS });
 
     return labels;
-  } catch (error) {
-    console.error('Error fetching labels:', error);
+  } catch (error: any) {
+    console.error('Failed to fetch labels:', error);
     throw error;
   }
 }

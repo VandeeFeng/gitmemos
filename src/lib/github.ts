@@ -136,38 +136,11 @@ function getNextRequestId() {
   return `req_${++requestCounter}`;
 }
 
-// 添加标签筛选缓存
-interface LabelFilterCache {
-  issues: Issue[];
-  timestamp: number;
-  owner: string;
-  repo: string;
-}
-
-const labelFilterCache: Record<string, LabelFilterCache> = {};
-const LABEL_FILTER_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-
-function getLabelFilterCacheKey(owner: string, repo: string, label: string | undefined) {
-  return `label_filter:${owner}:${repo}:${label || ''}`;
-}
-
-// 缓存相关常量和类型
+// 缓存相关常量
 const ISSUES_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-
-interface IssuesCache {
-  timestamp: number;
-  data: {
-    issues: Issue[];
-    syncStatus: {
-      success: boolean;
-      totalSynced: number;
-      lastSyncAt: string;
-    } | null;
-  };
-}
+const PAGE_SIZE = 50;
 
 // 分页缓存
-const PAGE_SIZE = 50;
 const issuesPageCache: Record<string, {
   timestamp: number;
   data: Issue[];
@@ -295,7 +268,7 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
         labels ? [labels] : undefined
       );
 
-      // 更新缓存
+      // ��新缓存
       issuesPageCache[cacheKey] = {
         timestamp: Date.now(),
         data: issues
@@ -463,7 +436,7 @@ export async function getLabels(forceSync: boolean = false) {
     labelsCache.repo === config.repo && 
     (now - labelsCache.timestamp) < LABELS_CACHE_DURATION;
 
-  // 如果缓存有且不是强制同���，直接使用缓存
+  // 如果缓存有且不是强制同，直接使用缓存
   if (isCacheValid && !forceSync && labelsCache) {
     console.log('Using cached labels data');
     return labelsCache.data;

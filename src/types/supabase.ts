@@ -10,6 +10,7 @@ export interface Database {
           issues_per_page: number
           created_at: string
           updated_at: string
+          password?: string
         }
         Insert: {
           owner: string
@@ -18,6 +19,7 @@ export interface Database {
           issues_per_page?: number
           created_at?: string
           updated_at?: string
+          password?: string
         }
         Update: {
           owner?: string
@@ -25,6 +27,7 @@ export interface Database {
           token?: string
           issues_per_page?: number
           updated_at?: string
+          password?: string
         }
       }
       sync_history: {

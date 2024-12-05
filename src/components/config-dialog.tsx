@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { getGitHubConfig, setGitHubConfig } from '@/lib/github';
+import { verifyPassword, isPasswordVerified } from '@/lib/db';
 import { GitHubConfig } from '@/types/github';
 
 interface ConfigDialogProps {
@@ -17,13 +18,40 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
     token: '',
     issuesPerPage: 10
   });
+  const [password, setPassword] = useState('');
   const [saving, setSaving] = useState(false);
+  const [passwordVerified, setPasswordVerified] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       getGitHubConfig().then(setConfig);
+      setPasswordVerified(isPasswordVerified());
     }
   }, [isOpen]);
+
+  const handleVerifyPassword = async () => {
+    if (!password) {
+      alert('Please enter password');
+      return;
+    }
+
+    setVerifying(true);
+    try {
+      const isValid = await verifyPassword(password);
+      if (isValid) {
+        setPasswordVerified(true);
+        alert('Password verified successfully!');
+      } else {
+        alert('Invalid password');
+      }
+    } catch (error) {
+      console.error('Error verifying password:', error);
+      alert('Failed to verify password');
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!config.owner || !config.repo || !config.token) {
@@ -33,7 +61,10 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
 
     setSaving(true);
     try {
-      await setGitHubConfig(config);
+      await setGitHubConfig({
+        ...config,
+        password: password
+      });
       onClose();
       // 刷新页面以应用新配置
       window.location.reload();
@@ -92,22 +123,45 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
                 Need a token? <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-secondary hover:underline">Create one here</a>
               </p>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-text-secondary mb-1">
+                Password
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="flex-1 px-3 py-2 text-sm border border-default rounded-lg bg-bg-primary dark:bg-bg-tertiary focus:outline-none focus:border-secondary dark:focus:border-secondary"
+                  placeholder="Enter password"
+                />
+                <button
+                  onClick={handleVerifyPassword}
+                  disabled={verifying}
+                  className="px-3 py-2 text-sm font-medium text-white bg-secondary hover:bg-opacity-90 rounded-lg disabled:opacity-50"
+                >
+                  {verifying ? 'Verifying...' : 'Verify'}
+                </button>
+              </div>
+              {passwordVerified && (
+                <p className="mt-1 text-xs text-success">Password verified successfully!</p>
+              )}
+            </div>
           </div>
-          <div className="mt-6 flex justify-end gap-3">
-            <Button
-              variant="outline"
+          <div className="mt-6 flex justify-end space-x-3">
+            <button
               onClick={onClose}
-              className="border-default hover:bg-bg-secondary dark:hover:bg-bg-tertiary transition-colors"
+              className="px-4 py-2 text-sm font-medium text-text-primary bg-bg-primary dark:bg-bg-tertiary border border-default rounded-lg hover:bg-bg-secondary dark:hover:bg-bg-secondary transition-colors"
             >
               Cancel
-            </Button>
-            <Button
-              variant="success"
+            </button>
+            <button
               onClick={handleSave}
               disabled={saving}
+              className="px-4 py-2 text-sm font-medium text-white bg-secondary hover:bg-opacity-90 rounded-lg disabled:opacity-50"
             >
-              {saving ? 'Saving...' : 'Save Changes'}
-            </Button>
+              {saving ? 'Saving...' : 'Save'}
+            </button>
           </div>
         </div>
       </div>

@@ -19,6 +19,7 @@ export interface GitHubConfig {
   repo: string;
   token: string;
   issuesPerPage: number;
+  password?: string;
 }
 
 // 用于编辑器的 Issue 类型，body 必须是 string

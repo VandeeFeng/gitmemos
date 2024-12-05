@@ -33,6 +33,7 @@ interface DbConfig {
   token: string;
   issues_per_page: number;
   created_at: string;
+  password?: string;
 }
 
 interface IssueCache {
@@ -60,6 +61,8 @@ interface DbError {
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 const dbCache: Record<string, IssueCache> = {};
+
+const PASSWORD_VERIFIED_KEY = 'password_verified';
 
 function getCacheKey(owner: string, repo: string, page: number, labelsFilter?: string[]) {
   return `${owner}:${repo}:${page}:${labelsFilter?.join(',') || ''}`;
@@ -134,11 +137,26 @@ export async function testConnection(): Promise<boolean> {
 }
 
 // 配置相关操作
+export async function verifyPassword(password: string): Promise<boolean> {
+  const { data } = await supabase
+    .from('configs')
+    .select('password')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  const isValid = !!(data && data.password && data.password === password);
+  if (isValid) {
+    setPasswordVerified(true);
+  }
+  return isValid;
+}
+
 export async function getConfig(): Promise<GitHubConfig | null> {
   // 先从数据库获取配置
   const { data } = await supabase
     .from('configs')
-    .select('*')
+    .select('owner, repo, token, issues_per_page, created_at')
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
@@ -214,6 +232,7 @@ export async function saveConfig(config: GitHubConfig) {
       .update({
         token: config.token,
         issues_per_page: config.issuesPerPage,
+        password: config.password,
         updated_at: new Date().toISOString()
       })
       .eq('owner', config.owner)
@@ -231,7 +250,8 @@ export async function saveConfig(config: GitHubConfig) {
         owner: config.owner,
         repo: config.repo,
         token: config.token,
-        issues_per_page: config.issuesPerPage
+        issues_per_page: config.issuesPerPage,
+        password: config.password
       });
 
     if (error) {
@@ -513,4 +533,21 @@ export async function shouldSync(owner: string, repo: string): Promise<boolean> 
     // If there's an error checking sync status, assume sync is needed
     return true;
   }
+}
+
+export function setPasswordVerified(verified: boolean) {
+  if (typeof window !== 'undefined') {
+    if (verified) {
+      localStorage.setItem(PASSWORD_VERIFIED_KEY, 'true');
+    } else {
+      localStorage.removeItem(PASSWORD_VERIFIED_KEY);
+    }
+  }
+}
+
+export function isPasswordVerified(): boolean {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem(PASSWORD_VERIFIED_KEY) === 'true';
+  }
+  return false;
 } 

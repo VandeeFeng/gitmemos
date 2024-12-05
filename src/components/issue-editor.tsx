@@ -7,6 +7,7 @@ import { createIssue, updateIssue, getLabels, createLabel, getGitHubConfig } fro
 import { useTheme } from 'next-themes';
 import { Label, EditableIssue } from '@/types/github';
 import { LABEL_COLORS } from '@/lib/colors';
+import { isPasswordVerified } from '@/lib/db';
 
 interface IssueEditorProps {
   issue?: EditableIssue;
@@ -30,9 +31,14 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
     description: ''
   });
   const [creatingLabel, setCreatingLabel] = useState(false);
+  const [passwordVerified, setPasswordVerified] = useState(false);
   const labelDropdownRef = useRef<HTMLDivElement>(null);
   const labelButtonRef = useRef<HTMLButtonElement>(null);
   const { theme } = useTheme();
+
+  useEffect(() => {
+    setPasswordVerified(isPasswordVerified());
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -277,9 +283,19 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
         >
           Cancel
         </Button>
-        <Button variant="success" onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving...' : issue ? 'Update issue' : 'Create issue'}
-        </Button>
+        <div 
+          title={!passwordVerified ? "Please verify password in settings before creating or updating issues" : ""}
+          className={!passwordVerified ? "cursor-not-allowed" : ""}
+        >
+          <Button 
+            variant="success" 
+            onClick={handleSave} 
+            disabled={saving || !passwordVerified}
+            className={!passwordVerified ? "opacity-50" : ""}
+          >
+            {saving ? 'Saving...' : issue ? 'Update issue' : 'Create issue'}
+          </Button>
+        </div>
       </div>
     </div>
   );

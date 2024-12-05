@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { Label } from '@/types/github';
-import { getLabels, getGitHubConfig } from '@/lib/github';
+import { getLabels } from '@/lib/github';
 import { useIssues } from './issue-context';
 
 interface LabelContextType {
@@ -23,7 +23,7 @@ export function LabelProvider({ children }: { children: ReactNode }) {
   const [labels, setLabels] = useState<Label[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { config } = useIssues(); // Get config from issue context
+  const { config, initialized } = useIssues(); // Get config and initialization status from issue context
 
   const syncLabels = useCallback(async () => {
     if (!config?.owner || !config?.repo) {
@@ -50,17 +50,25 @@ export function LabelProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    async function initializeLabels() {
-      if (!config?.owner || !config?.repo) {
-        setError('Waiting for GitHub configuration...');
-        setLoading(false);
-        return;
-      }
+    // Wait for issue context to be initialized
+    if (!initialized) {
+      setLoading(true);
+      return;
+    }
 
+    // Check if config is available
+    if (!config?.owner || !config?.repo) {
+      setError('Waiting for GitHub configuration...');
+      setLoading(false);
+      return;
+    }
+
+    async function initializeLabels() {
       try {
+        setLoading(true);
+        setError(null);
         const labelsData = await getLabels();
         setLabels(labelsData);
-        setError(null);
       } catch (error) {
         console.error('Error initializing labels:', error);
         setError(error instanceof Error ? error.message : 'Failed to initialize labels');
@@ -70,7 +78,7 @@ export function LabelProvider({ children }: { children: ReactNode }) {
     }
 
     initializeLabels();
-  }, [config]); // Re-run when config changes
+  }, [config, initialized]); // Re-run when config or initialized status changes
 
   return (
     <LabelContext.Provider value={{ labels, loading, error, syncLabels, updateLabels }}>

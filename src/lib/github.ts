@@ -429,26 +429,29 @@ export async function getLabels(forceSync: boolean = false): Promise<Label[]> {
 
   try {
     console.log('Fetching labels from GitHub API...');
-    const response = await fetch(`/api/github/labels${forceSync ? '?force=true' : ''}`);
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        `Failed to fetch labels: ${response.statusText}${
-          errorData.error ? ` - ${errorData.error}` : ''
-        }`
-      );
-    }
+    const octokit = new Octokit({ auth: config.token });
+    const { data } = await octokit.rest.issues.listLabelsForRepo({
+      owner: config.owner,
+      repo: config.repo,
+    });
 
-    const labels = await response.json();
-    
+    const labels = data.map(label => ({
+      id: label.id,
+      name: label.name,
+      color: label.color,
+      description: label.description,
+    }));
+
     // Update cache
     const cacheKey = CACHE_KEYS.LABELS(config.owner, config.repo);
     cacheManager?.set(cacheKey, labels, { expiry: CACHE_EXPIRY.LABELS });
 
     return labels;
   } catch (error: any) {
-    console.error('Failed to fetch labels:', error);
-    throw error;
+    console.error('GitHub API error:', error.response?.data || error);
+    throw new Error(
+      `Failed to fetch labels: ${error.response?.data?.message || error.message}`
+    );
   }
 }
 

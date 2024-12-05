@@ -159,7 +159,7 @@ export async function getConfig(): Promise<GitHubConfig | null> {
     };
   }
 
-  // 如果数据库没���配置，尝试从环境变量获取
+  // 如果数据库没配置，尝试从环境变量获取
   const owner = process.env.NEXT_PUBLIC_GITHUB_OWNER;
   const repo = process.env.NEXT_PUBLIC_GITHUB_REPO;
   const token = process.env.NEXT_PUBLIC_GITHUB_TOKEN;

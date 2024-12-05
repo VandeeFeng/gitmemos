@@ -151,12 +151,45 @@ function getLabelFilterCacheKey(owner: string, repo: string, label: string | und
   return `label_filter:${owner}:${repo}:${label || ''}`;
 }
 
-// 添加分页缓存
-const PAGE_SIZE = 50; // 每页数量
+// 缓存相关常量和类型
+const ISSUES_CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
+
+interface IssuesCache {
+  timestamp: number;
+  data: {
+    issues: Issue[];
+    syncStatus: {
+      success: boolean;
+      totalSynced: number;
+      lastSyncAt: string;
+    } | null;
+  };
+}
+
+// 分页缓存
+const PAGE_SIZE = 50;
 const issuesPageCache: Record<string, {
   timestamp: number;
   data: Issue[];
 }> = {};
+
+// 缓存键生成函数
+function getIssuesCacheKey(owner: string, repo: string, page: number, labels?: string) {
+  return `issues:${owner}:${repo}:${page}:${labels || ''}`;
+}
+
+// 清理过期缓存
+function cleanupIssuesCache() {
+  const now = Date.now();
+  Object.keys(issuesPageCache).forEach(key => {
+    if (now - issuesPageCache[key].timestamp > ISSUES_CACHE_DURATION) {
+      delete issuesPageCache[key];
+    }
+  });
+}
+
+// 定期清理缓存
+setInterval(cleanupIssuesCache, ISSUES_CACHE_DURATION);
 
 // 优化后的获取issues函数
 export async function getIssues(page: number = 1, labels?: string, forceSync: boolean = false) {
@@ -290,16 +323,6 @@ export async function getIssues(page: number = 1, labels?: string, forceSync: bo
   };
 
   return promise;
-}
-
-// 清理过期的分页缓存
-export function cleanupIssuesCache() {
-  const now = Date.now();
-  Object.keys(issuesPageCache).forEach(key => {
-    if (now - issuesPageCache[key].timestamp > ISSUES_CACHE_DURATION) {
-      delete issuesPageCache[key];
-    }
-  });
 }
 
 export async function getIssue(issueNumber: number, forceSync: boolean = false) {
@@ -440,7 +463,7 @@ export async function getLabels(forceSync: boolean = false) {
     labelsCache.repo === config.repo && 
     (now - labelsCache.timestamp) < LABELS_CACHE_DURATION;
 
-  // 如果缓存有且不是强制同步，直接使用缓存
+  // 如果缓存有且不是强制同���，直接使用缓存
   if (isCacheValid && !forceSync && labelsCache) {
     console.log('Using cached labels data');
     return labelsCache.data;

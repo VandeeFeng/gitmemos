@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Octokit } from 'octokit';
 import { getGitHubConfig } from '@/lib/github';
-import { Issue, CreateIssueInput, UpdateIssueInput } from '@/types/github';
+import { Issue, CreateIssueInput, UpdateIssueInput, GitHubApiError } from '@/types/github';
 import { getIssues, saveIssue } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 
@@ -121,11 +121,11 @@ export async function GET(request: Request) {
         await saveIssue(config.owner, config.repo, issue);
 
         return NextResponse.json(issue);
-      } catch (error: any) {
-        console.error('GitHub API error (single issue):', error.response?.data || error);
+      } catch (error) {
+        console.error('GitHub API error (single issue):', (error as GitHubApiError).response?.data || error);
         return NextResponse.json(
-          { error: error.response?.data?.message || 'Failed to fetch issue from GitHub' },
-          { status: error.response?.status || 500 }
+          { error: (error as GitHubApiError).response?.data?.message || 'Failed to fetch issue from GitHub' },
+          { status: (error as GitHubApiError).response?.status || 500 }
         );
       }
     } else {
@@ -171,18 +171,18 @@ export async function GET(request: Request) {
         }
 
         return NextResponse.json(issues);
-      } catch (error: any) {
-        console.error('GitHub API error (issues list):', error.response?.data || error);
+      } catch (error) {
+        console.error('GitHub API error (issues list):', (error as GitHubApiError).response?.data || error);
         return NextResponse.json(
-          { error: error.response?.data?.message || 'Failed to fetch issues from GitHub' },
-          { status: error.response?.status || 500 }
+          { error: (error as GitHubApiError).response?.data?.message || 'Failed to fetch issues from GitHub' },
+          { status: (error as GitHubApiError).response?.status || 500 }
         );
       }
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in issues route:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch issues' },
+      { error: (error as Error).message || 'Failed to fetch issues' },
       { status: 500 }
     );
   }
@@ -240,17 +240,17 @@ export async function POST(request: Request) {
       await saveIssue(config.owner, config.repo, issue);
 
       return NextResponse.json(issue);
-    } catch (error: any) {
-      console.error('GitHub API error:', error.response?.data || error);
+    } catch (error) {
+      console.error('GitHub API error:', (error as GitHubApiError).response?.data || error);
       return NextResponse.json(
-        { error: error.response?.data?.message || 'Failed to create issue on GitHub' },
-        { status: error.response?.status || 500 }
+        { error: (error as GitHubApiError).response?.data?.message || 'Failed to create issue on GitHub' },
+        { status: (error as GitHubApiError).response?.status || 500 }
       );
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in create issue route:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to create issue' },
+      { error: (error as Error).message || 'Failed to create issue' },
       { status: 500 }
     );
   }
@@ -309,17 +309,17 @@ export async function PATCH(request: Request) {
       await saveIssue(config.owner, config.repo, issue);
 
       return NextResponse.json(issue);
-    } catch (error: any) {
-      console.error('GitHub API error:', error.response?.data || error);
+    } catch (error) {
+      console.error('GitHub API error:', (error as GitHubApiError).response?.data || error);
       return NextResponse.json(
-        { error: error.response?.data?.message || 'Failed to update issue on GitHub' },
-        { status: error.response?.status || 500 }
+        { error: (error as GitHubApiError).response?.data?.message || 'Failed to update issue on GitHub' },
+        { status: (error as GitHubApiError).response?.status || 500 }
       );
     }
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in update issue route:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to update issue' },
+      { error: (error as Error).message || 'Failed to update issue' },
       { status: 500 }
     );
   }

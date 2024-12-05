@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
-import { PostgrestError } from '@supabase/supabase-js';
 
 export async function GET() {
   try {

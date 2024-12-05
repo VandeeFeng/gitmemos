@@ -19,7 +19,23 @@ export interface GitHubConfig {
   repo: string;
   token: string;
   issuesPerPage: number;
-  password?: string;
+}
+
+export interface GitHubApiError {
+  response?: {
+    data?: {
+      message?: string;
+    };
+    status?: number;
+  };
+  message?: string;
+}
+
+export interface DbConfig {
+  owner: string;
+  repo: string;
+  token: string;
+  issues_per_page: number;
 }
 
 // 用于编辑器的 Issue 类型，body 必须是 string

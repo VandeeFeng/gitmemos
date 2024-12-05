@@ -1,11 +1,11 @@
-import { GitHubConfig, Issue, Label } from '@/types/github';
+import { GitHubConfig, Issue, Label, DbConfig, GitHubApiError } from '@/types/github';
 import { getConfig, saveConfig, getIssues as getIssuesFromApi, checkSyncStatus, recordSync } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 import { Octokit } from 'octokit';
 
 let config: GitHubConfig | null = null;
 
-function convertDbConfigToGitHubConfig(dbConfig: any): GitHubConfig {
+function convertDbConfigToGitHubConfig(dbConfig: DbConfig): GitHubConfig {
   return {
     owner: dbConfig.owner,
     repo: dbConfig.repo,
@@ -14,7 +14,7 @@ function convertDbConfigToGitHubConfig(dbConfig: any): GitHubConfig {
   };
 }
 
-function convertGitHubConfigToDbConfig(githubConfig: GitHubConfig): any {
+function convertGitHubConfigToDbConfig(githubConfig: GitHubConfig): DbConfig {
   return {
     owner: githubConfig.owner,
     repo: githubConfig.repo,
@@ -232,8 +232,8 @@ export async function getIssues(
               lastSyncAt: new Date().toISOString()
             }
           };
-        } catch (error: any) {
-          console.error(`[${requestId}] GitHub API sync failed:`, error.response?.data || error);
+        } catch (error) {
+          console.error(`[${requestId}] GitHub API sync failed:`, (error as GitHubApiError).response?.data || error);
           
           // Record failed sync
           await recordSync(
@@ -241,11 +241,11 @@ export async function getIssues(
             config.repo, 
             'failed',
             0,
-            error.response?.data?.message || error.message
+            (error as GitHubApiError).response?.data?.message || (error as Error).message
           );
           
           throw new Error(
-            `GitHub API sync failed: ${error.response?.data?.message || error.message}`
+            `GitHub API sync failed: ${(error as GitHubApiError).response?.data?.message || (error as Error).message}`
           );
         }
       }

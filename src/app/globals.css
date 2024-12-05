@@ -78,3 +78,18 @@
   scrollbar-width: thin;
   scrollbar-color: #444c56 transparent;
 }
+
+/* 改善暗色模式下编辑器的文本选择颜色 */
+.dark [data-color-mode="dark"] {
+  --md-editor-selection-background: rgba(56, 139, 253, 0.4);
+}
+
+[data-color-mode="dark"] .wmde-markdown-var {
+  selection: var(--md-editor-selection-background);
+}
+
+[data-color-mode="dark"] .w-md-editor-text-input::selection,
+[data-color-mode="dark"] .w-md-editor-text-input *::selection {
+  background-color: var(--md-editor-selection-background) !important;
+  color: #adbac7 !important;
+}

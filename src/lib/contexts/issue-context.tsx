@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { Issue, GitHubConfig } from '@/types/github';
 import { getIssues, getGitHubConfig } from '@/lib/github';
+import { recordSyncHistory } from '@/lib/db';
 
 interface IssueContextType {
   issues: Issue[];
@@ -58,7 +59,7 @@ function setCache(data: CacheData) {
   localStorage.setItem(CACHE_KEY, JSON.stringify({ ...data, timestamp: Date.now() }));
 }
 
-// 全局内存缓存
+// 全局内存缓
 let memoryCache: CacheData | null = null;
 
 export function IssueProvider({ children }: { children: ReactNode }) {
@@ -94,9 +95,26 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       }));
       setCache(newState);
       memoryCache = newState;
+
+      // 记录同步历史
+      await recordSyncHistory(
+        state.config.owner,
+        state.config.repo,
+        'success',
+        result.issues.length
+      );
     } catch (error) {
       console.error('Error syncing issues:', error);
       setState(prev => ({ ...prev, loading: false }));
+      if (state.config) {
+        await recordSyncHistory(
+          state.config.owner,
+          state.config.repo,
+          'failed',
+          0,
+          error instanceof Error ? error.message : 'Unknown error'
+        );
+      }
     }
   }, [state.config]);
 

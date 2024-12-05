@@ -509,6 +509,107 @@ export async function createLabel(name: string, color: string, description?: str
   }
 }
 
+export async function createIssue(title: string, body: string, labels: string[]): Promise<Issue> {
+  const config = await getGitHubConfig();
+  const client = await getOctokit();
+
+  try {
+    const { data } = await client.rest.issues.create({
+      owner: config.owner,
+      repo: config.repo,
+      title,
+      body,
+      labels
+    });
+
+    const issue: Issue = {
+      number: data.number,
+      title: data.title,
+      body: data.body || '',
+      created_at: data.created_at,
+      state: data.state,
+      labels: data.labels
+        .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
+          typeof label === 'object' && label !== null)
+        .map(label => ({
+          id: label.id,
+          name: label.name,
+          color: label.color,
+          description: label.description,
+        }))
+    };
+
+    // Save to database
+    await syncIssuesData(config.owner, config.repo, [issue]);
+
+    // Update cache
+    const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');
+    const cached = cacheManager?.get<Issue[]>(cacheKey) || [];
+    cached.unshift(issue); // Add to beginning since it's newest
+    cacheManager?.set(cacheKey, cached, { expiry: CACHE_EXPIRY.ISSUES });
+
+    return issue;
+  } catch (error) {
+    console.error('Failed to create issue:', error);
+    throw error;
+  }
+}
+
+export async function updateIssue(
+  issueNumber: number,
+  updates: {
+    title?: string;
+    body?: string;
+    state?: 'open' | 'closed';
+    labels?: string[];
+  }
+): Promise<Issue> {
+  const config = await getGitHubConfig();
+  const client = await getOctokit();
+
+  try {
+    const { data } = await client.rest.issues.update({
+      owner: config.owner,
+      repo: config.repo,
+      issue_number: issueNumber,
+      ...updates
+    });
+
+    const issue: Issue = {
+      number: data.number,
+      title: data.title,
+      body: data.body || '',
+      created_at: data.created_at,
+      state: data.state,
+      labels: data.labels
+        .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
+          typeof label === 'object' && label !== null)
+        .map(label => ({
+          id: label.id,
+          name: label.name,
+          color: label.color,
+          description: label.description,
+        }))
+    };
+
+    // Save to database
+    await syncIssuesData(config.owner, config.repo, [issue]);
+
+    // Update cache
+    const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');
+    const cached = cacheManager?.get<Issue[]>(cacheKey);
+    if (cached) {
+      const updatedCache = cached.map(i => i.number === issueNumber ? issue : i);
+      cacheManager?.set(cacheKey, updatedCache, { expiry: CACHE_EXPIRY.ISSUES });
+    }
+
+    return issue;
+  } catch (error) {
+    console.error('Failed to update issue:', error);
+    throw error;
+  }
+}
+
 export async function getIssue(issueNumber: number, forceSync: boolean = false): Promise<Issue> {
   const config = await getGitHubConfig();
   const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');

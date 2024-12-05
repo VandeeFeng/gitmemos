@@ -132,7 +132,7 @@ export async function getIssues(
     if (cached && !needsSync) {
       return {
         ...cached,
-        lastSyncAt: syncStatus?.lastSyncAt
+        lastSyncAt: syncStatus?.lastSyncAt || undefined
       };
     }
 
@@ -158,7 +158,7 @@ export async function getIssues(
     
     return {
       ...data,
-      lastSyncAt: syncStatus?.lastSyncAt
+      lastSyncAt: syncStatus?.lastSyncAt || undefined
     };
   } catch (error) {
     console.error('Error fetching issues:', error);
@@ -270,9 +270,6 @@ export async function recordSync(
       console.error('Failed to record sync:', await response.text());
       return false;
     }
-
-    // Clear sync check cache to force fresh check next time
-    cacheManager?.remove(CACHE_KEYS.SYNC_CHECK(owner, repo));
     
     return true;
   } catch (error) {

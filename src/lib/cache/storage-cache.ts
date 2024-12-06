@@ -5,13 +5,14 @@ const DEFAULT_VERSION = '1.0';
 const CACHE_PREFIX = 'gitmemo_cache:';
 
 export class StorageCache implements CacheManager {
-  private cache: Map<string, CacheEntry> = new Map();
-  private removalCounts: Map<string, number> = new Map();
-  private logTimeout: NodeJS.Timeout | null = null;
   private readonly storage: Storage;
+  private removalCounts: Map<string, number>;
+  private logTimeout: NodeJS.Timeout | null;
 
   constructor(storage: Storage = localStorage) {
     this.storage = storage;
+    this.removalCounts = new Map();
+    this.logTimeout = null;
     console.log('StorageCache initialized');
   }
 
@@ -21,6 +22,27 @@ export class StorageCache implements CacheManager {
 
   private isExpired(timestamp: number, expiry: number): boolean {
     return Date.now() - timestamp > expiry;
+  }
+
+  private logRemovals() {
+    if (this.removalCounts.size > 0) {
+      const logs = Array.from(this.removalCounts.entries()).map(([key, count]) => {
+        const baseKey = key.split(':').slice(0, -1).join(':');
+        return `${baseKey} (${count} items)`;
+      });
+      console.log('Cache removals:', logs.join(', '));
+      this.removalCounts.clear();
+    }
+  }
+
+  private scheduleLogRemovals() {
+    if (this.logTimeout) {
+      clearTimeout(this.logTimeout);
+    }
+    this.logTimeout = setTimeout(() => {
+      this.logRemovals();
+      this.logTimeout = null;
+    }, 1000);
   }
 
   set<T>(key: string, data: T, options: Partial<CacheOptions> = {}): void {
@@ -112,30 +134,13 @@ export class StorageCache implements CacheManager {
     const fullKey = this.getFullKey(key);
     try {
       this.storage.removeItem(fullKey);
-      
-      // Count removals by key pattern
-      const keyPattern = key.split(':')[0]; // Get the type of cache (e.g., 'issues', 'labels')
-      const count = (this.removalCounts.get(keyPattern) || 0) + 1;
-      this.removalCounts.set(keyPattern, count);
-
-      // Debounce log output
-      if (this.logTimeout) {
-        clearTimeout(this.logTimeout);
-      }
-      this.logTimeout = setTimeout(() => {
-        this.logRemovals();
-      }, 1000); // Wait 1 second before logging
+      // Count removals by base key (without the last segment)
+      const baseKey = key.split(':').slice(0, -1).join(':');
+      this.removalCounts.set(baseKey, (this.removalCounts.get(baseKey) || 0) + 1);
+      this.scheduleLogRemovals();
     } catch (error) {
       console.error(`Failed to remove cache for key ${key}:`, error);
     }
-  }
-
-  private logRemovals() {
-    this.removalCounts.forEach((count, keyPattern) => {
-      console.log(`Cache removed: ${keyPattern} (${count} items)`);
-    });
-    this.removalCounts.clear();
-    this.logTimeout = null;
   }
 
   clear(): void {

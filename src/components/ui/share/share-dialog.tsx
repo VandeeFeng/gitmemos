@@ -165,12 +165,12 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
             }`}>
               <div ref={cardRef} className={isDark ? "bg-[#2d333b]" : "bg-white"}>
                 <ShareCard issue={issue} />
-                <div className={`flex items-center justify-center text-sm border-t p-4 ${
+                <div className={`flex items-center justify-center text-base border-t p-4 ${
                   isDark 
                     ? "text-gray-400 border-[#444c56]" 
                     : "text-gray-500 border-gray-200"
                 }`}>
-                  <img src="/favicon.ico" alt="GitMemo" className="w-5 h-5 mr-2 rounded-full" />
+                  <img src="/favicon.ico" alt="GitMemo" className="w-10 h-10 mr-2 rounded-full" />
                   via GitMemo
                 </div>
               </div>

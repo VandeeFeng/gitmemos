@@ -1,5 +1,3 @@
-import { toast } from "sonner";
-
 interface ImageGeneratorOptions {
   element: HTMLElement;
   backgroundColor: string;

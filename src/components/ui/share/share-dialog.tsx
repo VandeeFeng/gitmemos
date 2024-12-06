@@ -64,7 +64,7 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
     try {
       await navigator.clipboard.writeText(window.location.href);
       toast.success("Link copied to clipboard");
-    } catch (err) {
+    } catch {
       toast.error("Failed to copy link");
     }
   };

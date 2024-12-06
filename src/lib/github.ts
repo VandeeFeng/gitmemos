@@ -156,6 +156,21 @@ export async function getIssues(
   if (!forceSync) {
     const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, page, labels || '');
     const cached = cacheManager?.get<Issue[]>(cacheKey);
+    
+    // Even if we have cache, let's verify with database
+    const response = await getIssuesFromApi(config.owner, config.repo, page, labels ? [labels] : undefined);
+    const dbIssues = response?.issues || [];
+    
+    // If database has different data than cache, use database data
+    if (dbIssues.length > 0 && (!cached || JSON.stringify(dbIssues) !== JSON.stringify(cached))) {
+      console.log('Database data differs from cache, updating cache...');
+      cacheManager?.set(cacheKey, dbIssues, { expiry: CACHE_EXPIRY.ISSUES });
+      return {
+        issues: dbIssues,
+        syncStatus: null
+      };
+    }
+    
     if (cached) {
       return {
         issues: cached,

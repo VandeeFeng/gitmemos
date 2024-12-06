@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { getGitHubConfig, setGitHubConfig } from '@/lib/github';
 import { verifyPassword, isPasswordVerified, setPasswordVerified as setPasswordVerifiedState } from '@/lib/api';
 import { GitHubConfig } from '@/types/github';
+import { toast } from 'sonner';
 
 interface ConfigDialogProps {
   isOpen: boolean;
@@ -32,7 +33,7 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
 
   const handleVerifyPassword = async () => {
     if (!password) {
-      alert('Please enter password');
+      toast.error('Please enter password');
       return;
     }
 
@@ -42,13 +43,13 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
       if (isValid) {
         setPasswordVerified(true);
         setPasswordVerifiedState(true);
-        alert('Password verified successfully!');
+        toast.success('Password verified successfully');
       } else {
-        alert('Invalid password');
+        toast.error('Invalid password');
       }
     } catch (error) {
       console.error('Error verifying password:', error);
-      alert('Failed to verify password');
+      toast.error('Failed to verify password');
     } finally {
       setVerifying(false);
     }
@@ -56,19 +57,20 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
 
   const handleSave = async () => {
     if (!config.owner || !config.repo || !config.token) {
-      alert('Please fill in all required fields');
+      toast.error('Please fill in all required fields');
       return;
     }
 
     setSaving(true);
     try {
       await setGitHubConfig(config);
+      toast.success('Configuration saved successfully');
       onClose();
       // 刷新页面以应用新配置
       window.location.reload();
     } catch (error) {
       console.error('Error saving config:', error);
-      alert('Failed to save configuration');
+      toast.error('Failed to save configuration');
     } finally {
       setSaving(false);
     }

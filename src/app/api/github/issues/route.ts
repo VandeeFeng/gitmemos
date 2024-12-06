@@ -261,8 +261,10 @@ export async function PATCH(request: Request) {
   try {
     const body: UpdateIssueInput = await request.json();
     const config = await getGitHubConfig();
+    console.log('Update issue - GitHub config:', { owner: config.owner, repo: config.repo, hasToken: !!config.token });
 
     if (!config.owner || !config.repo) {
+      console.error('Missing owner or repo in config');
       return NextResponse.json(
         { error: 'Missing owner or repo in config' },
         { status: 400 }
@@ -270,6 +272,7 @@ export async function PATCH(request: Request) {
     }
 
     if (!config.token) {
+      console.error('Missing GitHub token in config');
       return NextResponse.json(
         { error: 'GitHub token is missing' },
         { status: 401 }
@@ -277,6 +280,7 @@ export async function PATCH(request: Request) {
     }
 
     const client = await getOctokit();
+    console.log('Updating issue on GitHub:', { number: body.number, title: body.title, labels: body.labels });
 
     try {
       const { data } = await client.rest.issues.update({
@@ -305,8 +309,11 @@ export async function PATCH(request: Request) {
           }))
       };
 
+      console.log('Successfully updated issue on GitHub');
+
       // Sync to database
       await saveIssue(config.owner, config.repo, issue);
+      console.log('Successfully synced updated issue to database');
 
       return NextResponse.json(issue);
     } catch (error) {

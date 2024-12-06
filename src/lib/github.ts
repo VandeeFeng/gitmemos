@@ -1,5 +1,5 @@
 import { GitHubConfig, Issue, Label, DbConfig, GitHubApiError } from '@/types/github';
-import { getConfig, saveConfig, getIssues as getIssuesFromApi, checkSyncStatus, recordSync, getLabels as getLabelsFromDb, saveLabel } from '@/lib/api';
+import { getConfig, saveConfig, getIssues as getIssuesFromApi, checkSyncStatus, recordSync, getLabels as getLabelsFromDb, saveLabel, saveIssue } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 import { Octokit } from 'octokit';
 
@@ -36,34 +36,42 @@ export async function setGitHubConfig(newConfig: GitHubConfig) {
 }
 
 export async function getGitHubConfig(): Promise<GitHubConfig> {
-  // 1. Use runtime config first
-  if (config) {
-    return config;
-  }
+  try {
+    // 1. Use runtime config first
+    if (config) {
+      console.log('Using runtime config:', { owner: config.owner, repo: config.repo, hasToken: !!config.token });
+      return config;
+    }
 
-  // 2. Get from cache/API
-  const dbConfig = await getConfig();
-  if (dbConfig) {
+    // 2. Get from cache/API
+    const dbConfig = await getConfig();
+    console.log('Got config from API:', dbConfig ? { owner: dbConfig.owner, repo: dbConfig.repo, hasToken: !!dbConfig.token } : 'null');
+    
+    if (!dbConfig) {
+      throw new Error('Failed to get GitHub configuration');
+    }
+
+    if (!dbConfig.owner || !dbConfig.repo || !dbConfig.token) {
+      throw new Error('Incomplete GitHub configuration. Please check your settings.');
+    }
+
     const cacheKey = CACHE_KEYS.CONFIG(dbConfig.owner, dbConfig.repo);
     const cached = cacheManager?.get<GitHubConfig>(cacheKey);
     if (cached) {
+      console.log('Using cached config:', { owner: cached.owner, repo: cached.repo, hasToken: !!cached.token });
       config = cached;
       return cached;
     }
     
     const githubConfig = convertDbConfigToGitHubConfig(dbConfig);
+    console.log('Created new GitHub config:', { owner: githubConfig.owner, repo: githubConfig.repo, hasToken: !!githubConfig.token });
     config = githubConfig;
     cacheManager?.set(cacheKey, githubConfig, { expiry: CACHE_EXPIRY.CONFIG });
     return githubConfig;
+  } catch (error) {
+    console.error('Error in getGitHubConfig:', error);
+    throw error;
   }
-
-  // 3. Return empty config if none found
-  return {
-    owner: '',
-    repo: '',
-    token: '',
-    issuesPerPage: 10
-  };
 }
 
 export async function checkNeedsSync(owner: string, repo: string, forceSync: boolean): Promise<boolean> {
@@ -374,19 +382,51 @@ export async function updateIssue(
   body: string,
   labels: string[]
 ): Promise<Issue> {
-  const response = await fetch('/api/github/issues', {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ number: issueNumber, title, body, labels }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to update issue: ${response.statusText}`);
+  console.log('Updating issue using GitHub API:', { issueNumber, title, labels });
+  
+  const config = await getGitHubConfig();
+  if (!config.token || !config.owner || !config.repo) {
+    throw new Error('GitHub configuration is incomplete');
   }
 
-  return response.json();
+  const client = new Octokit({ auth: config.token });
+  
+  try {
+    const { data } = await client.rest.issues.update({
+      owner: config.owner,
+      repo: config.repo,
+      issue_number: issueNumber,
+      title,
+      body,
+      labels
+    });
+
+    const issue: Issue = {
+      number: data.number,
+      title: data.title,
+      body: data.body || '',
+      created_at: data.created_at,
+      state: data.state,
+      labels: data.labels
+        .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
+          typeof label === 'object' && label !== null)
+        .map(label => ({
+          id: label.id,
+          name: label.name,
+          color: label.color,
+          description: label.description,
+        }))
+    };
+
+    // Sync to database
+    await saveIssue(config.owner, config.repo, issue);
+    console.log('Issue updated successfully:', { number: issue.number, title: issue.title });
+    
+    return issue;
+  } catch (error) {
+    console.error('GitHub API error:', error);
+    throw new Error(error instanceof Error ? error.message : 'Failed to update issue');
+  }
 }
 
 export async function getLabels(forceSync: boolean = false): Promise<Label[]> {

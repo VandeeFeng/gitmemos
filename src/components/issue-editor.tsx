@@ -3,13 +3,15 @@
 import { useState, useEffect, useRef } from 'react';
 import MDEditor from '@uiw/react-md-editor';
 import { Button } from './ui/button';
-import { EditableIssue } from '@/types/github';
+import { EditableIssue, GitHubConfig } from '@/types/github';
 import { getGitHubConfig } from '@/lib/github';
 import { createIssue, updateIssue, createLabel } from '@/lib/github';
 import { LABEL_COLORS } from '@/lib/colors';
 import { useLabels } from '@/lib/contexts/label-context';
+import { useIssues } from '@/lib/contexts/issue-context';
 import { useTheme } from 'next-themes';
 import { isPasswordVerified } from '@/lib/api';
+import { toast } from 'sonner';
 
 interface IssueEditorProps {
   issue?: EditableIssue;
@@ -33,16 +35,30 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
   const [saving, setSaving] = useState(false);
   const [creatingLabel, setCreatingLabel] = useState(false);
   const [passwordVerified, setPasswordVerified] = useState(false);
+  const [config, setConfig] = useState<GitHubConfig | null>(null);
   const labelDropdownRef = useRef<HTMLDivElement>(null);
   const labelButtonRef = useRef<HTMLButtonElement>(null);
   
-  // Use the LabelContext
+  // Use the LabelContext and IssueContext
   const { labels: availableLabels, updateLabels } = useLabels();
+  const { refreshIssues } = useIssues();
 
   const { theme } = useTheme();
 
   useEffect(() => {
     setPasswordVerified(isPasswordVerified());
+  }, []);
+
+  useEffect(() => {
+    async function initConfig() {
+      try {
+        const githubConfig = await getGitHubConfig();
+        setConfig(githubConfig);
+      } catch (error) {
+        console.error('Error getting GitHub config:', error);
+      }
+    }
+    initConfig();
   }, []);
 
   useEffect(() => {
@@ -63,8 +79,7 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
   }, []);
 
   const handleSave = async () => {
-    const config = await getGitHubConfig();
-    if (!config.token || !config.owner || !config.repo) {
+    if (!config || !config.token || !config.owner || !config.repo) {
       alert('Please configure your GitHub settings first');
       return;
     }
@@ -78,13 +93,17 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
     try {
       if (issue?.number) {
         await updateIssue(issue.number, title, content, selectedLabels);
+        toast.success('Issue updated successfully');
       } else {
         await createIssue(title, content, selectedLabels);
+        toast.success('Issue created successfully');
       }
+      // Refresh issues after successful save
+      await refreshIssues();
       onSave();
     } catch (error) {
       console.error('Error saving issue:', error);
-      alert('Failed to save issue');
+      toast.error(error instanceof Error ? error.message : 'Failed to save issue');
     } finally {
       setSaving(false);
     }

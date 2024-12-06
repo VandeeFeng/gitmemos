@@ -46,11 +46,26 @@ export function isPasswordVerified(): boolean {
 // Config API
 export async function getConfig(): Promise<Config | null> {
   try {
+    console.log('Fetching config from API...');
     const response = await fetch('/api/supabase/config');
+    
     if (!response.ok) {
-      throw new Error('Failed to fetch config');
+      const errorData = await response.json().catch(() => null);
+      console.error('Config API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData?.error || 'Unknown error'
+      });
+      throw new Error('Failed to fetch config: ' + (errorData?.error || response.statusText));
     }
+    
     const data = await response.json();
+    console.log('Config API response:', {
+      hasData: !!data,
+      hasOwner: !!data?.owner,
+      hasRepo: !!data?.repo,
+      hasToken: !!data?.token
+    });
     
     // 缓存配置
     if (data) {
@@ -64,7 +79,7 @@ export async function getConfig(): Promise<Config | null> {
     return data;
   } catch (error) {
     console.error('Error fetching config:', error);
-    return null;
+    throw error;
   }
 }
 

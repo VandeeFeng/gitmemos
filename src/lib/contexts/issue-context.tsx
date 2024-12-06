@@ -5,6 +5,7 @@ import { Issue, GitHubConfig } from '@/types/github';
 import { getIssues as getGitHubIssues, getGitHubConfig } from '@/lib/github';
 import { checkSyncStatus, recordSync } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
+import { getIssues as getIssuesFromApi } from '@/lib/api';
 
 interface IssueContextType {
   issues: Issue[];
@@ -14,6 +15,7 @@ interface IssueContextType {
   isInitializing: boolean;
   syncIssues: () => Promise<void>;
   updateIssues: (newIssues: Issue[]) => void;
+  refreshIssues: () => Promise<void>;
 }
 
 const IssueContext = createContext<IssueContextType>({
@@ -23,7 +25,8 @@ const IssueContext = createContext<IssueContextType>({
   initialized: false,
   isInitializing: false,
   syncIssues: async () => {},
-  updateIssues: () => {}
+  updateIssues: () => {},
+  refreshIssues: async () => {}
 });
 
 interface CacheData {
@@ -39,7 +42,8 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     initialized: false,
     isInitializing: false,
     syncIssues: async () => {},
-    updateIssues: () => {}
+    updateIssues: () => {},
+    refreshIssues: async () => {}
   });
 
   const initializingRef = useRef(false);
@@ -127,6 +131,40 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
+  const fetchIssues = useCallback(async () => {
+    if (!configRef.current) return;
+    
+    setState(prev => ({ ...prev, loading: true }));
+    try {
+      const result = await getIssuesFromApi(configRef.current.owner, configRef.current.repo);
+      if (result?.issues) {
+        const newState: CacheData = {
+          issues: result.issues,
+          config: configRef.current,
+        };
+        setState(prev => ({ ...prev, issues: result.issues }));
+        cacheManager?.set(
+          CACHE_KEYS.ISSUES(configRef.current.owner, configRef.current.repo, 1, ''),
+          newState,
+          { expiry: CACHE_EXPIRY.ISSUES }
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching issues:', error);
+    } finally {
+      setState(prev => ({ ...prev, loading: false }));
+    }
+  }, []);
+
+  const refreshIssues = useCallback(async () => {
+    // Clear the cache first
+    if (configRef.current) {
+      cacheManager?.remove(CACHE_KEYS.ISSUES(configRef.current.owner, configRef.current.repo, 1, ''));
+    }
+    // Then fetch fresh data
+    await fetchIssues();
+  }, [fetchIssues]);
+
   useEffect(() => {
     let mounted = true;
     
@@ -146,7 +184,8 @@ export function IssueProvider({ children }: { children: ReactNode }) {
               loading: false, 
               initialized: true,
               syncIssues,
-              updateIssues
+              updateIssues,
+              refreshIssues
             }));
           }
           return;
@@ -199,7 +238,8 @@ export function IssueProvider({ children }: { children: ReactNode }) {
               loading: false,
               initialized: true,
               syncIssues,
-              updateIssues
+              updateIssues,
+              refreshIssues
             }));
           }
           return;
@@ -221,7 +261,8 @@ export function IssueProvider({ children }: { children: ReactNode }) {
             loading: false,
             initialized: true,
             syncIssues,
-            updateIssues
+            updateIssues,
+            refreshIssues
           }));
 
           cacheManager?.set(cacheKey, newState, { expiry: CACHE_EXPIRY.ISSUES });
@@ -234,7 +275,8 @@ export function IssueProvider({ children }: { children: ReactNode }) {
             loading: false, 
             initialized: true,
             syncIssues,
-            updateIssues
+            updateIssues,
+            refreshIssues
           }));
         }
       } finally {
@@ -256,7 +298,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [syncIssues, updateIssues]);
+  }, [syncIssues, updateIssues, refreshIssues]);
 
   return (
     <IssueContext.Provider value={state}>

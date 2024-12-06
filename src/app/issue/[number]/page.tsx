@@ -72,7 +72,7 @@ export default function IssuePage({ params }: PageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#22272e] p-4">
+    <div className="min-h-screen bg-bg-primary dark:bg-bg-primary p-4">
       <div className="max-w-4xl mx-auto animate-content-show">
         <div className="mb-12">
           <Button
@@ -87,14 +87,14 @@ export default function IssuePage({ params }: PageProps) {
           </Button>
         </div>
         
-        <div className="bg-white dark:bg-[#2d333b] border border-gray-200 dark:border-[#373e47] rounded-lg shadow-sm">
+        <div className="bg-bg-primary dark:bg-bg-secondary border border-default rounded-lg shadow-card dark:shadow-card-dark">
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="space-y-1 flex-1 min-w-0 pr-4">
-                <h1 className="text-2xl font-bold text-[#24292f] dark:text-[#adbac7]">
+                <h1 className="text-2xl font-bold text-text-primary">
                   {issue.title}
                 </h1>
-                <div className="flex items-center gap-2 text-xs text-[#57606a] dark:text-[#768390]">
+                <div className="flex items-center gap-2 text-xs text-text-secondary">
                   <span>#{issue.number}</span>
                   <span>·</span>
                   <span>
@@ -103,7 +103,7 @@ export default function IssuePage({ params }: PageProps) {
                 </div>
               </div>
             </div>
-            <div className="prose dark:prose-invert max-w-none">
+            <div className="prose dark:prose-invert max-w-none prose-pre:bg-bg-secondary dark:prose-pre:bg-bg-tertiary prose-pre:p-4 prose-pre:rounded-lg prose-pre:my-4 prose-code:text-text-primary dark:prose-code:text-text-primary prose-code:before:content-none prose-code:after:content-none prose-p:leading-relaxed">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeRaw, rehypeSanitize]}

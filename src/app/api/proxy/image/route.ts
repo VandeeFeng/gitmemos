@@ -25,6 +25,7 @@ export async function GET(request: Request) {
   }
 }
 
+// @ts-ignore - Request parameter is required by Next.js API routes
 export async function OPTIONS(_request: Request) {
   return new NextResponse(null, {
     headers: {

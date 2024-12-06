@@ -249,16 +249,23 @@ export async function getIssues(
             (error as GitHubApiError).response?.data?.message || (error as Error).message
           );
           
-          throw new Error(
-            `GitHub API sync failed: ${(error as GitHubApiError).response?.data?.message || (error as Error).message}`
-          );
+          // Enhance error message with more details
+          const errorMessage = (error as GitHubApiError).response?.data?.message || (error as Error).message;
+          const enhancedError = new Error(`GitHub API sync failed: ${errorMessage}`);
+          if ((error as GitHubApiError).response?.status) {
+            (enhancedError as GitHubApiError).response = (error as GitHubApiError).response;
+          }
+          throw enhancedError;
         }
       }
 
       // Get data from database via API
       console.log(`[${requestId}] Loading data from database...`);
       const response = await getIssuesFromApi(config.owner, config.repo, page, labels ? [labels] : undefined);
-      const issues = response?.issues || [];
+      if (!response) {
+        throw new Error('Failed to fetch issues from database');
+      }
+      const issues = response.issues || [];
       const syncStatus = await checkSyncStatus(config.owner, config.repo);
       
       // Update cache with database data
@@ -276,6 +283,9 @@ export async function getIssues(
           lastSyncAt: syncStatus.lastSyncAt || new Date().toISOString()
         } : null
       };
+    } catch (error) {
+      console.error(`[${requestId}] Error in getIssues:`, error);
+      throw error;
     } finally {
       delete requestLocks[lockKey];
     }

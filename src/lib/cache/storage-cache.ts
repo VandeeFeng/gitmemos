@@ -5,6 +5,9 @@ const DEFAULT_VERSION = '1.0';
 const CACHE_PREFIX = 'gitmemo_cache:';
 
 export class StorageCache implements CacheManager {
+  private cache: Map<string, CacheEntry> = new Map();
+  private removalCounts: Map<string, number> = new Map();
+  private logTimeout: NodeJS.Timeout | null = null;
   private readonly storage: Storage;
 
   constructor(storage: Storage = localStorage) {
@@ -109,10 +112,30 @@ export class StorageCache implements CacheManager {
     const fullKey = this.getFullKey(key);
     try {
       this.storage.removeItem(fullKey);
-      console.log(`Cache removed: ${key}`);
+      
+      // Count removals by key pattern
+      const keyPattern = key.split(':')[0]; // Get the type of cache (e.g., 'issues', 'labels')
+      const count = (this.removalCounts.get(keyPattern) || 0) + 1;
+      this.removalCounts.set(keyPattern, count);
+
+      // Debounce log output
+      if (this.logTimeout) {
+        clearTimeout(this.logTimeout);
+      }
+      this.logTimeout = setTimeout(() => {
+        this.logRemovals();
+      }, 1000); // Wait 1 second before logging
     } catch (error) {
       console.error(`Failed to remove cache for key ${key}:`, error);
     }
+  }
+
+  private logRemovals() {
+    this.removalCounts.forEach((count, keyPattern) => {
+      console.log(`Cache removed: ${keyPattern} (${count} items)`);
+    });
+    this.removalCounts.clear();
+    this.logTimeout = null;
   }
 
   clear(): void {
@@ -182,7 +205,7 @@ export class StorageCache implements CacheManager {
             });
           }
         } catch {
-          // 如果解析失���，直接删除
+          // 如果解析失，直接删除
           this.storage.removeItem(key);
           cleaned++;
           console.log(`Cleaned up invalid cache: ${key.replace(CACHE_PREFIX, '')}`);

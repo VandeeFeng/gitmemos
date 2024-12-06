@@ -3,9 +3,10 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { Issue, GitHubConfig } from '@/types/github';
 import { getIssues as getGitHubIssues, getGitHubConfig } from '@/lib/github';
-import { checkSyncStatus, recordSync } from '@/lib/api';
+import { checkSyncStatus, recordSync, saveIssue } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 import { getIssues as getIssuesFromApi } from '@/lib/api';
+import { Octokit } from 'octokit';
 
 interface IssueContextType {
   issues: Issue[];
@@ -52,24 +53,47 @@ export function IssueProvider({ children }: { children: ReactNode }) {
 
   // Memoize these functions to prevent unnecessary re-renders
   const syncIssues = useCallback(async () => {
-    if (!configRef.current) return;
+    if (!configRef.current) {
+      throw new Error('GitHub configuration is missing. Please configure your settings first.');
+    }
 
     setState(prev => ({ ...prev, loading: true }));
     try {
-      // 从 GitHub API 获取数据并同步到数据库
-      const response = await fetch('/api/github/issues', {
-        headers: {
-          'Content-Type': 'application/json',
-        },
+      // Use Octokit for direct GitHub API calls
+      const octokit = new Octokit({ auth: configRef.current.token });
+      const { data } = await octokit.rest.issues.listForRepo({
+        owner: configRef.current.owner,
+        repo: configRef.current.repo,
+        state: 'all',
+        per_page: configRef.current.issuesPerPage || 50,
+        page: 1,
+        sort: 'created',
+        direction: 'desc'
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to sync with GitHub');
+
+      const issues = data.map(issue => ({
+        number: issue.number,
+        title: issue.title,
+        body: issue.body || '',
+        created_at: issue.created_at,
+        state: issue.state,
+        labels: issue.labels
+          .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
+            typeof label === 'object' && label !== null)
+          .map(label => ({
+            id: label.id,
+            name: label.name,
+            color: label.color,
+            description: label.description,
+          }))
+      }));
+
+      // Save each issue to database
+      for (const issue of issues) {
+        await saveIssue(configRef.current.owner, configRef.current.repo, issue);
       }
 
-      const issues = await response.json();
-      console.log(`Synced ${issues.length} issues from GitHub to database`);
-      
+      // Update state and cache
       setState(prev => {
         if (!prev.config) return prev;
 
@@ -84,34 +108,44 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           { expiry: CACHE_EXPIRY.ISSUES }
         );
 
-        // 记录同步历史
-        recordSync(
-          prev.config.owner,
-          prev.config.repo,
-          'success',
-          issues.length
-        ).catch(console.error);
-
         return { 
           ...prev,
           issues,
           loading: false 
         };
       });
+
+      // Record successful sync
+      await recordSync(
+        configRef.current.owner,
+        configRef.current.repo,
+        'success',
+        issues.length
+      );
+
+      console.log(`Synced ${issues.length} issues from GitHub to database`);
     } catch (error) {
       console.error('Error syncing from GitHub:', error);
-      setState(prev => {
-        if (prev.config) {
-          recordSync(
-            prev.config.owner,
-            prev.config.repo,
-            'failed',
-            0,
-            error instanceof Error ? error.message : 'Unknown error'
-          ).catch(console.error);
-        }
-        return { ...prev, loading: false };
-      });
+      
+      // Record sync failure
+      if (configRef.current) {
+        await recordSync(
+          configRef.current.owner,
+          configRef.current.repo,
+          'failed',
+          0,
+          error instanceof Error ? error.message : 'Unknown error'
+        );
+      }
+      
+      setState(prev => ({ ...prev, loading: false }));
+      
+      // Re-throw with more descriptive error
+      if (error instanceof Error) {
+        throw error;
+      } else {
+        throw new Error('Failed to sync with GitHub');
+      }
     }
   }, []);
 
@@ -207,21 +241,21 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         if (needsSync) {
           console.log('Auto syncing from GitHub API to database...');
           try {
-            // 从 GitHub API 获取数据并同步到数据库
-            const response = await fetch('/api/github/issues', {
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            });
-            
-            if (!response.ok) {
-              throw new Error('Failed to sync with GitHub');
-            }
-
-            const issues = await response.json();
-            console.log(`Synced ${issues.length} issues from GitHub to database`);
+            // Use getGitHubIssues instead of direct fetch
+            const result = await getGitHubIssues(1, undefined, true, config);
+            console.log(`Synced ${result.issues.length} issues from GitHub to database`);
           } catch (error) {
             console.error('Error syncing from GitHub:', error);
+            // Record sync failure but don't throw - this is initialization
+            if (config) {
+              await recordSync(
+                config.owner,
+                config.repo,
+                'failed',
+                0,
+                error instanceof Error ? error.message : 'Unknown error'
+              );
+            }
           }
         }
 

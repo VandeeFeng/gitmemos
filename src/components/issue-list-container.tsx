@@ -6,6 +6,7 @@ import { PageLayout } from './layouts/page-layout';
 import { GitHubConfig, Issue } from '@/types/github';
 import { useIssues } from '@/lib/contexts/issue-context';
 import { ConfigDialog } from './config-dialog';
+import { toast } from 'sonner';
 
 interface IssueListContainerProps {
   initialIssues: Issue[];
@@ -58,6 +59,10 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
     setLoading(true);
     try {
       await syncIssues();
+      toast.success('Successfully synced with GitHub');
+    } catch (error) {
+      console.error('Sync failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to sync with GitHub');
     } finally {
       setLoading(false);
     }

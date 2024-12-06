@@ -4,6 +4,7 @@ import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 import { Octokit } from 'octokit';
 
 let config: GitHubConfig | null = null;
+let isFirstLoad = true;
 
 function convertDbConfigToGitHubConfig(dbConfig: DbConfig): GitHubConfig {
   return {
@@ -125,8 +126,7 @@ export async function getIssues(
   page: number = 1, 
   labels?: string, 
   forceSync: boolean = false,
-  existingConfig?: GitHubConfig,
-  isInitialLoad: boolean = false
+  existingConfig?: GitHubConfig
 ) {
   const config = existingConfig || await getGitHubConfig();
 
@@ -158,9 +158,9 @@ export async function getIssues(
     const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, page, labels || '');
     const cached = cacheManager?.get<Issue[]>(cacheKey);
     
-    // Only verify with database on initial load or force sync
-    if (isInitialLoad) {
-      console.log('Initial load or refresh, verifying with database...');
+    // Only check database on first load or force sync
+    if (isFirstLoad) {
+      console.log('First load or refresh, checking database...');
       const response = await getIssuesFromApi(config.owner, config.repo, page, labels ? [labels] : undefined);
       const dbIssues = response?.issues || [];
       
@@ -168,11 +168,13 @@ export async function getIssues(
       if (dbIssues.length > 0 && (!cached || JSON.stringify(dbIssues) !== JSON.stringify(cached))) {
         console.log('Database data differs from cache, updating cache...');
         cacheManager?.set(cacheKey, dbIssues, { expiry: CACHE_EXPIRY.ISSUES });
+        isFirstLoad = false;
         return {
           issues: dbIssues,
           syncStatus: null
         };
       }
+      isFirstLoad = false;
     }
     
     if (cached) {

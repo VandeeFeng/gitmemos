@@ -361,19 +361,50 @@ export async function getIssue(issueNumber: number, forceSync: boolean = false):
 }
 
 export async function createIssue(title: string, body: string, labels: string[]): Promise<Issue> {
-  const response = await fetch('/api/github/issues', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ title, body, labels }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to create issue: ${response.statusText}`);
+  console.log('Creating issue using GitHub API:', { title, labels });
+  
+  const config = await getGitHubConfig();
+  if (!config.token || !config.owner || !config.repo) {
+    throw new Error('GitHub configuration is incomplete');
   }
 
-  return response.json();
+  const client = new Octokit({ auth: config.token });
+  
+  try {
+    const { data } = await client.rest.issues.create({
+      owner: config.owner,
+      repo: config.repo,
+      title,
+      body,
+      labels
+    });
+
+    const issue: Issue = {
+      number: data.number,
+      title: data.title,
+      body: data.body || '',
+      created_at: data.created_at,
+      state: data.state,
+      labels: data.labels
+        .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
+          typeof label === 'object' && label !== null)
+        .map(label => ({
+          id: label.id,
+          name: label.name,
+          color: label.color,
+          description: label.description,
+        }))
+    };
+
+    // Sync to database
+    await saveIssue(config.owner, config.repo, issue);
+    console.log('Issue created successfully:', { number: issue.number, title: issue.title });
+    
+    return issue;
+  } catch (error) {
+    console.error('GitHub API error:', error);
+    throw new Error(error instanceof Error ? error.message : 'Failed to create issue');
+  }
 }
 
 export async function updateIssue(

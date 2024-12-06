@@ -6,6 +6,7 @@ import rehypeSanitize from "rehype-sanitize";
 import { FormattedDate } from "@/components/formatted-date";
 import { shareMarkdownComponents } from "./share-markdown";
 import { useTheme } from 'next-themes';
+import { getLabelStyles } from '@/lib/colors';
 
 interface ShareCardProps {
   issue: Issue;
@@ -37,10 +38,7 @@ export function ShareCard({ issue }: ShareCardProps) {
               <span
                 key={label.id}
                 className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full"
-                style={{
-                  backgroundColor: `#${label.color}1a`,
-                  color: `#${label.color}`,
-                }}
+                style={getLabelStyles(label.color)}
                 title={label.description || undefined}
               >
                 {label.name}

@@ -15,6 +15,7 @@ import { FormattedDate } from '@/components/formatted-date';
 import { PageLayout } from '@/components/layouts/page-layout';
 import { Loading } from '@/components/ui/loading';
 import { ShareDialog } from '@/components/ui/share/share-dialog';
+import { getLabelStyles } from '@/lib/colors';
 
 interface PageProps {
   params: Promise<{
@@ -127,6 +128,20 @@ export default function IssuePage({ params }: PageProps) {
                 Share
               </Button>
             </div>
+            {issue.labels.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-4">
+                {issue.labels.map(label => (
+                  <span
+                    key={label.id}
+                    className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full hover:opacity-80"
+                    style={getLabelStyles(label.color)}
+                    title={label.description || undefined}
+                  >
+                    {label.name}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="prose dark:prose-invert max-w-none prose-pre:bg-bg-secondary dark:prose-pre:bg-bg-tertiary prose-pre:p-4 prose-pre:rounded-lg prose-pre:my-4 prose-code:text-text-primary dark:prose-code:text-text-primary prose-code:before:content-none prose-code:after:content-none prose-p:leading-relaxed">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}

@@ -12,10 +12,9 @@
 
 <img src="assets/GitMemo1.png" alt="1" width="80%" />
 
-
-
 <img src="assets/GitMemo2.png" alt="2" width="80%" />
 
+<img src="assets/GitMemo3.png" alt="3" width="80%" />
 ## 技术栈
 
 - Next.js 13+ (App Router)
@@ -30,6 +29,7 @@
 - ✨ Markdown 编辑和实时预览
 - 🏷️ 标签管理和筛选
 - 🔗 反链
+- 📤 卡片分享
 
 ## 快速开始
 
@@ -64,3 +64,4 @@
 - [x] 数据库
 - [x] 登录功能
 - [x] TimeLine
+- [x] 分享功能

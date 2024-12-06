@@ -154,7 +154,7 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
               <circle cx="9" cy="9" r="2" />
               <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
             </svg>
-            Generate Image
+            Image
           </Button>
         </div>
         

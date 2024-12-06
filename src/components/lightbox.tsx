@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from './ui/button';
 import { Loading } from "@/components/ui/loading"
 
@@ -117,9 +118,9 @@ export function Lightbox({ src, alt = '', className = '', width, height }: Light
         height={height}
       />
       
-      {isOpen && (
+      {isOpen && createPortal(
         <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm"
           onClick={handleClose}
           onMouseMove={handleMouseMove}
         >
@@ -185,7 +186,8 @@ export function Lightbox({ src, alt = '', className = '', width, height }: Light
               </Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

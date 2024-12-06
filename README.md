@@ -1,6 +1,6 @@
 # GitMemos
 
-一个基于 GitHub Issues 的Memos 替代。配合 [VandeeFeng/gitmemo](https://github.com/VandeeFeng/gitmemo)，提供一个简单的页面。
+一个基于 GitHub Issues 的 Memos 替代。配合 [VandeeFeng/gitmemo](https://github.com/VandeeFeng/gitmemo)，提供一个简单的页面。
 
 代码由 cursor 协助生成。
 
@@ -18,14 +18,19 @@
 
 ## 技术栈
 
-- Next.js 13+ (App Router)
-- Tailwind CSS
-- shadcn/ui
-- TypeScript
+- Framework: Next.js 13+ (App Router)
+- UI: Tailwind CSS
+- UI: shadcn/ui
+- Language: TypeScript
+- Database: Supabase
+- Backend: GitHub API
+- Deploy: Vercel
 
 ## 主要功能
 
 - 📝 基于 GitHub Issues 的笔记管理
+- 📝 基于 Supabase 的数据库
+- 🔄 同步 GitHub Issues 数据
 - 🎨 支持亮色/暗色主题
 - ✨ Markdown 编辑和实时预览
 - 🏷️ 标签管理和筛选
@@ -44,9 +49,11 @@
 2. 配置环境变量：
    创建 `.env.local` 文件：
    ```
-   NEXT_PUBLIC_GITHUB_TOKEN=your_github_token
-   NEXT_PUBLIC_GITHUB_OWNER=your_github_username
-   NEXT_PUBLIC_GITHUB_REPO=your_repository_name
+   GITHUB_TOKEN=your_github_token
+   GITHUB_OWNER=your_github_username
+   GITHUB_REPO=your_repository_name
+   SUPABASE_URL=your_supabase_url
+   SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
 3. 启动开发服务器：

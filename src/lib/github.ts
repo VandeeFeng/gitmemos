@@ -125,7 +125,8 @@ export async function getIssues(
   page: number = 1, 
   labels?: string, 
   forceSync: boolean = false,
-  existingConfig?: GitHubConfig
+  existingConfig?: GitHubConfig,
+  isInitialLoad: boolean = false
 ) {
   const config = existingConfig || await getGitHubConfig();
 
@@ -157,18 +158,21 @@ export async function getIssues(
     const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, page, labels || '');
     const cached = cacheManager?.get<Issue[]>(cacheKey);
     
-    // Even if we have cache, let's verify with database
-    const response = await getIssuesFromApi(config.owner, config.repo, page, labels ? [labels] : undefined);
-    const dbIssues = response?.issues || [];
-    
-    // If database has different data than cache, use database data
-    if (dbIssues.length > 0 && (!cached || JSON.stringify(dbIssues) !== JSON.stringify(cached))) {
-      console.log('Database data differs from cache, updating cache...');
-      cacheManager?.set(cacheKey, dbIssues, { expiry: CACHE_EXPIRY.ISSUES });
-      return {
-        issues: dbIssues,
-        syncStatus: null
-      };
+    // Only verify with database on initial load or force sync
+    if (isInitialLoad) {
+      console.log('Initial load or refresh, verifying with database...');
+      const response = await getIssuesFromApi(config.owner, config.repo, page, labels ? [labels] : undefined);
+      const dbIssues = response?.issues || [];
+      
+      // If database has different data than cache, use database data
+      if (dbIssues.length > 0 && (!cached || JSON.stringify(dbIssues) !== JSON.stringify(cached))) {
+        console.log('Database data differs from cache, updating cache...');
+        cacheManager?.set(cacheKey, dbIssues, { expiry: CACHE_EXPIRY.ISSUES });
+        return {
+          issues: dbIssues,
+          syncStatus: null
+        };
+      }
     }
     
     if (cached) {

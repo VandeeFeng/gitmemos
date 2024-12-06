@@ -12,6 +12,8 @@ import rehypeSanitize from 'rehype-sanitize';
 import { markdownComponents } from '@/components/markdown-components';
 import { Backlinks } from '@/components/backlinks';
 import { FormattedDate } from '@/components/formatted-date';
+import { PageLayout } from '@/components/layouts/page-layout';
+import { Loading } from '@/components/ui/loading';
 
 interface PageProps {
   params: Promise<{
@@ -22,10 +24,12 @@ interface PageProps {
 export default function IssuePage({ params }: PageProps) {
   const resolvedParams = use(params);
   const [issue, setIssue] = useState<Issue | null>(null);
+  const [isContentReady, setIsContentReady] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     let mounted = true;
+    setIsContentReady(false);
     
     async function fetchIssue() {
       if (!resolvedParams?.number) return;
@@ -34,9 +38,21 @@ export default function IssuePage({ params }: PageProps) {
         const data = await getIssue(parseInt(resolvedParams.number), false);
         if (mounted) {
           setIssue(data);
+          // 使用 requestAnimationFrame 确保在下一帧再设置 ready 状态
+          // 这样可以给内容渲染留出时间
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              if (mounted) {
+                setIsContentReady(true);
+              }
+            });
+          });
         }
       } catch (error) {
         console.error('Error fetching issue:', error);
+        if (mounted) {
+          setIsContentReady(true);
+        }
       }
     }
 
@@ -47,18 +63,11 @@ export default function IssuePage({ params }: PageProps) {
     };
   }, [resolvedParams?.number]);
 
-  if (!issue) {
+  if (!issue || !isContentReady) {
     return (
-      <div className="min-h-screen bg-white dark:bg-[#22272e] p-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex justify-center items-center min-h-[200px]">
-            <div className="relative w-16 h-16">
-              <div className="absolute inset-0 border-4 border-[#f6f8fa] dark:border-[#2d333b] rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-t-[#2da44e] dark:border-t-[#2f81f7] rounded-full animate-spin"></div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageLayout showFooter={false} showSearchAndNew={false}>
+        <Loading />
+      </PageLayout>
     );
   }
 

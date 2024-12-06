@@ -81,8 +81,8 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
       <div className="bg-bg-primary dark:bg-bg-secondary rounded-lg shadow-lg w-full max-w-md mx-4 overflow-hidden">
-        {/* 标题栏 */}
-        <div className="px-6 py-4 border-b border-default bg-bg-secondary dark:bg-bg-tertiary">
+        {/* 标题 */}
+        <div className="px-6 py-4 border-b border-default bg-bg-primary dark:bg-bg-secondary">
           <h2 className="text-xl font-semibold text-text-primary">Repository Settings</h2>
         </div>
 
@@ -159,11 +159,11 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
         </div>
 
         {/* 底部按钮 */}
-        <div className="px-6 py-4 bg-bg-secondary dark:bg-bg-tertiary border-t border-default flex justify-end space-x-3">
+        <div className="px-6 py-4 bg-bg-primary dark:bg-bg-secondary border-t border-default flex justify-end space-x-3">
           <Button
             variant="outline"
             onClick={onClose}
-            className="border-default hover:bg-bg-tertiary dark:hover:bg-bg-primary transition-colors"
+            className="border-default hover:bg-bg-secondary dark:hover:bg-bg-tertiary transition-colors"
           >
             Cancel
           </Button>
@@ -171,7 +171,7 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
             variant="success"
             onClick={handleSave}
             disabled={saving}
-            className="min-w-[80px]"
+            className="min-w-[80px] hover:opacity-90 transition-opacity"
           >
             {saving ? 'Saving...' : 'Save'}
           </Button>

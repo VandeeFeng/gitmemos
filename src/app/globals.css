@@ -31,7 +31,7 @@
   :root.dark {
     color-scheme: dark;
     /* 暗色主题颜色 */
-    --color-bg-primary: 34 39 46;
+    --color-bg-primary: 34 40 47;
     --color-bg-secondary: 45 51 59;
     --color-bg-tertiary: 55 62 71;
     

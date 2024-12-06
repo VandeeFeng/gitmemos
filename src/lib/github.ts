@@ -246,6 +246,13 @@ export async function getIssues(
       const issues = response?.issues || [];
       const syncStatus = await checkSyncStatus(config.owner, config.repo);
       
+      // Update cache with database data
+      if (issues.length > 0) {
+        const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, page, labels || '');
+        cacheManager?.set(cacheKey, issues, { expiry: CACHE_EXPIRY.ISSUES });
+        console.log(`[${requestId}] Updated cache with database data`);
+      }
+      
       return { 
         issues,
         syncStatus: syncStatus ? {

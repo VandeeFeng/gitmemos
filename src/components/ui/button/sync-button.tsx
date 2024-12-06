@@ -1,5 +1,7 @@
+import * as React from "react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { Button } from "./base-button";
 
 interface SyncButtonProps {
   onSync: () => Promise<void>;
@@ -19,11 +21,13 @@ export function SyncButton({ onSync, className }: SyncButtonProps) {
   };
 
   return (
-    <button
+    <Button
       onClick={handleSync}
       disabled={syncing}
+      variant="ghost"
+      size="icon"
       className={cn(
-        "text-text-secondary hover:text-text-primary transition-colors",
+        "text-text-secondary hover:text-text-primary",
         syncing && "opacity-70 cursor-not-allowed",
         className
       )}
@@ -46,6 +50,6 @@ export function SyncButton({ onSync, className }: SyncButtonProps) {
       >
         <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38" />
       </svg>
-    </button>
+    </Button>
   );
 } 

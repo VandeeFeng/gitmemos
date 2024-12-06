@@ -58,8 +58,12 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
   const handleSync = useCallback(async () => {
     setLoading(true);
     try {
-      await syncIssues();
-      toast.success('Successfully synced with GitHub');
+      const result = await syncIssues();
+      if (result?.success) {
+        toast.success(`Successfully synced ${result.totalSynced} issues from GitHub`);
+      } else {
+        toast.error('Failed to sync with GitHub');
+      }
     } catch (error) {
       console.error('Sync failed:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to sync with GitHub');

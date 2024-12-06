@@ -14,7 +14,7 @@ interface IssueContextType {
   loading: boolean;
   initialized: boolean;
   isInitializing: boolean;
-  syncIssues: () => Promise<void>;
+  syncIssues: () => Promise<{ success: boolean; totalSynced: number }>;
   updateIssues: (newIssues: Issue[]) => void;
   refreshIssues: () => Promise<void>;
 }
@@ -25,7 +25,7 @@ const IssueContext = createContext<IssueContextType>({
   loading: true,
   initialized: false,
   isInitializing: false,
-  syncIssues: async () => {},
+  syncIssues: async () => ({ success: false, totalSynced: 0 }),
   updateIssues: () => {},
   refreshIssues: async () => {}
 });
@@ -42,7 +42,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     loading: true,
     initialized: false,
     isInitializing: false,
-    syncIssues: async () => {},
+    syncIssues: async () => ({ success: false, totalSynced: 0 }),
     updateIssues: () => {},
     refreshIssues: async () => {}
   });
@@ -124,6 +124,11 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       );
 
       console.log(`Synced ${issues.length} issues from GitHub to database`);
+      
+      return {
+        success: true,
+        totalSynced: issues.length
+      };
     } catch (error) {
       console.error('Error syncing from GitHub:', error);
       

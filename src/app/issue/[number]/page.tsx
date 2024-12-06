@@ -14,6 +14,7 @@ import { Backlinks } from '@/components/backlinks';
 import { FormattedDate } from '@/components/formatted-date';
 import { PageLayout } from '@/components/layouts/page-layout';
 import { Loading } from '@/components/ui/loading';
+import { ShareDialog } from '@/components/ui/share/share-dialog';
 
 interface PageProps {
   params: Promise<{
@@ -25,6 +26,7 @@ export default function IssuePage({ params }: PageProps) {
   const resolvedParams = use(params);
   const [issue, setIssue] = useState<Issue | null>(null);
   const [isContentReady, setIsContentReady] = useState(false);
+  const [showShareDialog, setShowShareDialog] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -38,8 +40,6 @@ export default function IssuePage({ params }: PageProps) {
         const data = await getIssue(parseInt(resolvedParams.number), false);
         if (mounted) {
           setIssue(data);
-          // 使用 requestAnimationFrame 确保在下一帧再设置 ready 状态
-          // 这样可以给内容渲染留出时间
           requestAnimationFrame(() => {
             requestAnimationFrame(() => {
               if (mounted) {
@@ -102,6 +102,30 @@ export default function IssuePage({ params }: PageProps) {
                   </span>
                 </div>
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowShareDialog(true)}
+                className="text-text-secondary hover:text-text-primary hover:bg-bg-secondary dark:hover:bg-bg-tertiary"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="mr-1.5"
+                >
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                  <polyline points="16 6 12 2 8 6" />
+                  <line x1="12" y1="2" x2="12" y2="15" />
+                </svg>
+                Share
+              </Button>
             </div>
             <div className="prose dark:prose-invert max-w-none prose-pre:bg-bg-secondary dark:prose-pre:bg-bg-tertiary prose-pre:p-4 prose-pre:rounded-lg prose-pre:my-4 prose-code:text-text-primary dark:prose-code:text-text-primary prose-code:before:content-none prose-code:after:content-none prose-p:leading-relaxed">
               <ReactMarkdown
@@ -116,6 +140,12 @@ export default function IssuePage({ params }: PageProps) {
           </div>
         </div>
       </div>
+      
+      <ShareDialog
+        isOpen={showShareDialog}
+        onClose={() => setShowShareDialog(false)}
+        issue={issue}
+      />
     </PageLayout>
   );
 } 

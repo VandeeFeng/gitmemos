@@ -79,48 +79,84 @@ export async function generateImage({
 }
 
 async function convertImageToBase64(imgUrl: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Failed to get canvas context'));
-        return;
+  const maxRetries = 3;
+  let retryCount = 0;
+
+  while (retryCount < maxRetries) {
+    try {
+      // 如果是 http 链接，使用代理
+      const proxyUrl = imgUrl.startsWith('http') ? `/api/proxy/image?url=${encodeURIComponent(imgUrl)}` : imgUrl;
+      
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        
+        img.onload = () => {
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              reject(new Error('Failed to get canvas context'));
+              return;
+            }
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+          } catch (err) {
+            reject(err);
+          }
+        };
+        
+        img.onerror = () => {
+          // 如果代理加载失败，尝试直接加载原始图片
+          if (img.src !== imgUrl) {
+            img.src = imgUrl;
+          } else {
+            reject(new Error('Failed to load image'));
+          }
+        };
+        
+        img.src = proxyUrl;
+      });
+    } catch (error) {
+      retryCount++;
+      if (retryCount === maxRetries) {
+        console.error('Failed to convert image after retries:', error);
+        // 返回一个占位图片的 base64
+        return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
       }
-      ctx.drawImage(img, 0, 0);
-      resolve(canvas.toDataURL('image/png'));
-    };
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = imgUrl;
-  });
+      // 等待一段时间后重试
+      await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+    }
+  }
+  
+  throw new Error('Failed to convert image after all retries');
 }
 
 async function preloadImages(element: HTMLElement): Promise<void> {
   const images = Array.from(element.getElementsByTagName('img'));
   
-  for (const img of images) {
+  const imagePromises = images.map(async (img) => {
     try {
-      if (img.src.startsWith('data:')) continue;
+      if (img.src.startsWith('data:')) return;
+      
       const base64Url = await convertImageToBase64(img.src);
       img.src = base64Url;
+      
+      // 等待图片加载完成
+      if (!img.complete) {
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+      }
     } catch (error) {
       console.error('Failed to convert image:', error);
+      // 不要让单个图片的失败影响整体流程
     }
-  }
-
-  // 等待所有图片加载完成
-  const imagePromises = images.map(img => {
-    if (img.complete) {
-      return Promise.resolve();
-    }
-    return new Promise((resolve, reject) => {
-      img.addEventListener('load', resolve);
-      img.addEventListener('error', reject);
-    });
   });
-  await Promise.all(imagePromises);
+  
+  // 等待所有图片处理完成，即使有些失败了
+  await Promise.allSettled(imagePromises);
 } 

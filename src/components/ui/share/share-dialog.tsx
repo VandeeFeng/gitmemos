@@ -78,13 +78,18 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
       const dataUrl = await generateImage({
         element: cardRef.current,
         backgroundColor: isDark ? '#2d333b' : '#ffffff',
+        pixelRatio: 2,
       });
 
       // 检测是否为移动端设备
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
       if (isMobile) {
-        // 移动端使用新标签页显示图片
+        // 移动端使用 Blob URL 而不是 data URL
+        const response = await fetch(dataUrl);
+        const blob = await response.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
         const newTab = window.open();
         if (newTab) {
           newTab.document.write(`
@@ -114,11 +119,30 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
                     text-align: center;
                     font-family: system-ui, -apple-system, sans-serif;
                   }
+                  .download-btn {
+                    margin-top: 16px;
+                    padding: 8px 16px;
+                    background: #2da44e;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-family: system-ui, -apple-system, sans-serif;
+                    cursor: pointer;
+                  }
                 </style>
               </head>
               <body>
-                <img src="${dataUrl}" alt="GitMemo Share">
-                <p class="tip">长按图片保存到相册</p>
+                <img src="${blobUrl}" alt="GitMemo Share">
+                <p class="tip">长按图片或点击下方按钮保存</p>
+                <a href="${blobUrl}" download="gitmemo-${issue.number}.png" class="download-btn">
+                  下载图片
+                </a>
+                <script>
+                  // 清理 Blob URL
+                  window.onbeforeunload = function() {
+                    URL.revokeObjectURL('${blobUrl}');
+                  };
+                </script>
               </body>
             </html>
           `);

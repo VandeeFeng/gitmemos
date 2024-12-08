@@ -51,17 +51,25 @@ export const shareMarkdownComponents: Components = {
       cleanAlt = alt;
     }
     
-    // 使用代理 URL
-    const proxyUrl = src ? `/api/proxy/image?url=${encodeURIComponent(src)}` : null;
+    // 使用代理 URL 并确保跨域处理
+    const proxyUrl = src.startsWith('http') ? `/api/proxy/image?url=${encodeURIComponent(src)}` : src;
     
     return (
       <img
-        src={proxyUrl || src}
+        src={proxyUrl}
         alt={cleanAlt || ''}
         width={width}
         height={height}
         className="max-h-[400px] rounded-lg mx-auto object-contain"
         crossOrigin="anonymous"
+        loading="eager"
+        onError={(e) => {
+          // 如果代理加载失败，尝试直接加载原始图片
+          const imgElement = e.target as HTMLImageElement;
+          if (imgElement.src !== src) {
+            imgElement.src = src;
+          }
+        }}
       />
     );
   },

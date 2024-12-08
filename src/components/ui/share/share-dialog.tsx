@@ -72,9 +72,9 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
   const handleGenerateImage = async () => {
     if (!cardRef.current) return;
 
-    try {
-      toast.loading("Generating image...");
+    const toastId = toast.loading("Generating image...");
 
+    try {
       const dataUrl = await generateImage({
         element: cardRef.current,
         backgroundColor: isDark ? '#2d333b' : '#ffffff',
@@ -86,11 +86,11 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
       link.href = dataUrl;
       link.click();
 
-      toast.dismiss();
+      toast.dismiss(toastId);
       toast.success("Image downloaded successfully");
     } catch (err) {
       console.error('Failed to generate image:', err);
-      toast.dismiss();
+      toast.dismiss(toastId);
       toast.error("Failed to generate image");
     }
   };

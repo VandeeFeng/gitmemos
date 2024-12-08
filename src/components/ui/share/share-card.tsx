@@ -37,7 +37,7 @@ export function ShareCard({ issue }: ShareCardProps) {
             {issue.labels.map(label => (
               <span
                 key={label.id}
-                className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full"
+                className="inline-flex items-center justify-center px-2 py-0.5 text-xs font-medium rounded-full"
                 style={getLabelStyles(label.color)}
                 title={label.description || undefined}
               >

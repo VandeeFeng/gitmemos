@@ -28,6 +28,15 @@ export const markdownComponents: Components = {
     }
     return <p {...props}>{children}</p>;
   },
+  blockquote: ({ children, ...props }) => {
+    return (
+      <div className="border-l-4 border-[#d0d7de] dark:border-[#373e47] pl-4 my-4">
+        <div className="italic text-[#57606a] dark:text-[#768390] break-words [overflow-wrap:anywhere]">
+          {children}
+        </div>
+      </div>
+    );
+  },
   img: ({ src, alt }) => {
     if (!src) return null;
     

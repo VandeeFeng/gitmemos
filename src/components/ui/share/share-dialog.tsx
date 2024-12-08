@@ -80,14 +80,60 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
         backgroundColor: isDark ? '#2d333b' : '#ffffff',
       });
 
-      // 创建下载链接
-      const link = document.createElement('a');
-      link.download = `gitmemo-${issue.number}.png`;
-      link.href = dataUrl;
-      link.click();
+      // 检测是否为移动端设备
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      if (isMobile) {
+        // 移动端使用新标签页显示图片
+        const newTab = window.open();
+        if (newTab) {
+          newTab.document.write(`
+            <html>
+              <head>
+                <title>Download Image</title>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <style>
+                  body {
+                    margin: 0;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    min-height: 100vh;
+                    background: ${isDark ? '#22272e' : '#f6f8fa'};
+                    padding: 16px;
+                  }
+                  img {
+                    max-width: 100%;
+                    height: auto;
+                    border-radius: 8px;
+                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+                  }
+                  .tip {
+                    color: ${isDark ? '#adbac7' : '#57606a'};
+                    margin-top: 16px;
+                    text-align: center;
+                    font-family: system-ui, -apple-system, sans-serif;
+                  }
+                </style>
+              </head>
+              <body>
+                <img src="${dataUrl}" alt="GitMemo Share">
+                <p class="tip">长按图片保存到相册</p>
+              </body>
+            </html>
+          `);
+          newTab.document.close();
+        }
+      } else {
+        // 桌面端使用下载链接
+        const link = document.createElement('a');
+        link.download = `gitmemo-${issue.number}.png`;
+        link.href = dataUrl;
+        link.click();
+      }
 
       toast.dismiss(toastId);
-      toast.success("Image downloaded successfully");
+      toast.success("Image generated successfully");
     } catch (err) {
       console.error('Failed to generate image:', err);
       toast.dismiss(toastId);

@@ -85,69 +85,29 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
       if (isMobile) {
-        // 移动端使用 Blob URL 而不是 data URL
+        // 移动端直接创建下载链接
         const response = await fetch(dataUrl);
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
 
-        const newTab = window.open();
-        if (newTab) {
-          newTab.document.write(`
-            <html>
-              <head>
-                <title>Download Image</title>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <style>
-                  body {
-                    margin: 0;
-                    display: flex;
-                    flex-direction: column;
-                    align-items: center;
-                    min-height: 100vh;
-                    background: ${isDark ? '#22272e' : '#f6f8fa'};
-                    padding: 16px;
-                  }
-                  img {
-                    max-width: 100%;
-                    height: auto;
-                    border-radius: 8px;
-                    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-                  }
-                  .tip {
-                    color: ${isDark ? '#adbac7' : '#57606a'};
-                    margin-top: 16px;
-                    text-align: center;
-                    font-family: system-ui, -apple-system, sans-serif;
-                  }
-                  .download-btn {
-                    margin-top: 16px;
-                    padding: 8px 16px;
-                    background: #2da44e;
-                    color: white;
-                    border: none;
-                    border-radius: 6px;
-                    font-family: system-ui, -apple-system, sans-serif;
-                    cursor: pointer;
-                  }
-                </style>
-              </head>
-              <body>
-                <img src="${blobUrl}" alt="GitMemo Share">
-                <p class="tip">长按图片或点击下方按钮保存</p>
-                <a href="${blobUrl}" download="gitmemo-${issue.number}.png" class="download-btn">
-                  下载图片
-                </a>
-                <script>
-                  // 清理 Blob URL
-                  window.onbeforeunload = function() {
-                    URL.revokeObjectURL('${blobUrl}');
-                  };
-                </script>
-              </body>
-            </html>
-          `);
-          newTab.document.close();
-        }
+        // 创建一个隐藏的下载链接
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `gitmemo-${issue.number}.png`;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+
+        // 触发点击
+        link.click();
+
+        // 清理
+        setTimeout(() => {
+          URL.revokeObjectURL(blobUrl);
+          document.body.removeChild(link);
+        }, 100);
+
+        // 显示提示
+        toast.success("图片已准备好，请在通知中查看下载");
       } else {
         // 桌面端使用下载链接
         const link = document.createElement('a');

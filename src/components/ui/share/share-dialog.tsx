@@ -77,14 +77,14 @@ function ImagePreview({ imageUrl, fileName, onClose, isDark, onDownload, downloa
         )}
         onClick={e => e.stopPropagation()}
       >
-        <div className="relative">
+        <div className="relative flex-1 flex items-center justify-center p-4">
           <img 
             src={imageUrl} 
             alt="Preview" 
-            className="max-w-full max-h-[70vh] object-contain"
+            className="max-w-full max-h-[70vh] w-auto h-auto object-contain rounded-lg"
           />
           <button
-            className="absolute top-2 right-2 p-2 rounded-full bg-black/50 text-white hover:bg-black/70"
+            className="absolute top-2 right-2 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
             onClick={onClose}
           >
             <svg
@@ -108,7 +108,7 @@ function ImagePreview({ imageUrl, fileName, onClose, isDark, onDownload, downloa
           isDark ? "border-[#444c56]" : "border-gray-200"
         )}>
           <Button
-            className="bg-[#2da44e] hover:bg-[#2c974b] text-white"
+            className="bg-[#2da44e] hover:bg-[#2c974b] text-white transition-colors"
             size="lg"
             onClick={() => onDownload(imageUrl, fileName)}
           >

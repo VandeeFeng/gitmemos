@@ -170,7 +170,7 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
     setPreviewImage(null);
   };
 
-  // ��听对话框关闭
+  // 监听对话框关闭
   useEffect(() => {
     if (!isOpen) {
       cleanup();
@@ -247,14 +247,33 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
 
   const handleDownload = (imageUrl: string, fileName: string) => {
     try {
-      const link = document.createElement('a');
-      link.href = imageUrl;
-      link.download = fileName;
-      link.click();
-      toast.success("Image saved successfully");
+      // 检测是否为 Firefox
+      const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
+      // 检测是否为移动设备
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      if (isFirefox && isMobile) {
+        // Firefox 移动版：直接打开图片在新标签页，用户可以长按保存
+        window.open(imageUrl, '_blank');
+        toast.success("Long press the image to save");
+      } else {
+        // 其他浏览器：使用 download 属性
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = fileName;
+        link.target = '_blank'; // 添加 target 属性以提高兼容性
+        document.body.appendChild(link); // 某些浏览器需要元素在 DOM 中
+        link.click();
+        setTimeout(() => {
+          document.body.removeChild(link); // 清理 DOM
+        }, 100);
+        toast.success("Image saved successfully");
+      }
     } catch (err) {
       console.error('Failed to download image:', err);
-      toast.error("Failed to save image");
+      // 如果下载失败，提供备选方案
+      window.open(imageUrl, '_blank');
+      toast.error("Failed to save image. Please try long pressing the image instead.");
     }
   };
 
@@ -353,7 +372,11 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
           }}
           isDark={isDark}
           onDownload={handleDownload}
-          downloadButtonText="Download Image"
+          downloadButtonText={
+            /firefox/i.test(navigator.userAgent) && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+              ? "Open Image"
+              : "Download Image"
+          }
         />
       )}
     </>

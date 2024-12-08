@@ -4,7 +4,7 @@ import { Issue } from "@/types/github";
 import { ShareCard } from "./share-card";
 import { toast } from "sonner";
 import { generateImage } from "./image-generator";
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useTheme } from 'next-themes';
 
 interface DialogProps {
@@ -55,10 +55,97 @@ interface ShareDialogProps {
   issue: Issue;
 }
 
+interface ImagePreviewProps {
+  imageUrl: string;
+  fileName: string;
+  onClose: () => void;
+  isDark: boolean;
+}
+
+function ImagePreview({ imageUrl, fileName, onClose, isDark }: ImagePreviewProps) {
+  const handleDownload = () => {
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = fileName;
+    link.click();
+  };
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div 
+        className={cn(
+          "relative rounded-lg overflow-hidden max-w-full max-h-[90vh] flex flex-col",
+          isDark ? "bg-[#2d333b]" : "bg-white"
+        )}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="relative">
+          <img 
+            src={imageUrl} 
+            alt="Preview" 
+            className="max-w-full max-h-[70vh] object-contain"
+          />
+          <button
+            className="absolute top-2 right-2 p-2 rounded-full bg-black/50 text-white hover:bg-black/70"
+            onClick={onClose}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className={cn(
+          "p-4 text-center border-t",
+          isDark ? "border-[#444c56]" : "border-gray-200"
+        )}>
+          <Button
+            className="bg-[#2da44e] hover:bg-[#2c974b] text-white"
+            size="lg"
+            onClick={handleDownload}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="mr-2"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            保存图片
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const handleCopyLink = async () => {
     try {
@@ -85,35 +172,23 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
       if (isMobile) {
-        // 移动端直接创建下载链接
+        // 转换 dataUrl 为 Blob URL
         const response = await fetch(dataUrl);
         const blob = await response.blob();
         const blobUrl = URL.createObjectURL(blob);
-
-        // 创建一个隐藏的下载链接
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = `gitmemo-${issue.number}.png`;
-        link.style.display = 'none';
-        document.body.appendChild(link);
-
-        // 触发点击
-        link.click();
-
-        // 清理
-        setTimeout(() => {
-          URL.revokeObjectURL(blobUrl);
-          document.body.removeChild(link);
-        }, 100);
-
-        // 显示提示
-        toast.success("图片已准备好，请在通知中查看下载");
+        
+        // 显示预览
+        setPreviewImage(blobUrl);
+        
+        // 清理旧的 Blob URL
+        return () => {
+          if (blobUrl) {
+            URL.revokeObjectURL(blobUrl);
+          }
+        };
       } else {
-        // 桌面端使用下载链接
-        const link = document.createElement('a');
-        link.download = `gitmemo-${issue.number}.png`;
-        link.href = dataUrl;
-        link.click();
+        // 桌面端直接显示预览
+        setPreviewImage(dataUrl);
       }
 
       toast.dismiss(toastId);
@@ -126,88 +201,105 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] flex flex-col">
-        <div className={`flex justify-between gap-4 p-6 border-b ${
-          isDark ? "border-[#444c56]" : "border-gray-200"
-        }`}>
-          <Button
-            variant="outline"
-            size="lg"
-            className={`flex-1 ${
-              isDark 
-                ? "border-[#444c56] hover:bg-[#2d333b]/80" 
-                : "border-gray-200 hover:bg-gray-100"
-            }`}
-            onClick={handleCopyLink}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="mr-2"
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-[600px] flex flex-col">
+          <div className={`flex justify-between gap-4 p-6 border-b ${
+            isDark ? "border-[#444c56]" : "border-gray-200"
+          }`}>
+            <Button
+              variant="outline"
+              size="lg"
+              className={`flex-1 ${
+                isDark 
+                  ? "border-[#444c56] hover:bg-[#2d333b]/80" 
+                  : "border-gray-200 hover:bg-gray-100"
+              }`}
+              onClick={handleCopyLink}
             >
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-            </svg>
-            Copy Link
-          </Button>
-          <Button
-            variant="outline"
-            size="lg"
-            className={`flex-1 ${
-              isDark 
-                ? "border-[#444c56] hover:bg-[#2d333b]/80" 
-                : "border-gray-200 hover:bg-gray-100"
-            }`}
-            onClick={handleGenerateImage}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="mr-2"
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="mr-2"
+              >
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              Copy Link
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              className={`flex-1 ${
+                isDark 
+                  ? "border-[#444c56] hover:bg-[#2d333b]/80" 
+                  : "border-gray-200 hover:bg-gray-100"
+              }`}
+              onClick={handleGenerateImage}
             >
-              <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-              <circle cx="9" cy="9" r="2" />
-              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-            </svg>
-            Image
-          </Button>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-6">
-            <div className={`border rounded-lg overflow-hidden ${
-              isDark ? "border-[#444c56]" : "border-gray-200"
-            }`}>
-              <div ref={cardRef} className={isDark ? "bg-[#2d333b]" : "bg-white"}>
-                <ShareCard issue={issue} />
-                <div className={`flex items-center justify-center text-base border-t p-4 ${
-                  isDark 
-                    ? "text-gray-400 border-[#444c56]" 
-                    : "text-gray-500 border-gray-200"
-                }`}>
-                  <img src="/favicon.ico" alt="GitMemo" className="w-10 h-10 mr-2 rounded-full" />
-                  via GitMemo
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="mr-2"
+              >
+                <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                <circle cx="9" cy="9" r="2" />
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+              </svg>
+              Image
+            </Button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-6">
+              <div className={`border rounded-lg overflow-hidden ${
+                isDark ? "border-[#444c56]" : "border-gray-200"
+              }`}>
+                <div ref={cardRef} className={isDark ? "bg-[#2d333b]" : "bg-white"}>
+                  <ShareCard issue={issue} />
+                  <div className={`flex items-center justify-center text-base border-t p-4 ${
+                    isDark 
+                      ? "text-gray-400 border-[#444c56]" 
+                      : "text-gray-500 border-gray-200"
+                  }`}>
+                    <img src="/favicon.ico" alt="GitMemo" className="w-10 h-10 mr-2 rounded-full" />
+                    via GitMemo
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {previewImage && (
+        <ImagePreview
+          imageUrl={previewImage}
+          fileName={`gitmemo-${issue.number}.png`}
+          onClose={() => {
+            setPreviewImage(null);
+            // 如果是 Blob URL，需要清理
+            if (previewImage.startsWith('blob:')) {
+              URL.revokeObjectURL(previewImage);
+            }
+          }}
+          isDark={isDark}
+        />
+      )}
+    </>
   );
 } 

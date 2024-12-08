@@ -159,6 +159,32 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
           Labels
         </Button>
 
+        {selectedLabels.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {selectedLabels.map(labelName => {
+              const label = availableLabels.find(l => l.name === labelName);
+              if (!label) return null;
+              return (
+                <button
+                  key={label.name}
+                  onClick={() => setSelectedLabels(prev => prev.filter(name => name !== label.name))}
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium transition-colors hover:opacity-80"
+                  style={{
+                    backgroundColor: `#${label.color}20`,
+                    color: `#${label.color}`,
+                    border: `1px solid #${label.color}40`
+                  }}
+                >
+                  {label.name}
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 ml-1 -mr-1">
+                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                  </svg>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {showLabelDropdown && (
           <div ref={labelDropdownRef} className="absolute left-0 top-full z-50 mt-2 w-64 rounded-lg border border-default bg-bg-primary dark:bg-bg-secondary shadow-card dark:shadow-card-dark">
             <div className="max-h-96 overflow-y-auto">

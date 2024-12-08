@@ -67,7 +67,9 @@ export default function IssuePage({ params }: PageProps) {
   if (!issue || !isContentReady) {
     return (
       <PageLayout showFooter={true} showSearchAndNew={false} className="pt-24 md:pt-28">
-        <Loading />
+        <div className="animate-content-show">
+          <Loading />
+        </div>
       </PageLayout>
     );
   }

@@ -51,6 +51,8 @@ export const shareMarkdownComponents: Components = {
       cleanAlt = alt;
     }
     
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
     // 使用代理 URL
     const proxyUrl = src ? `/api/proxy/image?url=${encodeURIComponent(src)}` : null;
     
@@ -62,6 +64,14 @@ export const shareMarkdownComponents: Components = {
         height={height}
         className="max-h-[400px] rounded-lg mx-auto object-contain"
         crossOrigin="anonymous"
+        loading={isMobile ? "eager" : "lazy"}
+        onError={(e) => {
+          const imgElement = e.currentTarget;
+          if (imgElement.src !== src) {
+            console.log('Proxy image load failed, falling back to original URL');
+            imgElement.src = src;
+          }
+        }}
       />
     );
   },

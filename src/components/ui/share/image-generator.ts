@@ -14,6 +14,7 @@ export async function generateImage({
   pixelRatio = 2,
 }: ImageGeneratorOptions): Promise<string> {
   const { toCanvas } = await import('html-to-image');
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
   // 等待所有图片加载完成并转换为 base64
   await preloadImages(element);
@@ -21,26 +22,46 @@ export async function generateImage({
   // 生成图片
   const dataUrl = await toCanvas(element, {
     quality: 1.0,
-    pixelRatio,
+    pixelRatio: isMobile ? Math.min(pixelRatio, window.devicePixelRatio || 2) : pixelRatio,
     backgroundColor: 'transparent',
     style: {
       transform: 'scale(1)',
       transformOrigin: 'top left',
     },
     filter: (node) => {
-      // 过滤掉不需要的元素，比如滚动条和图片预览
       const classList = node.classList;
       if (!classList) return true;
       return !classList.contains('overflow-y-auto') && 
              !classList.contains('cursor-zoom-in');
     },
-    fontEmbedCSS: undefined, // 禁用字体嵌入
-    skipFonts: true, // 跳过字体处理
+    fontEmbedCSS: undefined,
+    skipFonts: true,
+    cacheBust: isMobile, // 移动端添加缓存破坏
   }).then(canvas => {
-    // 创建一个新的 canvas 来添加圆角和内边距
+    // 移动端限制画布大小
+    let finalWidth = canvas.width;
+    let finalHeight = canvas.height;
+    
+    if (isMobile) {
+      const maxWidth = 1200;
+      const maxHeight = 1600;
+      
+      if (finalWidth > maxWidth) {
+        const ratio = maxWidth / finalWidth;
+        finalWidth = maxWidth;
+        finalHeight = Math.floor(canvas.height * ratio);
+      }
+      
+      if (finalHeight > maxHeight) {
+        const ratio = maxHeight / finalHeight;
+        finalHeight = maxHeight;
+        finalWidth = Math.floor(finalWidth * ratio);
+      }
+    }
+
     const finalCanvas = document.createElement('canvas');
-    finalCanvas.width = canvas.width + padding * 2;
-    finalCanvas.height = canvas.height + padding * 2;
+    finalCanvas.width = finalWidth + padding * 2;
+    finalCanvas.height = finalHeight + padding * 2;
     
     const ctx = finalCanvas.getContext('2d');
     if (!ctx) throw new Error('Failed to get canvas context');
@@ -60,15 +81,16 @@ export async function generateImage({
     ctx.arcTo(padding, padding, padding + radius, padding, radius);
     ctx.closePath();
 
-    // 填充背景
     ctx.fillStyle = backgroundColor;
     ctx.fill();
-
-    // 使用圆角路径作为裁剪区域
     ctx.clip();
 
     // 绘制内容
-    ctx.drawImage(canvas, padding, padding);
+    ctx.drawImage(
+      canvas,
+      0, 0, canvas.width, canvas.height,
+      padding, padding, finalWidth, finalHeight
+    );
 
     ctx.restore();
 
@@ -101,26 +123,44 @@ async function convertImageToBase64(imgUrl: string): Promise<string> {
 
 async function preloadImages(element: HTMLElement): Promise<void> {
   const images = Array.from(element.getElementsByTagName('img'));
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   
-  for (const img of images) {
+  const loadImage = async (img: HTMLImageElement) => {
     try {
-      if (img.src.startsWith('data:')) continue;
-      const base64Url = await convertImageToBase64(img.src);
-      img.src = base64Url;
+      if (img.src.startsWith('data:')) return;
+      
+      // 移动端设置较短的超时时间
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Image load timeout')), isMobile ? 10000 : 30000);
+      });
+      
+      const base64Promise = convertImageToBase64(img.src);
+      const base64Url = await Promise.race([base64Promise, timeoutPromise]);
+      img.src = base64Url as string;
     } catch (error) {
       console.error('Failed to convert image:', error);
+      // 如果转换失败，保留原始图片URL
+      return;
     }
+  };
+
+  // 移动端限制并发数，PC 端并行处理
+  if (isMobile) {
+    const batchSize = 3;
+    for (let i = 0; i < images.length; i += batchSize) {
+      const batch = images.slice(i, i + batchSize);
+      await Promise.all(batch.map(img => loadImage(img)));
+    }
+  } else {
+    await Promise.all(images.map(img => loadImage(img)));
   }
 
   // 等待所有图片加载完成
-  const imagePromises = images.map(img => {
-    if (img.complete) {
-      return Promise.resolve();
-    }
-    return new Promise((resolve, reject) => {
-      img.addEventListener('load', resolve);
-      img.addEventListener('error', reject);
+  await Promise.all(images.map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise((resolve) => {
+      img.onload = resolve;
+      img.onerror = resolve; // 即使加载失败也继续处理
     });
-  });
-  await Promise.all(imagePromises);
+  }));
 } 

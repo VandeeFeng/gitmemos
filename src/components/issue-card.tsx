@@ -35,7 +35,7 @@ export function IssueCard({
     <div className="group border border-default rounded-lg shadow-card dark:shadow-card-dark hover:shadow-card-hover dark:hover:shadow-card-dark-hover transition-shadow">
       <div className="px-6 py-4">
         <div className="flex items-start justify-between">
-          <div className="space-y-1 flex-1 min-w-0 pr-4">
+          <div className="flex-1 min-w-0 pr-4">
             <h3 className="font-semibold text-text-primary">
               <Link
                 href={`/issue/${issue.number}`}
@@ -47,7 +47,7 @@ export function IssueCard({
                 {issue.title}
               </Link>
             </h3>
-            <div className="flex items-center gap-2 text-xs text-text-secondary">
+            <div className="flex items-center gap-2 text-xs text-text-secondary mt-1">
               <span>#{issue.number}</span>
               <span>·</span>
               <span>

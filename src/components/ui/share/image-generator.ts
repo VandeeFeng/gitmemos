@@ -15,8 +15,52 @@ export async function generateImage({
 }: ImageGeneratorOptions): Promise<string> {
   const { toCanvas } = await import('html-to-image');
 
-  // 等待所有图片加载完成并转换为 base64
+  // 等待所有图片加载完成
+  const images = Array.from(element.getElementsByTagName('img'));
+  let loadingImages = false;
+
+  // 检查是否有任何图片仍在加载
+  for (const img of images) {
+    if (!img.complete) {
+      loadingImages = true;
+      break;
+    }
+  }
+
+  if (loadingImages) {
+    // 如果有图片正在加载，等待所有图片加载完成
+    await Promise.all(
+      images.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          // 设置一个超时，避免无限等待
+          setTimeout(reject, 30000); // 30秒超时
+        }).catch(error => {
+          console.error('Image load failed:', img.src, error);
+          // 即使图片加载失败也继续处理
+          return Promise.resolve();
+        });
+      })
+    );
+  }
+
+  // 等待所有图片转换为 base64
   await preloadImages(element);
+
+  // 再次检查所有图片是否都成功加载
+  const allImagesLoaded = images.every(img => {
+    const isLoaded = img.complete && img.naturalWidth > 0;
+    if (!isLoaded) {
+      console.warn('Image not properly loaded:', img.src);
+    }
+    return isLoaded;
+  });
+
+  if (!allImagesLoaded) {
+    console.warn('Some images failed to load properly');
+  }
 
   // 生成图片
   const dataUrl = await toCanvas(element, {
@@ -91,7 +135,12 @@ async function convertImageToBase64(imgUrl: string): Promise<string> {
         const img = new Image();
         img.crossOrigin = 'anonymous';
         
+        const timeoutId = setTimeout(() => {
+          reject(new Error('Image load timeout'));
+        }, 10000); // 10秒超时
+        
         img.onload = () => {
+          clearTimeout(timeoutId);
           try {
             const canvas = document.createElement('canvas');
             canvas.width = img.width;
@@ -109,6 +158,7 @@ async function convertImageToBase64(imgUrl: string): Promise<string> {
         };
         
         img.onerror = () => {
+          clearTimeout(timeoutId);
           // 如果代理加载失败，尝试直接加载原始图片
           if (img.src !== imgUrl) {
             img.src = imgUrl;
@@ -147,8 +197,21 @@ async function preloadImages(element: HTMLElement): Promise<void> {
       // 等待图片加载完成
       if (!img.complete) {
         await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
+          const timeoutId = setTimeout(() => {
+            reject(new Error('Image load timeout'));
+          }, 10000); // 10秒超时
+          
+          img.onload = () => {
+            clearTimeout(timeoutId);
+            resolve(undefined);
+          };
+          img.onerror = () => {
+            clearTimeout(timeoutId);
+            reject(new Error('Failed to load converted image'));
+          };
+        }).catch(error => {
+          console.error('Failed to load converted image:', error);
+          // 不要让单个图片的失败影响整体流程
         });
       }
     } catch (error) {

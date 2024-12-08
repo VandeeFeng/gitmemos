@@ -4,7 +4,7 @@ import { Issue } from "@/types/github";
 import { ShareCard } from "./share-card";
 import { toast } from "sonner";
 import { generateImage } from "./image-generator";
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 
 interface DialogProps {
@@ -60,16 +60,11 @@ interface ImagePreviewProps {
   fileName: string;
   onClose: () => void;
   isDark: boolean;
+  onDownload: (imageUrl: string, fileName: string) => void;
+  downloadButtonText: string;
 }
 
-function ImagePreview({ imageUrl, fileName, onClose, isDark }: ImagePreviewProps) {
-  const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = imageUrl;
-    link.download = fileName;
-    link.click();
-  };
-
+function ImagePreview({ imageUrl, fileName, onClose, isDark, onDownload, downloadButtonText }: ImagePreviewProps) {
   return (
     <div 
       className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4"
@@ -115,7 +110,7 @@ function ImagePreview({ imageUrl, fileName, onClose, isDark }: ImagePreviewProps
           <Button
             className="bg-[#2da44e] hover:bg-[#2c974b] text-white"
             size="lg"
-            onClick={handleDownload}
+            onClick={() => onDownload(imageUrl, fileName)}
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -133,7 +128,7 @@ function ImagePreview({ imageUrl, fileName, onClose, isDark }: ImagePreviewProps
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            保存图片
+            {downloadButtonText}
           </Button>
         </div>
       </div>
@@ -146,6 +141,37 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const toastIdRef = useRef<string | number | null>(null);
+
+  // 清理函数
+  const cleanup = () => {
+    // 取消正在进行的图片生成
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // 清除正在显示的 toast
+    if (toastIdRef.current !== null) {
+      toast.dismiss(toastIdRef.current);
+      toastIdRef.current = null;
+    }
+
+    // 清理预览图片
+    if (previewImage && previewImage.startsWith('blob:')) {
+      URL.revokeObjectURL(previewImage);
+    }
+    setPreviewImage(null);
+  };
+
+  // 监听对话框关闭
+  useEffect(() => {
+    if (!isOpen) {
+      cleanup();
+    }
+    return () => cleanup();
+  }, [isOpen]);
 
   const handleCopyLink = async () => {
     try {
@@ -159,14 +185,25 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
   const handleGenerateImage = async () => {
     if (!cardRef.current) return;
 
-    const toastId = toast.loading("Generating image...");
+    // 清理之前的操作
+    cleanup();
+
+    // 创建新的 AbortController
+    abortControllerRef.current = new AbortController();
+    toastIdRef.current = toast.loading("Generating image...");
 
     try {
       const dataUrl = await generateImage({
         element: cardRef.current,
         backgroundColor: isDark ? '#2d333b' : '#ffffff',
         pixelRatio: 2,
+        signal: abortControllerRef.current.signal,
       });
+
+      // 如果已经被取消，直接返回
+      if (abortControllerRef.current.signal.aborted) {
+        return;
+      }
 
       // 检测是否为移动端设备
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -179,24 +216,40 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
         
         // 显示预览
         setPreviewImage(blobUrl);
-        
-        // 清理旧的 Blob URL
-        return () => {
-          if (blobUrl) {
-            URL.revokeObjectURL(blobUrl);
-          }
-        };
       } else {
         // 桌面端直接显示预览
         setPreviewImage(dataUrl);
       }
 
-      toast.dismiss(toastId);
-      toast.success("Image generated successfully");
+      if (toastIdRef.current !== null) {
+        toast.dismiss(toastIdRef.current);
+        toastIdRef.current = null;
+      }
+    } catch (error) {
+      // 如果不是取消操作导致的错误，才显示错误提示
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        console.error('Failed to generate image:', error);
+        if (toastIdRef.current !== null) {
+          toast.dismiss(toastIdRef.current);
+          toastIdRef.current = null;
+        }
+        toast.error("Failed to generate image");
+      }
+    } finally {
+      abortControllerRef.current = null;
+    }
+  };
+
+  const handleDownload = (imageUrl: string, fileName: string) => {
+    try {
+      const link = document.createElement('a');
+      link.href = imageUrl;
+      link.download = fileName;
+      link.click();
+      toast.success("Image saved successfully");
     } catch (err) {
-      console.error('Failed to generate image:', err);
-      toast.dismiss(toastId);
-      toast.error("Failed to generate image");
+      console.error('Failed to download image:', err);
+      toast.error("Failed to save image");
     }
   };
 
@@ -291,13 +344,11 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
           imageUrl={previewImage}
           fileName={`gitmemo-${issue.number}.png`}
           onClose={() => {
-            setPreviewImage(null);
-            // 如果是 Blob URL，需要清理
-            if (previewImage.startsWith('blob:')) {
-              URL.revokeObjectURL(previewImage);
-            }
+            cleanup();
           }}
           isDark={isDark}
+          onDownload={handleDownload}
+          downloadButtonText="Download Image"
         />
       )}
     </>

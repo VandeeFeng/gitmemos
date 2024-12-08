@@ -4,6 +4,7 @@ interface ImageGeneratorOptions {
   padding?: number;
   radius?: number;
   pixelRatio?: number;
+  signal?: AbortSignal;
 }
 
 export async function generateImage({
@@ -12,8 +13,14 @@ export async function generateImage({
   padding = 24,
   radius = 8,
   pixelRatio = 2,
+  signal,
 }: ImageGeneratorOptions): Promise<string> {
   const { toCanvas } = await import('html-to-image');
+
+  // 检查是否已经被取消
+  if (signal?.aborted) {
+    throw new DOMException('Image generation aborted', 'AbortError');
+  }
 
   // 等待所有图片加载完成
   const images = Array.from(element.getElementsByTagName('img'));
@@ -33,10 +40,37 @@ export async function generateImage({
       images.map(img => {
         if (img.complete) return Promise.resolve();
         return new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = reject;
+          const handleAbort = () => {
+            img.removeEventListener('load', handleLoad);
+            img.removeEventListener('error', handleError);
+            reject(new DOMException('Image generation aborted', 'AbortError'));
+          };
+
+          const handleLoad = () => {
+            cleanup();
+            resolve(undefined);
+          };
+
+          const handleError = () => {
+            cleanup();
+            reject(new Error(`Failed to load image: ${img.src}`));
+          };
+
+          const cleanup = () => {
+            img.removeEventListener('load', handleLoad);
+            img.removeEventListener('error', handleError);
+            signal?.removeEventListener('abort', handleAbort);
+          };
+
+          img.addEventListener('load', handleLoad);
+          img.addEventListener('error', handleError);
+          signal?.addEventListener('abort', handleAbort);
+
           // 设置一个超时，避免无限等待
-          setTimeout(reject, 30000); // 30秒超时
+          setTimeout(() => {
+            cleanup();
+            reject(new Error('Image load timeout'));
+          }, 30000); // 30秒超时
         }).catch(error => {
           console.error('Image load failed:', img.src, error);
           // 即使图片加载失败也继续处理
@@ -46,8 +80,13 @@ export async function generateImage({
     );
   }
 
+  // 检查是否已经被取消
+  if (signal?.aborted) {
+    throw new DOMException('Image generation aborted', 'AbortError');
+  }
+
   // 等待所有图片转换为 base64
-  await preloadImages(element);
+  await preloadImages(element, signal);
 
   // 再次检查所有图片是否都成功加载
   const allImagesLoaded = images.every(img => {
@@ -60,6 +99,11 @@ export async function generateImage({
 
   if (!allImagesLoaded) {
     console.warn('Some images failed to load properly');
+  }
+
+  // 检查是否已经被取消
+  if (signal?.aborted) {
+    throw new DOMException('Image generation aborted', 'AbortError');
   }
 
   // 生成图片
@@ -81,6 +125,11 @@ export async function generateImage({
     fontEmbedCSS: undefined, // 禁用字体嵌入
     skipFonts: true, // 跳过字体处理
   }).then(canvas => {
+    // 检查是否已经被取消
+    if (signal?.aborted) {
+      throw new DOMException('Image generation aborted', 'AbortError');
+    }
+
     // 创建一个新的 canvas 来添加圆角和内边距
     const finalCanvas = document.createElement('canvas');
     finalCanvas.width = canvas.width + padding * 2;
@@ -122,12 +171,17 @@ export async function generateImage({
   return dataUrl;
 }
 
-async function convertImageToBase64(imgUrl: string): Promise<string> {
+async function convertImageToBase64(imgUrl: string, signal?: AbortSignal): Promise<string> {
   const maxRetries = 3;
   let retryCount = 0;
 
   while (retryCount < maxRetries) {
     try {
+      // 检查是否已经被取消
+      if (signal?.aborted) {
+        throw new DOMException('Image conversion aborted', 'AbortError');
+      }
+
       // 如果是 http 链接，使用代理
       const proxyUrl = imgUrl.startsWith('http') ? `/api/proxy/image?url=${encodeURIComponent(imgUrl)}` : imgUrl;
       
@@ -136,11 +190,17 @@ async function convertImageToBase64(imgUrl: string): Promise<string> {
         img.crossOrigin = 'anonymous';
         
         const timeoutId = setTimeout(() => {
+          cleanup();
           reject(new Error('Image load timeout'));
         }, 10000); // 10秒超时
+
+        const handleAbort = () => {
+          cleanup();
+          reject(new DOMException('Image conversion aborted', 'AbortError'));
+        };
         
-        img.onload = () => {
-          clearTimeout(timeoutId);
+        const handleLoad = () => {
+          cleanup();
           try {
             const canvas = document.createElement('canvas');
             canvas.width = img.width;
@@ -157,8 +217,8 @@ async function convertImageToBase64(imgUrl: string): Promise<string> {
           }
         };
         
-        img.onerror = () => {
-          clearTimeout(timeoutId);
+        const handleError = () => {
+          cleanup();
           // 如果代理加载失败，尝试直接加载原始图片
           if (img.src !== imgUrl) {
             img.src = imgUrl;
@@ -166,10 +226,26 @@ async function convertImageToBase64(imgUrl: string): Promise<string> {
             reject(new Error('Failed to load image'));
           }
         };
+
+        const cleanup = () => {
+          clearTimeout(timeoutId);
+          img.removeEventListener('load', handleLoad);
+          img.removeEventListener('error', handleError);
+          signal?.removeEventListener('abort', handleAbort);
+        };
+        
+        img.addEventListener('load', handleLoad);
+        img.addEventListener('error', handleError);
+        signal?.addEventListener('abort', handleAbort);
         
         img.src = proxyUrl;
       });
     } catch (error) {
+      // 如果是取消操作，直接抛出错误
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw error;
+      }
+
       retryCount++;
       if (retryCount === maxRetries) {
         console.error('Failed to convert image after retries:', error);
@@ -184,37 +260,65 @@ async function convertImageToBase64(imgUrl: string): Promise<string> {
   throw new Error('Failed to convert image after all retries');
 }
 
-async function preloadImages(element: HTMLElement): Promise<void> {
+async function preloadImages(element: HTMLElement, signal?: AbortSignal): Promise<void> {
   const images = Array.from(element.getElementsByTagName('img'));
   
   const imagePromises = images.map(async (img) => {
     try {
       if (img.src.startsWith('data:')) return;
       
-      const base64Url = await convertImageToBase64(img.src);
+      const base64Url = await convertImageToBase64(img.src, signal);
+      
+      // 检查是否已经被取消
+      if (signal?.aborted) {
+        throw new DOMException('Image preload aborted', 'AbortError');
+      }
+
       img.src = base64Url;
       
       // 等待图片加载完成
       if (!img.complete) {
         await new Promise((resolve, reject) => {
           const timeoutId = setTimeout(() => {
+            cleanup();
             reject(new Error('Image load timeout'));
           }, 10000); // 10秒超时
           
-          img.onload = () => {
-            clearTimeout(timeoutId);
+          const handleAbort = () => {
+            cleanup();
+            reject(new DOMException('Image preload aborted', 'AbortError'));
+          };
+
+          const handleLoad = () => {
+            cleanup();
             resolve(undefined);
           };
-          img.onerror = () => {
-            clearTimeout(timeoutId);
+
+          const handleError = () => {
+            cleanup();
             reject(new Error('Failed to load converted image'));
           };
+
+          const cleanup = () => {
+            clearTimeout(timeoutId);
+            img.removeEventListener('load', handleLoad);
+            img.removeEventListener('error', handleError);
+            signal?.removeEventListener('abort', handleAbort);
+          };
+
+          img.addEventListener('load', handleLoad);
+          img.addEventListener('error', handleError);
+          signal?.addEventListener('abort', handleAbort);
         }).catch(error => {
           console.error('Failed to load converted image:', error);
           // 不要让单个图片的失败影响整体流程
         });
       }
     } catch (error) {
+      // 如果是取消操作，抛出错误
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw error;
+      }
       console.error('Failed to convert image:', error);
       // 不要让单个图片的失败影响整体流程
     }

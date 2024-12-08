@@ -36,7 +36,7 @@ export async function generateImage({
     },
     fontEmbedCSS: undefined,
     skipFonts: true,
-    cacheBust: isMobile, // 移动端添加缓存破坏
+    cacheBust: isMobile, // 移动端添加缓存破��
   }).then(canvas => {
     // 移动端限制画布大小
     let finalWidth = canvas.width;
@@ -128,30 +128,45 @@ async function preloadImages(element: HTMLElement): Promise<void> {
   const loadImage = async (img: HTMLImageElement) => {
     try {
       if (img.src.startsWith('data:')) return;
-      
-      // 移动端设置较短的超时时间
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Image load timeout')), isMobile ? 10000 : 30000);
-      });
-      
-      const base64Promise = convertImageToBase64(img.src);
-      const base64Url = await Promise.race([base64Promise, timeoutPromise]);
-      img.src = base64Url as string;
+
+      if (isMobile) {
+        // 移动端确保图片完全加载
+        await new Promise((resolve) => {
+          if (img.complete) {
+            resolve(undefined);
+          } else {
+            img.onload = () => resolve(undefined);
+            img.onerror = () => resolve(undefined);
+          }
+        });
+      }
+
+      const base64Url = await convertImageToBase64(img.src);
+      img.src = base64Url;
+
+      if (isMobile) {
+        // 移动端再次确认图片加载完成
+        await new Promise((resolve) => {
+          if (img.complete) {
+            resolve(undefined);
+          } else {
+            img.onload = () => resolve(undefined);
+            img.onerror = () => resolve(undefined);
+          }
+        });
+      }
     } catch (error) {
       console.error('Failed to convert image:', error);
-      // 如果转换失败，保留原始图片URL
-      return;
     }
   };
 
-  // 移动端限制并发数，PC 端并行处理
   if (isMobile) {
-    const batchSize = 3;
-    for (let i = 0; i < images.length; i += batchSize) {
-      const batch = images.slice(i, i + batchSize);
-      await Promise.all(batch.map(img => loadImage(img)));
+    // 移动端串行处理图片以确保加载顺序
+    for (const img of images) {
+      await loadImage(img);
     }
   } else {
+    // PC端并行处理
     await Promise.all(images.map(img => loadImage(img)));
   }
 

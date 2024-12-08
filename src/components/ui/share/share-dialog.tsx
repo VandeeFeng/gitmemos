@@ -78,11 +78,16 @@ function ImagePreview({ imageUrl, fileName, onClose, isDark, onDownload, downloa
         onClick={e => e.stopPropagation()}
       >
         <div className="relative flex-1 flex items-center justify-center p-4">
-          <img 
-            src={imageUrl} 
-            alt="Preview" 
-            className="max-w-full max-h-[70vh] w-auto h-auto object-contain rounded-lg"
-          />
+          <div className={cn(
+            "rounded-lg overflow-hidden",
+            isDark ? "border border-[#444c56] shadow-lg" : "border border-gray-200 shadow-md"
+          )}>
+            <img 
+              src={imageUrl} 
+              alt="Preview" 
+              className="max-w-full max-h-[70vh] w-auto h-auto object-contain"
+            />
+          </div>
           <button
             className="absolute top-2 right-2 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
             onClick={onClose}
@@ -165,7 +170,7 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
     setPreviewImage(null);
   };
 
-  // 监听对话框关闭
+  // ��听对话框关闭
   useEffect(() => {
     if (!isOpen) {
       cleanup();

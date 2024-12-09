@@ -26,13 +26,11 @@ interface PageProps {
 export default function IssuePage({ params }: PageProps) {
   const resolvedParams = use(params);
   const [issue, setIssue] = useState<Issue | null>(null);
-  const [isContentReady, setIsContentReady] = useState(false);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     let mounted = true;
-    setIsContentReady(false);
     
     async function fetchIssue() {
       if (!resolvedParams?.number) return;
@@ -41,19 +39,9 @@ export default function IssuePage({ params }: PageProps) {
         const data = await getIssue(parseInt(resolvedParams.number), false);
         if (mounted) {
           setIssue(data);
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              if (mounted) {
-                setIsContentReady(true);
-              }
-            });
-          });
         }
       } catch (error) {
         console.error('Error fetching issue:', error);
-        if (mounted) {
-          setIsContentReady(true);
-        }
       }
     }
 
@@ -64,7 +52,7 @@ export default function IssuePage({ params }: PageProps) {
     };
   }, [resolvedParams?.number]);
 
-  if (!issue || !isContentReady) {
+  if (!issue) {
     return (
       <PageLayout showFooter={true} showSearchAndNew={false}>
         <div className="animate-content-show">

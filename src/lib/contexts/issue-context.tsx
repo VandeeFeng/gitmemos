@@ -87,7 +87,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           } else {
             failedLabels++;
           }
-        } catch (error) {
+        } catch (_) {
           failedLabels++;
         }
       }

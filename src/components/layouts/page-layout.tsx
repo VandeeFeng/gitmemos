@@ -37,6 +37,7 @@ export function PageLayout({
 }: PageLayoutProps) {
   const pathname = usePathname()
   const isTimelinePage = pathname === '/timeline'
+  const isIssuePage = pathname.startsWith('/issue/')
   
   // Ensure issues is always an array
   const safeIssues = Array.isArray(issues) ? issues : [];
@@ -56,7 +57,8 @@ export function PageLayout({
         />
       )}
       <main className={cn(
-        "container mx-auto px-4 max-w-4xl pt-24 md:pt-32 flex-grow",
+        "container mx-auto px-4 max-w-4xl flex-grow",
+        isIssuePage ? "pt-24 md:pt-28" : "pt-28 md:pt-36",
         className
       )}>
         {children}

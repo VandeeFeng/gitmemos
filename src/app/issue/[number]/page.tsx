@@ -68,7 +68,7 @@ export default function IssuePage({ params }: PageProps) {
   return (
     <PageLayout showFooter={true} showSearchAndNew={false}>
       <div className="animate-content-show">
-        <div className="mb-6">
+        <div className="mb-3">
           <Button
             onClick={() => router.back()}
             variant="link"

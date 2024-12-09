@@ -58,7 +58,7 @@ export function PageLayout({
       )}
       <main className={cn(
         "container mx-auto px-4 max-w-4xl flex-grow",
-        isIssuePage ? "pt-32 md:pt-28" : "pt-36 md:pt-36",
+        isIssuePage ? "pt-20 md:pt-28" : "pt-36 md:pt-36",
         className
       )}>
         {children}

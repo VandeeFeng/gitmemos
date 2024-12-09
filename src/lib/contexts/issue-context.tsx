@@ -231,8 +231,6 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           { expiry: CACHE_EXPIRY.ISSUES }
         );
       }
-    } catch (error) {
-      console.error('Error fetching issues:', error);
     } finally {
       setState(prev => ({ ...prev, loading: false }));
     }
@@ -419,7 +417,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, [syncIssues, updateIssues, refreshIssues]);
+  }, [syncIssues, updateIssues, refreshIssues, state.initialized]);
 
   return (
     <IssueContext.Provider value={state}>

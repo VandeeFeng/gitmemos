@@ -1,6 +1,11 @@
 import type { Components } from 'react-markdown';
 import Link from 'next/link';
 
+interface ListItemProps extends React.HTMLAttributes<HTMLLIElement> {
+  checked?: boolean;
+  children: React.ReactNode;
+}
+
 export const shareMarkdownComponents: Components = {
   p: ({ children, ...props }) => {
     if (typeof children === 'string') {
@@ -73,4 +78,20 @@ export const shareMarkdownComponents: Components = {
       />
     );
   },
-}; 
+  li: ({ children, checked, ...props }: ListItemProps) => {
+    if (typeof checked === 'boolean') {
+      return (
+        <li {...props} className="list-none flex items-start gap-2 my-1">
+          <input
+            type="checkbox"
+            checked={checked}
+            readOnly
+            className="mt-1.5"
+          />
+          <span className="flex-1">{children}</span>
+        </li>
+      );
+    }
+    return <li {...props}>{children}</li>;
+  }
+} 

@@ -75,6 +75,22 @@ const config = {
                 textDecoration: 'underline',
               },
             },
+            'ul > li': {
+              '&::marker': {
+                color: '#57606a',
+              },
+              '&::before': {
+                display: 'none',
+              },
+            },
+            'ul > li.contains-task-list': {
+              listStyleType: 'none',
+              paddingLeft: 0,
+            },
+            '.task-list-item': {
+              listStyleType: 'none',
+              paddingLeft: 0,
+            },
           },
         },
         invert: {
@@ -94,6 +110,11 @@ const config = {
               color: '#768390',
               borderLeftColor: '#373e47',
               fontWeight: '400',
+            },
+            'ul > li': {
+              '&::marker': {
+                color: '#768390',
+              },
             },
           },
         },
@@ -137,7 +158,11 @@ const config = {
   },
   plugins: [
     require("tailwindcss-animate"),
-    require("@tailwindcss/typography")
+    require('@tailwindcss/typography')({
+      target: 'modern',
+      className: 'prose',
+      modifiers: ['DEFAULT', 'sm', 'lg', 'xl', '2xl', 'invert'],
+    }),
   ],
 } satisfies Config;
 

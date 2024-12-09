@@ -1,9 +1,8 @@
 import type { Components } from 'react-markdown';
 import Link from 'next/link';
 
-interface ListItemProps extends React.HTMLAttributes<HTMLLIElement> {
+interface ListItemProps extends React.LiHTMLAttributes<HTMLLIElement> {
   checked?: boolean;
-  children: React.ReactNode;
 }
 
 export const shareMarkdownComponents: Components = {
@@ -78,7 +77,7 @@ export const shareMarkdownComponents: Components = {
       />
     );
   },
-  li: ({ children, checked, ...props }: ListItemProps) => {
+  li: ({ children, checked, ...props }: React.PropsWithChildren<ListItemProps>) => {
     if (typeof checked === 'boolean') {
       return (
         <li {...props} className="list-none flex items-start gap-2 my-1">

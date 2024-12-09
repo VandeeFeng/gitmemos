@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { Issue, GitHubConfig } from '@/types/github';
 import { getIssues as getGitHubIssues, getGitHubConfig } from '@/lib/github';
-import { checkSyncStatus, recordSync, saveIssue } from '@/lib/api';
+import { checkSyncStatus, recordSync, saveIssue, saveLabel } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 import { getIssues as getIssuesFromApi } from '@/lib/api';
 import { Octokit } from 'octokit';
@@ -61,6 +61,48 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     try {
       // Use Octokit for direct GitHub API calls
       const octokit = new Octokit({ auth: configRef.current.token });
+
+      // 首先同步标签
+      console.log('Syncing labels from GitHub...');
+      const labelsResponse = await octokit.rest.issues.listLabelsForRepo({
+        owner: configRef.current.owner,
+        repo: configRef.current.repo,
+      });
+
+      const labels = labelsResponse.data.map(label => ({
+        id: label.id,
+        name: label.name,
+        color: label.color,
+        description: label.description,
+      }));
+
+      // 保存标签到数据库
+      console.log(`Saving ${labels.length} labels to database...`);
+      let savedLabels = 0;
+      let failedLabels = 0;
+      for (const label of labels) {
+        try {
+          const success = await saveLabel(configRef.current.owner, configRef.current.repo, label);
+          if (success) {
+            savedLabels++;
+          } else {
+            failedLabels++;
+            console.error(`Failed to save label: ${label.name}`);
+          }
+        } catch (error) {
+          failedLabels++;
+          console.error(`Error saving label ${label.name}:`, error);
+        }
+      }
+
+      console.log(`Synced ${labels.length} labels from GitHub to database (${savedLabels} saved, ${failedLabels} failed)`);
+
+      // 清除标签缓存
+      if (configRef.current) {
+        cacheManager?.remove(CACHE_KEYS.LABELS(configRef.current.owner, configRef.current.repo));
+      }
+
+      // 然后同步 issues
       const { data } = await octokit.rest.issues.listForRepo({
         owner: configRef.current.owner,
         repo: configRef.current.repo,
@@ -241,12 +283,51 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           );
         }
 
-        // 如果需要同步（超过24小时或从未同步），自动同步
+        // 如果需要同步（超24小时或从未同步），自动同步
         const needsSync = syncStatus?.needsSync ?? true;
         if (needsSync) {
           console.log('Auto syncing from GitHub API to database...');
           try {
-            // Use getGitHubIssues instead of direct fetch
+            // 首先同步标签
+            const octokit = new Octokit({ auth: config.token });
+            console.log('Syncing labels from GitHub...');
+            const labelsResponse = await octokit.rest.issues.listLabelsForRepo({
+              owner: config.owner,
+              repo: config.repo,
+            });
+
+            const labels = labelsResponse.data.map(label => ({
+              id: label.id,
+              name: label.name,
+              color: label.color,
+              description: label.description,
+            }));
+
+            // 保存标签到数据库
+            console.log(`Saving ${labels.length} labels to database...`);
+            let savedLabels = 0;
+            let failedLabels = 0;
+            for (const label of labels) {
+              try {
+                const success = await saveLabel(config.owner, config.repo, label);
+                if (success) {
+                  savedLabels++;
+                } else {
+                  failedLabels++;
+                  console.error(`Failed to save label: ${label.name}`);
+                }
+              } catch (error) {
+                failedLabels++;
+                console.error(`Error saving label ${label.name}:`, error);
+              }
+            }
+
+            console.log(`Synced ${labels.length} labels from GitHub to database (${savedLabels} saved, ${failedLabels} failed)`);
+
+            // 清除标签缓存
+            cacheManager?.remove(CACHE_KEYS.LABELS(config.owner, config.repo));
+
+            // 然后同步 issues
             const result = await getGitHubIssues(1, undefined, true, config);
             console.log(`Synced ${result.issues.length} issues from GitHub to database`);
           } catch (error) {

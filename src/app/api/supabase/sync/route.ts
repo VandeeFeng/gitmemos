@@ -65,7 +65,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const { error } = await supabaseServer
+    // 插入新记录
+    const { error: insertError } = await supabaseServer
       .from('sync_history')
       .insert({
         owner,
@@ -76,11 +77,42 @@ export async function POST(request: Request) {
         last_sync_at: new Date().toISOString()
       });
 
-    if (error) {
+    if (insertError) {
       return NextResponse.json(
-        { error: error.message },
+        { error: insertError.message },
         { status: 500 }
       );
+    }
+
+    // 获取当前仓库的所有同步记录，按时间倒序排列
+    const { data: allRecords, error: selectError } = await supabaseServer
+      .from('sync_history')
+      .select('id, last_sync_at')
+      .eq('owner', owner)
+      .eq('repo', repo)
+      .order('last_sync_at', { ascending: false });
+
+    if (selectError) {
+      console.error('Error fetching sync records:', selectError);
+      // 不要因为清理失败而影响主流程
+      return NextResponse.json({ success: true });
+    }
+
+    // 如果记录数超过20条，删除多余的记录
+    if (allRecords && allRecords.length > 20) {
+      const recordsToDelete = allRecords.slice(20);
+      const idsToDelete = recordsToDelete.map(record => record.id);
+
+      const { error: deleteError } = await supabaseServer
+        .from('sync_history')
+        .delete()
+        .in('id', idsToDelete);
+
+      if (deleteError) {
+        console.error('Error cleaning up old sync records:', deleteError);
+      } else {
+        console.log(`Cleaned up ${recordsToDelete.length} old sync records`);
+      }
     }
 
     return NextResponse.json({ success: true });

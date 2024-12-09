@@ -10,7 +10,7 @@ interface ImageGeneratorOptions {
 export async function generateImage({
   element,
   backgroundColor,
-  padding = 24,
+  padding = 12,
   radius = 8,
   pixelRatio = 2,
   signal,
@@ -140,6 +140,10 @@ export async function generateImage({
 
     ctx.save();
     
+    // Set the background color to match the content background
+    ctx.fillStyle = backgroundColor;
+    ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
+    
     // 创建圆角路径
     ctx.beginPath();
     ctx.moveTo(padding + radius, padding);
@@ -153,13 +157,9 @@ export async function generateImage({
     ctx.arcTo(padding, padding, padding + radius, padding, radius);
     ctx.closePath();
 
-    // 填充背景
-    ctx.fillStyle = backgroundColor;
-    ctx.fill();
-
     // 使用圆角路径作为裁剪区域
     ctx.clip();
-
+    
     // 绘制内容
     ctx.drawImage(canvas, padding, padding);
 

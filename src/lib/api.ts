@@ -236,9 +236,6 @@ export async function getLabels(owner: string, repo: string): Promise<Label[] | 
 
 export async function saveLabel(owner: string, repo: string, label: Label): Promise<boolean> {
   try {
-    console.log('=== saveLabel called ===');
-    console.log('Parameters:', { owner, repo, label });
-    
     const response = await fetch('/api/supabase/labels', {
       method: 'POST',
       headers: {
@@ -247,12 +244,9 @@ export async function saveLabel(owner: string, repo: string, label: Label): Prom
       body: JSON.stringify({ owner, repo, label }),
     });
 
-    console.log('API Response status:', response.status);
-    const responseData = await response.json();
-    console.log('API Response data:', responseData);
-
     if (!response.ok) {
-      console.error('Failed to save label:', {
+      const responseData = await response.json();
+      console.error(`Failed to save label "${label.name}":`, {
         status: response.status,
         statusText: response.statusText,
         data: responseData
@@ -262,11 +256,9 @@ export async function saveLabel(owner: string, repo: string, label: Label): Prom
 
     // 清除相关缓存
     cacheManager?.remove(CACHE_KEYS.LABELS(owner, repo));
-    console.log('Label saved successfully and cache cleared');
-    
     return true;
   } catch (error) {
-    console.error('Error in saveLabel:', error);
+    console.error(`Error saving label "${label.name}":`, error);
     return false;
   }
 }

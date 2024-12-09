@@ -77,7 +77,6 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       }));
 
       // 保存标签到数据库
-      console.log(`Saving ${labels.length} labels to database...`);
       let savedLabels = 0;
       let failedLabels = 0;
       for (const label of labels) {
@@ -87,15 +86,17 @@ export function IssueProvider({ children }: { children: ReactNode }) {
             savedLabels++;
           } else {
             failedLabels++;
-            console.error(`Failed to save label: ${label.name}`);
           }
         } catch (error) {
           failedLabels++;
-          console.error(`Error saving label ${label.name}:`, error);
         }
       }
 
-      console.log(`Synced ${labels.length} labels from GitHub to database (${savedLabels} saved, ${failedLabels} failed)`);
+      if (failedLabels > 0) {
+        console.log(`Synced ${labels.length} labels: ${savedLabels} succeeded, ${failedLabels} failed`);
+      } else {
+        console.log(`Successfully synced ${labels.length} labels`);
+      }
 
       // 清除标签缓存
       if (configRef.current) {

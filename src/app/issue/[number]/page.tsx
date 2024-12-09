@@ -54,19 +54,14 @@ export default function IssuePage({ params }: PageProps) {
 
   if (!issue) {
     return (
-      <PageLayout showFooter={true} showSearchAndNew={false} className="pt-24 md:pt-28">
-        <div>
-          <div className="mb-6">
-            <div className="h-[40px]"></div>
-          </div>
-          <Loading />
-        </div>
+      <PageLayout showFooter={true} showSearchAndNew={false}>
+        <Loading/>
       </PageLayout>
     );
   }
 
   return (
-    <PageLayout showFooter={true} showSearchAndNew={false} className="pt-24 md:pt-28">
+    <PageLayout showFooter={true} showSearchAndNew={false}>
       <div className="animate-content-show">
         <div className="mb-6">
           <Button

@@ -49,8 +49,8 @@ export function ShareCard({ issue }: ShareCardProps) {
         
         <div className={`prose max-w-none ${
           isDark 
-            ? 'dark:prose-invert prose-pre:bg-[#2a2a2a] prose-code:text-white prose-p:text-gray-300 prose-headings:text-gray-100 prose-strong:text-gray-100 prose-em:text-gray-200 prose-blockquote:text-gray-300 prose-blockquote:border-gray-600' 
-            : 'prose-pre:bg-gray-100 prose-code:text-gray-900 prose-p:text-gray-600'
+            ? 'dark:prose-invert prose-pre:bg-bg-secondary dark:prose-pre:bg-bg-tertiary prose-code:text-text-primary dark:prose-code:text-text-primary' 
+            : 'prose-pre:bg-bg-secondary prose-code:text-text-primary'
         } prose-pre:p-4 prose-pre:rounded-lg prose-pre:my-4 prose-code:before:content-none prose-code:after:content-none prose-p:leading-relaxed bg-inherit`}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}

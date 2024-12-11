@@ -80,12 +80,12 @@ export const shareMarkdownComponents: Components = {
   li: ({ children, checked, ...props }: React.PropsWithChildren<ListItemProps>) => {
     if (typeof checked === 'boolean') {
       return (
-        <li {...props} className="list-none flex items-start gap-2 my-1">
+        <li {...props} className="list-none flex items-center gap-2 my-1">
           <input
             type="checkbox"
             checked={checked}
             readOnly
-            className="mt-1.5"
+            className="flex-none"
           />
           <span className="flex-1">{children}</span>
         </li>

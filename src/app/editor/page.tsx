@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { IssueEditor } from '@/components/issue-editor';
+import { IssueEditor } from '@/components/pages/issues/issue-editor';
 import { Issue } from '@/types/github';
 import { getIssue } from '@/lib/github';
 import { PageLayout } from '@/components/layouts/page-layout';

@@ -10,6 +10,7 @@ import { Backlinks } from '@/components/pages/backlinks';
 import { getLabelStyles } from '@/lib/colors';
 import { useState } from 'react';
 import { FormattedDate } from '@/components/layouts/formatted-date';
+import { useIssues } from '@/lib/contexts/issue-context';
 
 interface IssueCardProps {
   issue: Issue;
@@ -25,11 +26,14 @@ export function IssueCard({
   showStatus = true 
 }: IssueCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const { config } = useIssues();
 
   const toggleExpand = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsExpanded(!isExpanded);
   };
+
+  const githubIssueUrl = config ? `https://github.com/${config.owner}/${config.repo}/issues/${issue.number}` : '#';
 
   return (
     <div className="group border border-default rounded-lg shadow-card dark:shadow-card-dark hover:shadow-card-hover dark:hover:shadow-card-dark-hover transition-shadow">
@@ -79,25 +83,26 @@ export function IssueCard({
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
             {showStatus && (
-              <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${
-                issue.state === 'open'
-                  ? 'bg-[#dafbe1] text-[#1a7f37] dark:bg-[rgba(35,134,54,0.2)] dark:text-[#3fb950]'
-                  : 'bg-[#faf2f8] text-[#8250df] dark:bg-[rgba(130,80,223,0.2)] dark:text-[#a371f7]'
-              }`}>
-                <span className="relative flex w-2 h-2 mr-1.5">
-                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                    issue.state === 'open'
-                      ? 'bg-[#1a7f37] dark:bg-[#238636]'
-                      : 'bg-[#8250df] dark:bg-[#8250df]'
-                  }`}></span>
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${
-                    issue.state === 'open'
-                      ? 'bg-[#1a7f37] dark:bg-[#238636]'
-                      : 'bg-[#8250df] dark:bg-[#8250df]'
-                  }`}></span>
-                </span>
-                {issue.state}
-              </span>
+              <Link
+                href={githubIssueUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-text-secondary hover:text-text-primary transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  stroke="currentColor"
+                  fill="none"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+                </svg>
+              </Link>
             )}
             <Button
               variant="ghost"

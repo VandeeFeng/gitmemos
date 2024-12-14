@@ -1,15 +1,15 @@
 import { Issue } from '@/types/github';
 import Link from 'next/link';
-import { Button } from './ui/button';
+import { Button } from '@/components/ui/button';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
-import { markdownComponents } from './markdown-components';
-import { Backlinks } from './backlinks';
+import { markdownComponents } from '@/components/layouts/markdown-components';
+import { Backlinks } from '@/components/pages/backlinks';
 import { getLabelStyles } from '@/lib/colors';
 import { useState } from 'react';
-import { FormattedDate } from './formatted-date';
+import { FormattedDate } from '@/components/layouts/formatted-date';
 
 interface IssueCardProps {
   issue: Issue;

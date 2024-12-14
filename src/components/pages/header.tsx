@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { SearchBar } from './search-bar';
+import { SearchBar } from '@/components/pages/search-bar';
 import { Issue } from '@/types/github';
 import { useLabels } from '@/lib/contexts/label-context';
 import { 
@@ -12,7 +12,7 @@ import {
   ConfigButton,
   LogoButton,
   LabelFilterButton
-} from './ui/button';
+} from '@/components/ui/button';
 
 interface HeaderProps {
   onSearch?: (query: string) => void;

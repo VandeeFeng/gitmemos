@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import MDEditor from '@uiw/react-md-editor';
-import { Button } from './ui/button';
+import { Button } from '@/components/ui/button';
 import { EditableIssue, GitHubConfig } from '@/types/github';
 import { getGitHubConfig } from '@/lib/github';
 import { createIssue, updateIssue, createLabel } from '@/lib/github';

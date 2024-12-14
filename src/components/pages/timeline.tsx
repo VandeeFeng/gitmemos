@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { Issue } from '@/types/github';
-import { Button } from './ui/button';
-import { ActivityHeatmap } from './activity-heatmap';
-import { IssueCard } from './issue-card';
-import { FormattedDate } from './formatted-date';
-import { Loading } from './ui/loading';
+import { Button } from '@/components/ui/button';
+import { ActivityHeatmap } from '@/components/pages/activity-heatmap';
+import { IssueCard } from '@/components/pages/issues/issue-card';
+import { FormattedDate } from '@/components/layouts/formatted-date';
+import { Loading } from '@/components/ui/loading';
 
 interface TimelineProps {
   searchQuery: string;

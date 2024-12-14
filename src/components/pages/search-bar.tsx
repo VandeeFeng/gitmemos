@@ -1,6 +1,6 @@
 'use client';
 import { useState, ChangeEvent, useEffect, useRef } from 'react';
-import { Input } from "./ui/input";
+import { Input } from "@/components/ui/input";
 import { Issue } from '@/types/github';
 
 interface SearchBarProps {

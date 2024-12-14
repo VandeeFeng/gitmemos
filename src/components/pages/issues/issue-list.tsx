@@ -1,9 +1,9 @@
 'use client';
 
-import { Button } from './ui/button';
+import { Button } from '@/components/ui/button';
 import { Issue } from '@/types/github';
 import { IssueCard } from './issue-card';
-import { Loading } from './ui/loading';
+import { Loading } from '@/components/ui/loading';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useRef, useEffect } from 'react';
 

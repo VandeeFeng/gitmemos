@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Timeline } from '@/components/timeline';
+import { Timeline } from '@/components/pages/timeline';
 import { PageLayout } from '@/components/layouts/page-layout';
 import { Loading } from '@/components/ui/loading';
 import { animations } from '@/lib/animations';

@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { IssueList } from './issue-list';
-import { PageLayout } from './layouts/page-layout';
+import { IssueList } from '@/components/pages/issues/issue-list';
+import { PageLayout } from '@/components/layouts/page-layout';
 import { GitHubConfig, Issue } from '@/types/github';
 import { useIssues } from '@/lib/contexts/issue-context';
-import { ConfigDialog } from './config-dialog';
+import { ConfigDialog } from '@/components/pages/config-dialog';
 import { toast } from 'sonner';
 
 interface IssueListContainerProps {

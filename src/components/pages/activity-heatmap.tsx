@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Issue } from '@/types/github';
-import { FormattedDate } from './formatted-date';
+import { FormattedDate } from '@/components/layouts/formatted-date';
 
 interface ActivityHeatmapProps {
   issues: Issue[];

@@ -1,8 +1,8 @@
 'use client';
 
 import { cn } from "@/lib/utils"
-import { Header } from "@/components/header"
-import { Footer } from "@/components/footer"
+import { Header } from "@/components/pages/header"
+import { Footer } from "@/components/layouts/footer"
 import { usePathname } from 'next/navigation'
 import { Issue } from "@/types/github"
 

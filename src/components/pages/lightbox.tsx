@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Button } from './ui/button';
+import { Button } from '@/components/ui/button';
 import { Loading } from "@/components/ui/loading"
 
 interface LightboxProps {

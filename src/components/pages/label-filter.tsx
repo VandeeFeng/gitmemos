@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Label } from '@/types/github';
-import { Loading } from './ui/loading';
+import { Loading } from '@/components/ui/loading';
 
 interface LabelFilterProps {
   selectedLabel: string | null;

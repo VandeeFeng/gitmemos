@@ -3,7 +3,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
-import { FormattedDate } from "@/components/formatted-date";
+import { FormattedDate } from "@/components/layouts/formatted-date";
 import { shareMarkdownComponents } from "./share-markdown";
 import { useTheme } from 'next-themes';
 import { getLabelStyles } from '@/lib/colors';

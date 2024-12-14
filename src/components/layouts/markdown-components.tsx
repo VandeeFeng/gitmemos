@@ -1,6 +1,6 @@
 import type { Components } from 'react-markdown';
 import Link from 'next/link';
-import { Lightbox } from './lightbox';
+import { Lightbox } from '@/components/pages/lightbox';
 
 interface ListItemProps extends React.LiHTMLAttributes<HTMLLIElement> {
   checked?: boolean;

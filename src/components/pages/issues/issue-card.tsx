@@ -16,14 +16,12 @@ interface IssueCardProps {
   issue: Issue;
   selectedLabel: string | null;
   onLabelClick: (label: string) => void;
-  showStatus?: boolean;
 }
 
 export function IssueCard({ 
   issue, 
   selectedLabel, 
-  onLabelClick,
-  showStatus = true 
+  onLabelClick
 }: IssueCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const { config } = useIssues();

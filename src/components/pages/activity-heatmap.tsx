@@ -71,15 +71,17 @@ export function ActivityHeatmap({ issues, year, month, onDateClick }: ActivityHe
       
       // Calculate color intensity based on activity count
       let bgColor = 'bg-[#ebedf0] dark:bg-[#2d333b]';
+      let opacityClass = '';
       if (count > 0) {
         const intensity = Math.ceil((count / maxCount) * 4);
-        bgColor = `bg-[#0969da] dark:bg-[#2f81f7] opacity-${Math.min(intensity * 25, 100)}`;
+        bgColor = 'bg-[#0969da] dark:bg-[#2f81f7]';
+        opacityClass = `opacity-${Math.min(intensity * 25, 100)}`;
       }
       
       days.push(
         <div
           key={dateKey}
-          className={`w-3 h-3 rounded-sm ${bgColor} cursor-pointer transition-all hover:scale-110 hover:brightness-125 group relative`}
+          className={`w-3 h-3 rounded-sm ${bgColor} ${opacityClass} cursor-pointer transition-colors hover:!opacity-100 group relative`}
           onClick={() => onDateClick?.(dateKey)}
         >
           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block">

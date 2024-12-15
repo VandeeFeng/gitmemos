@@ -313,7 +313,7 @@ export async function checkSyncStatus(owner: string, repo: string): Promise<{
 
     const data = await response.json();
     return {
-      needsSync: !data.lastSyncAt || Date.now() - new Date(data.lastSyncAt).getTime() > 1000 * 60 * 60, // 1 hour
+      needsSync: !data.lastSyncAt || Date.now() - new Date(data.lastSyncAt).getTime() > 1000 * 60 * 60 * 24, // 24 hours
       lastSyncAt: data.lastSyncAt,
       status: data.status,
       issuesSynced: data.issuesSynced
@@ -323,4 +323,3 @@ export async function checkSyncStatus(owner: string, repo: string): Promise<{
     return null;
   }
 }
-  

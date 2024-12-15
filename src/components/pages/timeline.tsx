@@ -259,7 +259,6 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
                               issue={issue}
                               selectedLabel={selectedLabel}
                               onLabelClick={onLabelClick}
-                              showStatus={false}
                             />
                           ))}
                         </div>

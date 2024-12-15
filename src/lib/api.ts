@@ -306,18 +306,12 @@ export async function checkSyncStatus(owner: string, repo: string): Promise<{
 } | null> {
   try {
     const response = await fetch(`/api/supabase/sync?owner=${owner}&repo=${repo}`);
+    
     if (!response.ok) {
-      console.error('Failed to check sync status:', await response.text());
-      return null;
+      throw new Error('Failed to check sync status');
     }
-
-    const data = await response.json();
-    return {
-      needsSync: !data.lastSyncAt || Date.now() - new Date(data.lastSyncAt).getTime() > 1000 * 60 * 60 * 24, // 24 hours
-      lastSyncAt: data.lastSyncAt,
-      status: data.status,
-      issuesSynced: data.issuesSynced
-    };
+    
+    return response.json();
   } catch (error) {
     console.error('Error checking sync status:', error);
     return null;

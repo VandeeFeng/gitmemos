@@ -274,94 +274,9 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         // 检查同步状态
         const syncStatus = await checkSyncStatus(config.owner, config.repo);
         if (syncStatus?.lastSyncAt) {
-          const lastSyncTime = new Date(syncStatus.lastSyncAt).getTime();
-          const now = Date.now();
-          const hoursSinceLastSync = Math.round((now - lastSyncTime) / (1000 * 60 * 60));
           console.log(
-            `Last sync time: ${new Date(syncStatus.lastSyncAt).toLocaleString()} (${hoursSinceLastSync} hours ago)`
+            `Last sync time: ${new Date(syncStatus.lastSyncAt).toLocaleString()}`
           );
-        }
-
-        // 如果需要同步（超24小时或从未同步），自动同步
-        const needsSync = syncStatus?.needsSync ?? true;
-        if (needsSync) {
-          console.log('Auto syncing from GitHub API to database...');
-          try {
-            // 首先同步标签
-            const octokit = new Octokit({ auth: config.token });
-            console.log('Syncing labels from GitHub...');
-            const labelsResponse = await octokit.rest.issues.listLabelsForRepo({
-              owner: config.owner,
-              repo: config.repo,
-            });
-
-            const labels = labelsResponse.data.map(label => ({
-              id: label.id,
-              name: label.name,
-              color: label.color,
-              description: label.description,
-            }));
-
-            // 保存标签到数据库
-            console.log(`Saving ${labels.length} labels to database...`);
-            let savedLabels = 0;
-            let failedLabels = 0;
-            for (const label of labels) {
-              try {
-                const success = await saveLabel(config.owner, config.repo, label);
-                if (success) {
-                  savedLabels++;
-                } else {
-                  failedLabels++;
-                  console.error(`Failed to save label: ${label.name}`);
-                }
-              } catch (error) {
-                failedLabels++;
-                console.error(`Error saving label ${label.name}:`, error);
-              }
-            }
-
-            console.log(`Synced ${labels.length} labels from GitHub to database (${savedLabels} saved, ${failedLabels} failed)`);
-
-            // 清除标签缓存
-            cacheManager?.remove(CACHE_KEYS.LABELS(config.owner, config.repo));
-
-            // 然后同步 issues
-            const result = await getGitHubIssues(1, undefined, true, config);
-            console.log(`Synced ${result.issues.length} issues from GitHub to database`);
-          } catch (error) {
-            console.error('Error syncing from GitHub:', error);
-            // Record sync failure but don't throw - this is initialization
-            if (config) {
-              await recordSync(
-                config.owner,
-                config.repo,
-                'failed',
-                0,
-                error instanceof Error ? error.message : 'Unknown error'
-              );
-            }
-          }
-        }
-
-        // 检查缓存
-        const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');
-        const cached = cacheManager?.get<CacheData>(cacheKey);
-
-        if (cached?.issues && cached?.config) {
-          if (mounted) {
-            setState(prev => ({
-              ...prev,
-              issues: cached.issues,
-              config: cached.config,
-              loading: false,
-              initialized: true,
-              syncIssues,
-              updateIssues,
-              refreshIssues
-            }));
-          }
-          return;
         }
 
         // 从服务器获取数据
@@ -384,7 +299,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
             refreshIssues
           }));
 
-          cacheManager?.set(cacheKey, newState, { expiry: CACHE_EXPIRY.ISSUES });
+          cacheManager?.set(CACHE_KEYS.ISSUES(config.owner, config.repo, 1, ''), newState, { expiry: CACHE_EXPIRY.ISSUES });
         }
       } catch (error) {
         console.error('Error initializing data:', error);

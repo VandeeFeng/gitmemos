@@ -35,12 +35,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ needsSync: true, lastSyncAt: null });
     }
 
-    const lastSyncTime = new Date(data.last_sync_at).getTime();
-    const now = Date.now();
-    const hoursSinceLastSync = (now - lastSyncTime) / (1000 * 60 * 60);
-
     return NextResponse.json({
-      needsSync: data.status === 'failed' || hoursSinceLastSync >= 24,
+      needsSync: data.status === 'failed',
       lastSyncAt: data.last_sync_at,
       status: data.status,
       issuesSynced: data.issues_synced

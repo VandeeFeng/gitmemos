@@ -126,25 +126,10 @@ export async function getIssues(
     const cacheKey = CACHE_KEYS.ISSUES(owner, repo, page, labels?.join(','));
     const cached = cacheManager?.get<{ issues: Issue[]; total: number }>(cacheKey);
     
-    // 检查同步状态
+    // 获取同步状态
     const syncStatus = await checkSyncStatus(owner, repo);
-    const needsSync = syncStatus?.needsSync ?? true;
     
-    // 如果需要同步（超过24小时或从未同步）
-    if (needsSync) {
-      console.log('Auto syncing due to outdated or missing sync status...');
-      // 从 GitHub API 获取数据
-      const response = await fetch('/api/github/issues');
-      if (!response.ok) {
-        throw new Error('Failed to sync with GitHub');
-      }
-      // 清除缓存
-      cacheManager?.remove(cacheKey);
-    } else if (syncStatus?.lastSyncAt) {
-      console.log('Last sync time:', new Date(syncStatus.lastSyncAt).toLocaleString());
-    }
-    
-    if (cached && !needsSync) {
+    if (cached) {
       return {
         ...cached,
         lastSyncAt: syncStatus?.lastSyncAt || undefined

@@ -61,7 +61,8 @@ export async function GET(request: Request) {
       number: issue.issue_number,
       title: issue.title,
       body: issue.body || '',
-      created_at: issue.github_created_at,
+      created_at: issue.created_at,
+      github_created_at: issue.github_created_at,
       state: issue.state,
       labels: issue.labels.map((labelName: string) => {
         const labelInfo = labels_data?.find((l: Label) => l.name === labelName);

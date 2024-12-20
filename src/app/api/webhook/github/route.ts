@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
 import { headers } from 'next/headers';
 import crypto from 'crypto';
+import { Issue, Label } from '@/types/github';
+
+interface GitHubWebhookIssue extends Omit<Issue, 'labels'> {
+  labels: Label[];
+}
+
+interface GitHubWebhookLabel extends Label {}
 
 // 验证 GitHub webhook 签名
 function verifyGitHubWebhook(payload: string, signature: string): boolean {
@@ -98,7 +105,7 @@ export async function POST(request: Request) {
 
     try {
       if (eventType === 'issues') {
-        const issue = event.issue;
+        const issue = event.issue as GitHubWebhookIssue;
 
         // 准备要保存到 Supabase 的数据
         const issueData = {
@@ -108,7 +115,7 @@ export async function POST(request: Request) {
           title: issue.title,
           body: issue.body,
           state: issue.state,
-          labels: issue.labels.map((label: any) => label.name),
+          labels: issue.labels.map((label: Label) => label.name),
           github_created_at: issue.created_at,
           updated_at: new Date().toISOString()
         };

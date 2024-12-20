@@ -3,6 +3,7 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { headers } from 'next/headers';
 import crypto from 'crypto';
 import { Issue, Label } from '@/types/github';
+import { cacheManager, CACHE_KEYS } from '@/lib/cache';
 
 interface GitHubWebhookIssue extends Omit<Issue, 'labels'> {
   labels: Label[];
@@ -128,6 +129,12 @@ export async function POST(request: Request) {
         if (issueError) {
           throw issueError;
         }
+
+        // 清除相关缓存
+        const issuesListCacheKey = CACHE_KEYS.ISSUES(owner, repo, 1, '');
+        const singleIssueCacheKey = `issue:${owner}:${repo}:${issue.number}`;
+        cacheManager?.remove(issuesListCacheKey);
+        cacheManager?.remove(singleIssueCacheKey);
 
         // 记录成功的同步
         await recordSync(owner, repo, 'success', 1);

@@ -4,18 +4,17 @@ import { useState, useCallback, useEffect } from 'react';
 import { IssueList } from '@/components/pages/issues/issue-list';
 import { PageLayout } from '@/components/layouts/page-layout';
 import { GitHubConfig, Issue } from '@/types/github';
-import { useIssues } from '@/lib/contexts/issue-context';
 import { ConfigDialog } from '@/components/pages/config-dialog';
 import { toast } from 'sonner';
 
 interface IssueListContainerProps {
   initialIssues: Issue[];
   initialConfig: GitHubConfig;
+  onSync: () => Promise<{ success: boolean; totalSynced: number } | undefined>;
 }
 
-export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
-  const { issues: contextIssues, loading: contextLoading, syncIssues } = useIssues();
-  const [issues, setIssues] = useState<Issue[]>(contextIssues.length > 0 ? contextIssues : initialIssues);
+export function IssueListContainer({ initialIssues, onSync }: IssueListContainerProps) {
+  const [issues, setIssues] = useState<Issue[]>(Array.isArray(initialIssues) ? initialIssues : []);
   const [displayedIssues, setDisplayedIssues] = useState<Issue[]>([]);  // 用于显示的分页数据
   const [displayCount, setDisplayCount] = useState(10);  // 初始显示10条
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,16 +23,16 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
 
-  // Update local issues when context issues change
+  // Update local issues when initialIssues change
   useEffect(() => {
-    if (contextIssues.length > 0) {
-      setIssues(contextIssues);
+    if (Array.isArray(initialIssues)) {
+      setIssues(initialIssues);
     }
-  }, [contextIssues]);
+  }, [initialIssues]);
 
   // Update displayed issues when issues change or display count changes
   useEffect(() => {
-    const filtered = issues.filter((issue: Issue) => {
+    const filtered = Array.isArray(issues) ? issues.filter((issue: Issue) => {
       if (selectedLabel && !issue.labels.some((label: { name: string }) => label.name === selectedLabel)) {
         return false;
       }
@@ -50,7 +49,7 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
       }
       
       return true;
-    });
+    }) : [];
 
     setDisplayedIssues(filtered.slice(0, displayCount));
   }, [issues, displayCount, selectedLabel, searchQuery]);
@@ -58,7 +57,7 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
   const handleSync = useCallback(async () => {
     setLoading(true);
     try {
-      const result = await syncIssues();
+      const result = await onSync();
       if (result?.success) {
         toast.success(`Successfully synced ${result.totalSynced} issues from GitHub`);
       } else {
@@ -70,7 +69,7 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
     } finally {
       setLoading(false);
     }
-  }, [syncIssues]);
+  }, [onSync]);
 
   const handleLoadMore = useCallback(async () => {
     if (loadingMore) return;
@@ -92,7 +91,7 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
     setDisplayCount(10);  // 重置显示数量
   }, [selectedLabel]);
 
-  const filteredIssues = issues.filter((issue: Issue) => {
+  const filteredIssues = Array.isArray(issues) ? issues.filter((issue: Issue) => {
     if (selectedLabel && !issue.labels.some((label: { name: string }) => label.name === selectedLabel)) {
       return false;
     }
@@ -109,7 +108,7 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
     }
     
     return true;
-  });
+  }) : [];
 
   return (
     <>
@@ -129,7 +128,7 @@ export function IssueListContainer({ initialIssues }: IssueListContainerProps) {
             onLabelClick={handleLabelSelect}
             searchQuery={searchQuery}
             onLoadMore={handleLoadMore}
-            loading={loading || contextLoading}
+            loading={loading}
             hasMore={displayedIssues.length < filteredIssues.length}
             loadingMore={loadingMore}
           />

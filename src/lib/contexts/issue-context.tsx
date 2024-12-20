@@ -200,15 +200,10 @@ export function IssueProvider({ children }: { children: ReactNode }) {
   const updateIssues = useCallback((newIssues: Issue[]) => {
     if (!configRef.current) return;
     
-    const newState: CacheData = {
-      issues: newIssues,
-      config: configRef.current,
-    };
-
     setState(prev => ({ ...prev, issues: newIssues }));
     cacheManager?.set(
       CACHE_KEYS.ISSUES(configRef.current.owner, configRef.current.repo, 1, ''),
-      newState,
+      { issues: newIssues },
       { expiry: CACHE_EXPIRY.ISSUES }
     );
   }, []);
@@ -220,14 +215,10 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     try {
       const result = await getIssuesFromApi(configRef.current.owner, configRef.current.repo);
       if (result?.issues) {
-        const newState: CacheData = {
-          issues: result.issues,
-          config: configRef.current,
-        };
         setState(prev => ({ ...prev, issues: result.issues }));
         cacheManager?.set(
           CACHE_KEYS.ISSUES(configRef.current.owner, configRef.current.repo, 1, ''),
-          newState,
+          { issues: result.issues },
           { expiry: CACHE_EXPIRY.ISSUES }
         );
       }
@@ -271,7 +262,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // 检查同步状态
+        // 检查��步状态
         const syncStatus = await checkSyncStatus(config.owner, config.repo);
         if (syncStatus?.lastSyncAt) {
           console.log(
@@ -283,14 +274,13 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         const issuesResult = await getGitHubIssues(1, undefined, false, config);
         
         if (mounted) {
-          const newState: CacheData = {
-            issues: issuesResult.issues,
-            config,
-          };
+          // 确保 issues 数组存在
+          const issues = Array.isArray(issuesResult.issues) ? issuesResult.issues : [];
+          console.log('Loaded issues:', { count: issues.length });
 
           setState(prev => ({
             ...prev,
-            issues: issuesResult.issues,
+            issues,
             config,
             loading: false,
             initialized: true,
@@ -299,7 +289,15 @@ export function IssueProvider({ children }: { children: ReactNode }) {
             refreshIssues
           }));
 
-          cacheManager?.set(CACHE_KEYS.ISSUES(config.owner, config.repo, 1, ''), newState, { expiry: CACHE_EXPIRY.ISSUES });
+          // 更新缓存
+          if (issues.length > 0) {
+            console.log('Updating cache with issues');
+            cacheManager?.set(
+              CACHE_KEYS.ISSUES(config.owner, config.repo, 1, ''),
+              { issues },
+              { expiry: CACHE_EXPIRY.ISSUES }
+            );
+          }
         }
       } catch (error) {
         console.error('Error initializing data:', error);

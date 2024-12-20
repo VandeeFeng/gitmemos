@@ -129,7 +129,8 @@ export async function getIssues(
     // 获取同步状态
     const syncStatus = await checkSyncStatus(owner, repo);
     
-    if (cached) {
+    if (cached?.issues && Array.isArray(cached.issues)) {
+      console.log('API: Using cached issues:', { count: cached.issues.length });
       return {
         ...cached,
         lastSyncAt: syncStatus?.lastSyncAt || undefined
@@ -146,18 +147,29 @@ export async function getIssues(
       params.set('labels', labels.join(','));
     }
 
+    console.log('API: Fetching issues from Supabase...');
     const response = await fetch(`/api/supabase/issues?${params}`);
     if (!response.ok) {
       throw new Error('Failed to fetch issues');
     }
 
     const data = await response.json();
+    console.log('API: Got issues from Supabase:', { count: data.issues?.length || 0 });
+    
+    // 确保数据格式正确
+    const issues = Array.isArray(data.issues) ? data.issues : [];
+    const total = typeof data.total === 'number' ? data.total : issues.length;
     
     // 缓存结果
-    cacheManager?.set(cacheKey, data, { expiry: CACHE_EXPIRY.ISSUES });
+    if (issues.length > 0) {
+      console.log('API: Caching issues');
+      const cacheData = { issues, total };
+      cacheManager?.set(cacheKey, cacheData, { expiry: CACHE_EXPIRY.ISSUES });
+    }
     
     return {
-      ...data,
+      issues,
+      total,
       lastSyncAt: syncStatus?.lastSyncAt || undefined
     };
   } catch (error) {

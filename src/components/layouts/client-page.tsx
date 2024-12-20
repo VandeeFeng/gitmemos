@@ -6,7 +6,7 @@ import { PageLayout } from '@/components/layouts/page-layout';
 import { Loading } from '@/components/ui/loading';
 
 export function ClientPage() {
-  const { issues, config, loading } = useIssues();
+  const { issues, config, loading, syncIssues } = useIssues();
 
   if (loading) {
     return (
@@ -20,6 +20,7 @@ export function ClientPage() {
     <IssueListContainer 
       initialIssues={issues}
       initialConfig={config!}
+      onSync={syncIssues}
     />
   );
 } 

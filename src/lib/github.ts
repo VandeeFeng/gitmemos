@@ -155,13 +155,18 @@ export async function getIssues(
   // If not force sync, check cache
   if (!forceSync) {
     const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, page, labels || '');
-    const cached = cacheManager?.get<Issue[]>(cacheKey);
+    const cached = cacheManager?.get<{ issues: Issue[] }>(cacheKey);
     
-    if (cached) {
+    console.log('Cache data:', cached);
+    
+    if (cached?.issues && Array.isArray(cached.issues)) {
+      console.log('Using cached issues:', { count: cached.issues.length });
       return {
-        issues: cached,
+        issues: cached.issues,
         syncStatus: null
       };
+    } else {
+      console.log('Invalid cache data, fetching from database...');
     }
 
     // Only check database when cache is empty (first load or expired cache)
@@ -170,12 +175,14 @@ export async function getIssues(
     const dbIssues = response?.issues || [];
     
     if (dbIssues.length > 0) {
-      console.log('Found data in database, updating cache...');
-      cacheManager?.set(cacheKey, dbIssues, { expiry: CACHE_EXPIRY.ISSUES });
+      console.log('Found data in database:', { count: dbIssues.length });
+      cacheManager?.set(cacheKey, { issues: dbIssues }, { expiry: CACHE_EXPIRY.ISSUES });
       return {
         issues: dbIssues,
         syncStatus: null
       };
+    } else {
+      console.log('No issues found in database');
     }
   }
 
@@ -224,7 +231,7 @@ export async function getIssues(
 
           // Update cache
           const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, page, labels || '');
-          cacheManager?.set(cacheKey, issues, { expiry: CACHE_EXPIRY.ISSUES });
+          cacheManager?.set(cacheKey, { issues }, { expiry: CACHE_EXPIRY.ISSUES });
 
           // Record successful sync
           await recordSync(config.owner, config.repo, 'success', issues.length);
@@ -271,7 +278,7 @@ export async function getIssues(
       // Update cache with database data
       if (issues.length > 0) {
         const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, page, labels || '');
-        cacheManager?.set(cacheKey, issues, { expiry: CACHE_EXPIRY.ISSUES });
+        cacheManager?.set(cacheKey, { issues }, { expiry: CACHE_EXPIRY.ISSUES });
         console.log(`[${requestId}] Updated cache with database data`);
       }
       

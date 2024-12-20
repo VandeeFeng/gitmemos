@@ -106,18 +106,31 @@ export async function POST(request: Request) {
       if (eventType === 'issues') {
         const issue = event.issue as GitHubWebhookIssue;
 
+        // 验证必要字段
+        if (!issue.number || !issue.title || !issue.state) {
+          console.error('Missing required issue fields:', issue);
+          throw new Error('Missing required issue fields');
+        }
+
+        const now = new Date().toISOString();
+
         // 准备要保存到 Supabase 的数据
         const issueData = {
-          owner,
-          repo,
-          issue_number: issue.number,
-          title: issue.title,
-          body: issue.body,
-          state: issue.state,
-          labels: issue.labels.map((label: Label) => label.name),
-          github_created_at: issue.created_at,
-          updated_at: new Date().toISOString()
+          owner: owner.trim(),
+          repo: repo.trim(),
+          issue_number: parseInt(issue.number.toString(), 10), // 确保是整数
+          title: issue.title.trim(),
+          body: issue.body?.trim() || '', // 确保 body 不为 null
+          state: issue.state.trim(),
+          labels: Array.isArray(issue.labels) 
+            ? issue.labels.map((label: Label) => label.name.trim())
+            : [],
+          github_created_at: new Date(issue.created_at).toISOString(), // 确保日期格式正确
+          created_at: now, // 添加 created_at 字段
+          updated_at: now
         };
+
+        console.log('Saving issue data to Supabase:', JSON.stringify(issueData, null, 2));
 
         // 保存到 Supabase
         const { error: issueError } = await supabaseServer
@@ -127,8 +140,18 @@ export async function POST(request: Request) {
           });
 
         if (issueError) {
+          console.error('Error saving issue to Supabase:', {
+            error: issueError,
+            data: issueData
+          });
           throw issueError;
         }
+
+        console.log('Successfully saved issue to Supabase:', {
+          owner,
+          repo,
+          issue_number: issue.number
+        });
 
         // 清除相关缓存
         const issuesListCacheKey = CACHE_KEYS.ISSUES(owner, repo, 1, '');

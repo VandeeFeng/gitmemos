@@ -8,8 +8,6 @@ interface GitHubWebhookIssue extends Omit<Issue, 'labels'> {
   labels: Label[];
 }
 
-interface GitHubWebhookLabel extends Label {}
-
 // 验证 GitHub webhook 签名
 function verifyGitHubWebhook(payload: string, signature: string): boolean {
   const secret = process.env.GITHUB_WEBHOOK_SECRET;
@@ -134,7 +132,7 @@ export async function POST(request: Request) {
         // 记录成功的同步
         await recordSync(owner, repo, 'success', 1);
       } else if (eventType === 'label') {
-        const label = event.label;
+        const label = event.label as Label;
         const action = event.action;
 
         if (action === 'deleted') {

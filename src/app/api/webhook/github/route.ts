@@ -114,6 +114,15 @@ export async function POST(request: Request) {
 
         const now = new Date().toISOString();
 
+        // 检查 issue 是否已存在
+        const { data: existingIssue } = await supabaseServer
+          .from('issues')
+          .select('id, created_at')
+          .eq('owner', owner)
+          .eq('repo', repo)
+          .eq('issue_number', issue.number)
+          .single();
+
         // 准备要保存到 Supabase 的数据
         const issueData = {
           owner,
@@ -124,7 +133,7 @@ export async function POST(request: Request) {
           state: issue.state,
           labels: issue.labels.map((label: Label) => label.name),
           github_created_at: issue.created_at,
-          created_at: now,
+          ...(existingIssue ? {} : { created_at: now }), // 只在新建时设置 created_at
           updated_at: now
         };
 

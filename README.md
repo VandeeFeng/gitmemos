@@ -73,4 +73,5 @@
 - [x] 登录功能
 - [x] TimeLine
 - [x] 分享功能
+- [x] 实时更新，配置了GitHub webhook
 - [ ] 移动端适配

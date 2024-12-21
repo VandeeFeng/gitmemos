@@ -8,7 +8,7 @@
 
 部署到 Vercel 时填写必要的环境变量即可默认显示自己仓库的 issues 数据。
 
-如果想显示其他仓库，现在只是提供了一个 简单的 GitHub Config 来配置仓库和 API，数据保存在 LocalStorage。会优先获取环境变量的账号数据，其次是 config 。具体的登录功能没有继续往下了。
+如果想显示其他仓库，现在只是提供了一个 简单的 GitHub Config 来配置仓库和 API，数据保存在 supabase 中。会优先获取环境变量的账号数据，具体的登录功能没有继续往下了。
 
 <img src="assets/GitMemo1.png" alt="1" width="80%" />
 

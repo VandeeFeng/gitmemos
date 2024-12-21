@@ -140,18 +140,43 @@ export async function POST(request: Request) {
         console.log('Saving issue data to Supabase:', JSON.stringify(issueData, null, 2));
 
         // 使用 upsert 保存到 Supabase
-        const { error: issueError } = await supabaseServer
+        const { data: upsertData, error: issueError } = await supabaseServer
           .from('issues')
           .upsert(issueData, {
-            onConflict: 'unique_owner_repo_issue_number'
+            onConflict: 'issues_owner_repo_issue_number_key'
           });
 
         if (issueError) {
-          console.error('Error saving issue to Supabase:', {
-            error: issueError,
-            data: issueData,
-            constraint: 'unique_owner_repo_issue_number'
-          });
+          const errorDetails = {
+            error: {
+              message: issueError.message,
+              code: issueError.code,
+              details: issueError.details,
+              hint: issueError.hint
+            },
+            issueData: {
+              owner,
+              repo,
+              issue_number: issue.number,
+              title: issue.title
+            },
+            existingIssue: existingIssue ? {
+              id: existingIssue.id,
+              created_at: existingIssue.created_at
+            } : null
+          };
+          
+          console.error('Error saving issue to Supabase:', JSON.stringify(errorDetails, null, 2));
+          
+          // 记录失败的同步，包含详细错误信息
+          await recordSync(
+            owner,
+            repo,
+            'failed',
+            0,
+            `Failed to save issue: ${JSON.stringify(errorDetails)}`
+          );
+          
           throw issueError;
         }
 

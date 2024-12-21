@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import crypto from 'crypto';
 import { Issue, Label } from '@/types/github';
 import { Database } from '@/types/supabase';
+import { recordSync } from '@/lib/api';
 
 // GitHub webhook payload类型定义
 interface GitHubWebhookPayload {
@@ -115,20 +116,7 @@ export async function POST(request: Request) {
             throw new Error('Missing issue data');
           }
           await updateIssue(owner, repo, data.issue);
-          // 使用API记录同步历史
-          await fetch('/api/supabase/sync', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              owner,
-              repo,
-              status: 'success',
-              issuesSynced: 1,
-              sync_type: 'webhook'
-            }),
-          });
+          await recordSync(owner, repo, 'success', 1, undefined, 'webhook');
           break;
         
         case 'label':
@@ -165,20 +153,7 @@ export async function POST(request: Request) {
               }
             }
           }
-          // 使用API记录同步历史
-          await fetch('/api/supabase/sync', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              owner,
-              repo,
-              status: 'success',
-              issuesSynced: 1,
-              sync_type: 'webhook'
-            }),
-          });
+          await recordSync(owner, repo, 'success', 1, undefined, 'webhook');
           break;
 
         default:
@@ -193,22 +168,7 @@ export async function POST(request: Request) {
       console.error('Error processing webhook:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       
-      // 使用API记录同步失败
-      await fetch('/api/supabase/sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          owner,
-          repo,
-          status: 'failed',
-          issuesSynced: 0,
-          errorMessage,
-          sync_type: 'webhook'
-        }),
-      });
-
+      await recordSync(owner, repo, 'failed', 0, errorMessage, 'webhook');
       throw error;
     }
   } catch (error) {

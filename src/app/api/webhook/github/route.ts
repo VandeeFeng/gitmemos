@@ -33,6 +33,69 @@ function verifyGitHubWebhook(payload: string, signature: string): boolean {
   );
 }
 
+// 检查配置是否存在
+async function checkConfig(deliveryId: string | null, event: string | null, owner: string, repo: string) {
+  // 先尝试从环境变量获取配置
+  const envConfig = {
+    owner: process.env.GITHUB_OWNER,
+    repo: process.env.GITHUB_REPO,
+    token: process.env.GITHUB_TOKEN,
+    issues_per_page: 10
+  };
+
+  if (envConfig.owner && envConfig.repo && envConfig.token) {
+    return { config: envConfig };
+  }
+
+  // 如果环境变量不完整，从数据库获取配置
+  const { data: config, error: configError } = await supabaseServer
+    .from('configs')
+    .select('*')
+    .limit(1)
+    .single();
+
+  if (configError) {
+    return {
+      error: NextResponse.json(
+        {
+          error: 'Config check failed',
+          details: {
+            deliveryId,
+            message: `Failed to get config: ${configError.message}`,
+            code: configError.code,
+            hint: configError.hint,
+            details: configError.details,
+            event,
+            owner,
+            repo
+          }
+        },
+        { status: 500 }
+      )
+    };
+  }
+
+  if (!config && (!envConfig.owner || !envConfig.repo || !envConfig.token)) {
+    return {
+      error: NextResponse.json(
+        {
+          error: 'Config not found',
+          details: {
+            deliveryId,
+            message: 'No configuration found in database or environment',
+            event,
+            owner,
+            repo
+          }
+        },
+        { status: 500 }
+      )
+    };
+  }
+
+  return { config: config || envConfig };
+}
+
 export async function POST(request: Request) {
   try {
     const headersList = await headers();
@@ -124,62 +187,10 @@ export async function POST(request: Request) {
             );
           }
 
-          // 检查配置是否存在
-          const { data: existingConfig, error: configError } = await supabaseServer
-            .from('configs')
-            .select('id')
-            .eq('owner', owner)
-            .eq('repo', repo)
-            .single();
-
-          if (configError && configError.code !== 'PGRST116') {
-            return NextResponse.json(
-              {
-                error: 'Config check failed',
-                details: {
-                  deliveryId,
-                  message: `Failed to check config: ${configError.message}`,
-                  code: configError.code,
-                  hint: configError.hint,
-                  details: configError.details,
-                  event,
-                  owner,
-                  repo
-                }
-              },
-              { status: 500 }
-            );
-          }
-
-          // 如果配置不存在，创建一个新的配置
-          if (!existingConfig) {
-            const { error: createConfigError } = await supabaseServer
-              .from('configs')
-              .insert({
-                owner,
-                repo,
-                token: process.env.GITHUB_TOKEN || '',
-                issues_per_page: 30
-              });
-
-            if (createConfigError) {
-              return NextResponse.json(
-                {
-                  error: 'Config creation failed',
-                  details: {
-                    deliveryId,
-                    message: `Failed to create config: ${createConfigError.message}`,
-                    code: createConfigError.code,
-                    hint: createConfigError.hint,
-                    details: createConfigError.details,
-                    event,
-                    owner,
-                    repo
-                  }
-                },
-                { status: 500 }
-              );
-            }
+          // 检查配置
+          const configResult = await checkConfig(deliveryId, event, owner, repo);
+          if (configResult.error) {
+            return configResult.error;
           }
 
           // 保存 issue
@@ -284,62 +295,10 @@ export async function POST(request: Request) {
             );
           }
 
-          // 检查配置是否存在
-          const { data: existingLabelConfig, error: labelConfigError } = await supabaseServer
-            .from('configs')
-            .select('id')
-            .eq('owner', owner)
-            .eq('repo', repo)
-            .single();
-
-          if (labelConfigError && labelConfigError.code !== 'PGRST116') {
-            return NextResponse.json(
-              {
-                error: 'Config check failed',
-                details: {
-                  deliveryId,
-                  message: `Failed to check config: ${labelConfigError.message}`,
-                  code: labelConfigError.code,
-                  hint: labelConfigError.hint,
-                  details: labelConfigError.details,
-                  event,
-                  owner,
-                  repo
-                }
-              },
-              { status: 500 }
-            );
-          }
-
-          // 如果配置不存在，创建一个新的配置
-          if (!existingLabelConfig) {
-            const { error: createConfigError } = await supabaseServer
-              .from('configs')
-              .insert({
-                owner,
-                repo,
-                token: process.env.GITHUB_TOKEN || '',
-                issues_per_page: 30
-              });
-
-            if (createConfigError) {
-              return NextResponse.json(
-                {
-                  error: 'Config creation failed',
-                  details: {
-                    deliveryId,
-                    message: `Failed to create config: ${createConfigError.message}`,
-                    code: createConfigError.code,
-                    hint: createConfigError.hint,
-                    details: createConfigError.details,
-                    event,
-                    owner,
-                    repo
-                  }
-                },
-                { status: 500 }
-              );
-            }
+          // 检查配置
+          const labelConfigResult = await checkConfig(deliveryId, event, owner, repo);
+          if (labelConfigResult.error) {
+            return labelConfigResult.error;
           }
 
           // 存 label

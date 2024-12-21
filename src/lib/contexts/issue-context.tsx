@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { Issue, GitHubConfig } from '@/types/github';
 import { getIssues as getGitHubIssues, getGitHubConfig } from '@/lib/github';
-import { checkSyncStatus, recordSync, saveIssue, saveLabel, saveIssues } from '@/lib/api';
+import { checkSyncStatus, recordSync, saveLabel, saveIssues } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 import { getIssues as getIssuesFromApi } from '@/lib/api';
 import { Octokit } from 'octokit';

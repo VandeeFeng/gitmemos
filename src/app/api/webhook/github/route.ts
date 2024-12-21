@@ -143,7 +143,7 @@ export async function POST(request: Request) {
         const { error: issueError } = await supabaseServer
           .from('issues')
           .upsert(issueData, {
-            onConflict: 'issues_owner_repo_issue_number_key'
+            onConflict: 'owner,repo,issue_number'
           });
 
         if (issueError) {

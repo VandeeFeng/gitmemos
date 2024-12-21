@@ -4,7 +4,7 @@ import { headers } from 'next/headers';
 import crypto from 'crypto';
 import { Issue, Label } from '@/types/github';
 import { Database } from '@/types/supabase';
-import { recordSync } from '@/lib/api';
+import { recordSync, saveIssue } from '@/lib/api';
 
 // GitHub webhook payload类型定义
 interface GitHubWebhookPayload {
@@ -32,52 +32,6 @@ function verifyGitHubWebhook(payload: string, signature: string): boolean {
     Buffer.from(signature),
     Buffer.from(calculatedSignature)
   );
-}
-
-// 更新issue记录
-async function updateIssue(owner: string, repo: string, githubIssue: Issue) {
-  const { data: existingIssue } = await supabaseServer
-    .from('issues')
-    .select('*')
-    .eq('owner', owner)
-    .eq('repo', repo)
-    .eq('issue_number', githubIssue.number)
-    .single();
-
-  const issueData: Database['public']['Tables']['issues']['Insert'] = {
-    owner,
-    repo,
-    issue_number: githubIssue.number,
-    title: githubIssue.title,
-    body: githubIssue.body,
-    state: githubIssue.state,
-    labels: githubIssue.labels.map(label => label.name),
-    github_created_at: githubIssue.created_at,
-    updated_at: new Date().toISOString()
-  };
-
-  if (!existingIssue) {
-    const { error: insertError } = await supabaseServer
-      .from('issues')
-      .insert([issueData]);
-
-    if (insertError) {
-      console.error('Error inserting issue:', insertError);
-      throw insertError;
-    }
-  } else {
-    const { error: updateError } = await supabaseServer
-      .from('issues')
-      .update(issueData)
-      .eq('owner', owner)
-      .eq('repo', repo)
-      .eq('issue_number', githubIssue.number);
-
-    if (updateError) {
-      console.error('Error updating issue:', updateError);
-      throw updateError;
-    }
-  }
 }
 
 export async function POST(request: Request) {
@@ -115,7 +69,7 @@ export async function POST(request: Request) {
           if (!data.issue) {
             throw new Error('Missing issue data');
           }
-          await updateIssue(owner, repo, data.issue);
+          await saveIssue(owner, repo, data.issue);
           await recordSync(owner, repo, 'success', 1, undefined, 'webhook');
           break;
         

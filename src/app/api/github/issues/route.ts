@@ -94,6 +94,7 @@ export async function GET(request: Request) {
           title: data.title,
           body: data.body || '',
           created_at: data.created_at,
+          github_created_at: data.created_at,
           state: data.state,
           labels: data.labels
             .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
@@ -149,6 +150,7 @@ export async function GET(request: Request) {
           title: issue.title,
           body: issue.body || '',
           created_at: issue.created_at,
+          github_created_at: issue.created_at,
           state: issue.state,
           labels: issue.labels
             .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
@@ -224,6 +226,7 @@ export async function POST(request: Request) {
         title: data.title,
         body: data.body || '',
         created_at: data.created_at,
+        github_created_at: data.created_at,
         state: data.state,
         labels: data.labels
           .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
@@ -297,6 +300,7 @@ export async function PATCH(request: Request) {
         title: data.title,
         body: data.body || '',
         created_at: data.created_at,
+        github_created_at: data.created_at,
         state: data.state,
         labels: data.labels
           .filter((label): label is { id: number; name: string; color: string; description: string | null } => 

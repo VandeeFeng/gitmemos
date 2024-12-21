@@ -130,6 +130,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         title: issue.title,
         body: issue.body || '',
         created_at: issue.created_at,
+        github_created_at: issue.created_at,
         state: issue.state,
         labels: issue.labels
           .filter((label): label is { id: number; name: string; color: string; description: string | null } => 

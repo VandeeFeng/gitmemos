@@ -43,22 +43,19 @@ async function checkConfig(deliveryId: string | null, event: string | null, owne
     issues_per_page: 10
   };
 
-  // 如果环境变量配置完整且匹配，直接使用
-  if (envConfig.owner === owner && 
-      envConfig.repo === repo && 
+  // 如果环境变量配置完整且匹配（不区分大小写），直接使用
+  if (envConfig.owner?.toLowerCase() === owner.toLowerCase() && 
+      envConfig.repo?.toLowerCase() === repo.toLowerCase() && 
       envConfig.token) {
     return { config: envConfig };
   }
 
   // 如果环境变量配置不完整或不匹配，检查数据库
-  const { data: existingConfig, error: configError } = await supabaseServer
+  const { data: configs, error: configError } = await supabaseServer
     .from('configs')
-    .select('*')
-    .eq('owner', owner)
-    .eq('repo', repo)
-    .single();
+    .select('*');
 
-  if (configError && configError.code !== 'PGRST116') {
+  if (configError) {
     return {
       error: NextResponse.json(
         {
@@ -79,6 +76,13 @@ async function checkConfig(deliveryId: string | null, event: string | null, owne
     };
   }
 
+  // 不区分大小写查找匹配的配置
+  const existingConfig = configs?.find(
+    config => 
+      config.owner.toLowerCase() === owner.toLowerCase() && 
+      config.repo.toLowerCase() === repo.toLowerCase()
+  );
+
   if (!existingConfig) {
     return {
       error: NextResponse.json(
@@ -89,7 +93,9 @@ async function checkConfig(deliveryId: string | null, event: string | null, owne
             message: 'No valid configuration found for this repository',
             event,
             owner,
-            repo
+            repo,
+            envOwner: envConfig.owner,  // 添加更多调试信息
+            envRepo: envConfig.repo
           }
         },
         { status: 400 }

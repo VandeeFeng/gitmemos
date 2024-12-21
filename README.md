@@ -61,11 +61,20 @@
    npm run dev
    ```
 
-## GitHub Token 设置
+## GitHub 配置
+### GitHub Token 设置
 
-1. 访问 [GitHub Token 设置页面](https://github.com/settings/tokens)
+1. 访问仓库，点击 `Settings` -> `Developer settings` -> `Personal access tokens` -> `Generate new token`
 2. 生成新的 token，找到仓库，勾选 `issue` 读写权限
 3. 将 token 添加到 `.env.local` 文件中
+
+### GitHub webhook 设置
+1. 访问仓库，点击 `Settings` -> `Webhooks` -> `Add webhook`
+2. 填写 `Payload URL` 为 `https://your-vercel-app-url/api/webhook/github`
+3. 选择 `Content type` 为 `application/json`
+4. 选择 `Secret` 为 `your_secret_key`，这个 secret 需要和 `.env.local`的`GITHUB_WEBHOOK_SECRET` 的 secret 一致
+5. 选择 `Which events would you like to trigger this webhook?` 为 `Issues`、`Labels`
+6. 点击 `Add webhook`
 
 ## Supabase 设置
 参考 [doc/supabase_SQL.md](./doc/supabase_SQL.md)

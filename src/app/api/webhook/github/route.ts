@@ -140,7 +140,7 @@ export async function POST(request: Request) {
               ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: now }),
               updated_at: now
             }, {
-              onConflict: 'owner,repo,issue_number'
+              onConflict: 'issues_issue_number_key'
             });
 
           if (saveError) {
@@ -225,7 +225,7 @@ export async function POST(request: Request) {
             );
           }
 
-          // ���存 label
+          // 存 label
           const { error: labelError } = await supabaseServer
             .from('labels')
             .upsert({

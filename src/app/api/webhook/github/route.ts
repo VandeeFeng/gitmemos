@@ -197,38 +197,6 @@ export async function POST(request: Request) {
             throw new Error('Missing issue data in webhook payload');
           }
 
-          // 先检查 issue 是否已存在
-          const { data: existingIssue, error: checkError } = await supabaseServer
-            .from('issues')
-            .select('id, created_at')
-            .eq('owner', owner)
-            .eq('repo', repo)
-            .eq('issue_number', data.issue.number)
-            .single();
-
-          if (checkError && checkError.code !== 'PGRST116') {
-            return NextResponse.json(
-              {
-                error: 'Database check failed',
-                details: {
-                  deliveryId,
-                  message: `Failed to check existing issue: ${checkError.message}`,
-                  code: checkError.code,
-                  hint: checkError.hint,
-                  details: checkError.details,
-                  event,
-                  owner,
-                  repo,
-                  issue: {
-                    number: data.issue.number,
-                    title: data.issue.title
-                  }
-                }
-              },
-              { status: 500 }
-            );
-          }
-
           // 检查配置
           const configResult = await checkConfig(deliveryId, event, owner, repo);
           if (configResult.error) {

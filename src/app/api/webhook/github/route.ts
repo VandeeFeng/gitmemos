@@ -43,60 +43,15 @@ async function checkConfig(deliveryId: string | null, event: string | null, owne
     issues_per_page: 10
   };
 
-  if (envConfig.owner && envConfig.repo && envConfig.token) {
-    // 如果使用环境变量配置，确保在数据库中也有对应的配置
-    const { data: existingConfig, error: configError } = await supabaseServer
-      .from('configs')
-      .select('*')
-      .eq('owner', envConfig.owner)
-      .eq('repo', envConfig.repo)
-      .single();
-
-    if (!existingConfig && !configError) {
-      // 如果配置不存在，创建一个新的配置
-      const { error: insertError } = await supabaseServer
-        .from('configs')
-        .insert({
-          owner: envConfig.owner,
-          repo: envConfig.repo,
-          token: envConfig.token,
-          issues_per_page: envConfig.issues_per_page
-        });
-
-      if (insertError) {
-        return {
-          error: NextResponse.json(
-            {
-              error: 'Config creation failed',
-              details: {
-                deliveryId,
-                message: `Failed to create config: ${insertError.message}`,
-                code: insertError.code,
-                hint: insertError.hint,
-                details: insertError.details,
-                event,
-                owner,
-                repo
-              }
-            },
-            { status: 500 }
-          )
-        };
-      }
-    }
-
-    return { config: envConfig };
-  }
-
-  // 如果环境变量不完整，从数据库获取配置
-  const { data: config, error: configError } = await supabaseServer
+  // 检查数据库中是否已存在配置
+  const { data: existingConfig, error: configError } = await supabaseServer
     .from('configs')
     .select('*')
     .eq('owner', owner)
     .eq('repo', repo)
     .single();
 
-  if (configError) {
+  if (configError && configError.code !== 'PGRST116') {
     return {
       error: NextResponse.json(
         {
@@ -117,25 +72,61 @@ async function checkConfig(deliveryId: string | null, event: string | null, owne
     };
   }
 
-  if (!config && (!envConfig.owner || !envConfig.repo || !envConfig.token)) {
+  // 如果数据库中没有配置，但环境变量配置匹配，则创建配置
+  if (!existingConfig && envConfig.owner === owner && envConfig.repo === repo && envConfig.token) {
+    const { error: insertError } = await supabaseServer
+      .from('configs')
+      .insert({
+        owner: envConfig.owner,
+        repo: envConfig.repo,
+        token: envConfig.token,
+        issues_per_page: envConfig.issues_per_page
+      });
+
+    if (insertError) {
+      return {
+        error: NextResponse.json(
+          {
+            error: 'Config creation failed',
+            details: {
+              deliveryId,
+              message: `Failed to create config: ${insertError.message}`,
+              code: insertError.code,
+              hint: insertError.hint,
+              details: insertError.details,
+              event,
+              owner,
+              repo
+            }
+          },
+          { status: 500 }
+        )
+      };
+    }
+
+    return { config: envConfig };
+  }
+
+  if (!existingConfig) {
     return {
       error: NextResponse.json(
         {
           error: 'Config not found',
           details: {
             deliveryId,
-            message: 'No configuration found in database or environment',
+            message: 'No configuration found for this repository',
             event,
             owner,
-            repo
+            repo,
+            suggestion: 'Please set up repository configuration first'
           }
         },
-        { status: 500 }
+        { status: 400 }
       )
     };
   }
 
-  return { config: config || envConfig };
+  return { config: existingConfig };
 }
 
 export async function POST(request: Request) {
@@ -203,23 +194,51 @@ export async function POST(request: Request) {
             return configResult.error;
           }
 
-          // 保存 issue
-          const now = new Date().toISOString();
-          const { error: saveError } = await supabaseServer
+          // 先检查 issue 是否已存在
+          const { data: existingIssue } = await supabaseServer
             .from('issues')
-            .upsert({
-              owner,
-              repo,
-              issue_number: data.issue.number,
-              title: data.issue.title,
-              body: data.issue.body || '',
-              state: data.issue.state,
-              labels: data.issue.labels.map(label => label.name),
-              github_created_at: data.issue.created_at,
-              updated_at: now
-            }, {
-              onConflict: 'owner,repo,issue_number'
-            });
+            .select('*')
+            .eq('owner', owner)
+            .eq('repo', repo)
+            .eq('issue_number', data.issue.number)
+            .single();
+
+          const now = new Date().toISOString();
+          
+          let saveError;
+          if (existingIssue) {
+            // 如果issue存在，只更新可能发生变化的字段
+            const { error } = await supabaseServer
+              .from('issues')
+              .update({
+                title: data.issue.title,
+                body: data.issue.body || '',
+                state: data.issue.state,
+                labels: data.issue.labels.map(label => label.name),
+                updated_at: now
+              })
+              .eq('owner', owner)
+              .eq('repo', repo)
+              .eq('issue_number', data.issue.number);
+            saveError = error;
+          } else {
+            // 如果issue不存在，创建新记录
+            const { error } = await supabaseServer
+              .from('issues')
+              .insert({
+                owner,
+                repo,
+                issue_number: data.issue.number,
+                title: data.issue.title,
+                body: data.issue.body || '',
+                state: data.issue.state,
+                labels: data.issue.labels.map(label => label.name),
+                github_created_at: data.issue.created_at,
+                created_at: now,
+                updated_at: now
+              });
+            saveError = error;
+          }
 
           if (saveError) {
             return NextResponse.json(

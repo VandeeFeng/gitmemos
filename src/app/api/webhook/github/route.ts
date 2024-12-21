@@ -2,14 +2,8 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
 import { headers } from 'next/headers';
 import crypto from 'crypto';
-import { Issue, Label } from '@/types/github';
-import { cacheManager, CACHE_KEYS } from '@/lib/cache';
 
-interface GitHubWebhookIssue extends Omit<Issue, 'labels'> {
-  labels: Label[];
-}
-
-// 验证 GitHub webhook 签名
+// 验证GitHub webhook签名
 function verifyGitHubWebhook(payload: string, signature: string): boolean {
   const secret = process.env.GITHUB_WEBHOOK_SECRET;
   if (!secret) {
@@ -18,247 +12,194 @@ function verifyGitHubWebhook(payload: string, signature: string): boolean {
   }
 
   const hmac = crypto.createHmac('sha256', secret);
-  const digest = hmac.update(payload).digest('hex');
-  const calculatedSignature = `sha256=${digest}`;
-
+  const calculatedSignature = 'sha256=' + hmac.update(payload).digest('hex');
   return crypto.timingSafeEqual(
     Buffer.from(signature),
     Buffer.from(calculatedSignature)
   );
 }
 
-// 记录同步历史
-async function recordSync(
-  owner: string,
-  repo: string,
-  status: 'success' | 'failed',
-  issuesSynced: number,
-  errorMessage?: string,
-  sync_type: 'webhook' | 'full' = 'webhook'  // 默认为 webhook
-) {
-  try {
-    // 插入新记录
+// 更新issue记录
+async function updateIssue(owner: string, repo: string, issue: any) {
+  const { data: existingIssue, error: fetchError } = await supabaseServer
+    .from('issues')
+    .select('*')
+    .eq('owner', owner)
+    .eq('repo', repo)
+    .eq('issue_number', issue.number)
+    .single();
+
+  const issueData = {
+    owner,
+    repo,
+    issue_number: issue.number,
+    title: issue.title,
+    body: issue.body,
+    state: issue.state,
+    labels: issue.labels.map((label: any) => label.name),
+    github_created_at: issue.created_at,
+    updated_at: new Date().toISOString()
+  };
+
+  if (!existingIssue) {
     const { error: insertError } = await supabaseServer
-      .from('sync_history')
-      .insert({
-        owner,
-        repo,
-        status,
-        sync_type,
-        issues_synced: issuesSynced,
-        error_message: errorMessage,
-        last_sync_at: new Date().toISOString()
-      });
+      .from('issues')
+      .insert([issueData]);
 
     if (insertError) {
-      console.error('Error recording sync history:', insertError);
-      return;
+      console.error('Error inserting issue:', insertError);
+      throw insertError;
     }
-
-    // 清理旧记录
-    const { data: allRecords, error: selectError } = await supabaseServer
-      .from('sync_history')
-      .select('id, last_sync_at')
+  } else {
+    const { error: updateError } = await supabaseServer
+      .from('issues')
+      .update(issueData)
       .eq('owner', owner)
       .eq('repo', repo)
-      .order('last_sync_at', { ascending: false });
+      .eq('issue_number', issue.number);
 
-    if (selectError) {
-      console.error('Error fetching sync records:', selectError);
-      return;
+    if (updateError) {
+      console.error('Error updating issue:', updateError);
+      throw updateError;
     }
-
-    // 保留最近20条记录
-    if (allRecords && allRecords.length > 20) {
-      const recordsToDelete = allRecords.slice(20);
-      const idsToDelete = recordsToDelete.map(record => record.id);
-
-      const { error: deleteError } = await supabaseServer
-        .from('sync_history')
-        .delete()
-        .in('id', idsToDelete);
-
-      if (deleteError) {
-        console.error('Error cleaning up old sync records:', deleteError);
-      }
-    }
-  } catch (error) {
-    console.error('Error in recordSync:', error);
   }
 }
 
 export async function POST(request: Request) {
   try {
-    const payload = await request.text();
     const headersList = await headers();
     const signature = headersList.get('x-hub-signature-256');
-
-    // 验证 webhook 签名
-    if (!signature || !verifyGitHubWebhook(payload, signature)) {
-      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    const event = headersList.get('x-github-event');
+    
+    if (!signature) {
+      return NextResponse.json(
+        { error: 'Missing signature' },
+        { status: 400 }
+      );
     }
 
-    const event = JSON.parse(payload);
-    const eventType = headersList.get('x-github-event');
-    const repository = event.repository;
+    const payload = await request.text();
+    
+    // 验证webhook签名
+    if (!verifyGitHubWebhook(payload, signature)) {
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 401 }
+      );
+    }
+
+    const data = JSON.parse(payload);
+    const { repository } = data;
     const owner = repository.owner.login;
     const repo = repository.name;
 
+    // 处理不同类型的事件
     try {
-      if (eventType === 'issues') {
-        const issue = event.issue as GitHubWebhookIssue;
-
-        // 验证必要字段
-        if (!issue.number || !issue.title || !issue.state) {
-          console.error('Missing required issue fields:', issue);
-          throw new Error('Missing required issue fields');
-        }
-
-        // 检查 issue 是否已存在
-        const { data: existingIssue } = await supabaseServer
-          .from('issues')
-          .select('issue_number, created_at')
-          .eq('owner', owner)
-          .eq('repo', repo)
-          .eq('issue_number', issue.number)
-          .single();
-
-        const now = new Date().toISOString();
-
-        // 准备要保存到 Supabase 的数据
-        const issueData = {
-          owner,
-          repo,
-          issue_number: issue.number,
-          title: issue.title,
-          body: issue.body,
-          state: issue.state,
-          labels: issue.labels.map((label: Label) => label.name),
-          github_created_at: issue.created_at,
-          ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: now }),
-          updated_at: now
-        };
-
-        console.log('Saving issue data to Supabase:', JSON.stringify(issueData, null, 2));
-
-        // 使用 upsert 保存到 Supabase
-        const { error: issueError } = await supabaseServer
-          .from('issues')
-          .upsert(issueData, {
-            onConflict: 'owner,repo,issue_number'
+      switch (event) {
+        case 'issues':
+          await updateIssue(owner, repo, data.issue);
+          // 使用API记录同步历史
+          await fetch('/api/supabase/sync', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              owner,
+              repo,
+              status: 'success',
+              issuesSynced: 1,
+              sync_type: 'webhook'
+            }),
           });
+          break;
+        
+        case 'label':
+          // 当label变化时，我们需要更新所有包含该label的issue
+          if (data.label) {
+            const { data: affectedIssues, error: fetchError } = await supabaseServer
+              .from('issues')
+              .select('*')
+              .eq('owner', owner)
+              .eq('repo', repo)
+              .contains('labels', [data.label.name]);
 
-        if (issueError) {
-          const errorDetails = {
-            error: {
-              message: issueError.message,
-              code: issueError.code,
-              details: issueError.details,
-              hint: issueError.hint
+            if (fetchError) {
+              console.error('Error fetching affected issues:', fetchError);
+              throw fetchError;
+            }
+
+            // 更新每个受影响的issue
+            if (affectedIssues) {
+              for (const issue of affectedIssues) {
+                const { error: updateError } = await supabaseServer
+                  .from('issues')
+                  .update({
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('owner', owner)
+                  .eq('repo', repo)
+                  .eq('issue_number', issue.issue_number);
+
+                if (updateError) {
+                  console.error('Error updating issue:', updateError);
+                  throw updateError;
+                }
+              }
+            }
+          }
+          // 使用API记录同步历史
+          await fetch('/api/supabase/sync', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
             },
-            issueData: {
+            body: JSON.stringify({
               owner,
               repo,
-              issue_number: issue.number,
-              title: issue.title
-            },
-            existingIssue: existingIssue ? {
-              issue_number: existingIssue.issue_number,
-              created_at: existingIssue.created_at
-            } : null
-          };
-          
-          console.error('Error saving issue to Supabase:', JSON.stringify(errorDetails, null, 2));
-          
-          // 记录失败的同步，包含详细错误信息
-          await recordSync(
-            owner,
-            repo,
-            'failed',
-            0,
-            `Failed to save issue: ${JSON.stringify(errorDetails)}`,
-            'webhook'
+              status: 'success',
+              issuesSynced: 1,
+              sync_type: 'webhook'
+            }),
+          });
+          break;
+
+        default:
+          return NextResponse.json(
+            { error: 'Unsupported event type' },
+            { status: 400 }
           );
-          
-          throw issueError;
-        }
-
-        console.log('Successfully saved issue to Supabase:', {
-          owner,
-          repo,
-          issue_number: issue.number
-        });
-
-        // 清除相关缓存
-        const issuesListCacheKey = CACHE_KEYS.ISSUES(owner, repo, 1, '');
-        const singleIssueCacheKey = `issue:${owner}:${repo}:${issue.number}`;
-        cacheManager?.remove(issuesListCacheKey);
-        cacheManager?.remove(singleIssueCacheKey);
-
-        // 记录成功的同步
-        await recordSync(owner, repo, 'success', 1, undefined, 'webhook');
-      } else if (eventType === 'label') {
-        const label = event.label as Label;
-        const action = event.action;
-
-        if (action === 'deleted') {
-          // 删除标签
-          const { error: deleteError } = await supabaseServer
-            .from('labels')
-            .delete()
-            .match({
-              owner,
-              repo,
-              name: label.name
-            });
-
-          if (deleteError) {
-            throw deleteError;
-          }
-        } else {
-          // 创建或更新标签
-          const labelData = {
-            owner,
-            repo,
-            name: label.name,
-            color: label.color,
-            description: label.description,
-            updated_at: new Date().toISOString()
-          };
-
-          const { error: labelError } = await supabaseServer
-            .from('labels')
-            .upsert(labelData, {
-              onConflict: 'owner,repo,name',
-              ignoreDuplicates: false
-            });
-
-          if (labelError) {
-            throw labelError;
-          }
-        }
-
-        // 记录成功的同步
-        await recordSync(owner, repo, 'success', 0, undefined, 'webhook');
       }
 
       return NextResponse.json({ success: true });
     } catch (error) {
-      // 记录失败的同步
-      await recordSync(
-        owner,
-        repo,
-        'failed',
-        0,
-        error instanceof Error ? error.message : 'Unknown error',
-        'webhook'
-      );
+      console.error('Error processing webhook:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // 使用API记录同步失败
+      await fetch('/api/supabase/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          owner,
+          repo,
+          status: 'failed',
+          issuesSynced: 0,
+          errorMessage,
+          sync_type: 'webhook'
+        }),
+      });
+
       throw error;
     }
   } catch (error) {
     console.error('Webhook processing error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
     return NextResponse.json(
-      { error: 'Failed to process webhook' },
+      { error: errorMessage },
       { status: 500 }
     );
   }

@@ -25,10 +25,10 @@ create table issues (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
   -- 添加复合唯一约束，确保每个仓库的 issue_number 唯一
-  unique(owner, repo, issue_number)
+  constraint issues_owner_repo_issue_number_key unique(owner, repo, issue_number)
 );
 
--- 修��� labels 表，添加 owner 和 repo 字段
+-- 修改 labels 表，添加 owner 和 repo 字段
 create table labels (
   id bigint primary key generated always as identity,
   owner text not null,

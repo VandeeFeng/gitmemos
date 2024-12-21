@@ -35,7 +35,7 @@ function verifyGitHubWebhook(payload: string, signature: string): boolean {
 
 // 检查配置是否存在
 async function checkConfig(deliveryId: string | null, event: string | null, owner: string, repo: string) {
-  // 先尝试从环境变量获取配置
+  // 先检查环境变量配置
   const envConfig = {
     owner: process.env.GITHUB_OWNER,
     repo: process.env.GITHUB_REPO,
@@ -43,7 +43,14 @@ async function checkConfig(deliveryId: string | null, event: string | null, owne
     issues_per_page: 10
   };
 
-  // 检查数据库中是否已存在配置
+  // 如果环境变量配置完整且匹配，直接使用
+  if (envConfig.owner === owner && 
+      envConfig.repo === repo && 
+      envConfig.token) {
+    return { config: envConfig };
+  }
+
+  // 如果环境变量配置不完整或不匹配，检查数据库
   const { data: existingConfig, error: configError } = await supabaseServer
     .from('configs')
     .select('*')
@@ -72,41 +79,6 @@ async function checkConfig(deliveryId: string | null, event: string | null, owne
     };
   }
 
-  // 如果数据库中没有配置，但环境变量配置匹配，则创建配置
-  if (!existingConfig && envConfig.owner === owner && envConfig.repo === repo && envConfig.token) {
-    const { error: insertError } = await supabaseServer
-      .from('configs')
-      .insert({
-        owner: envConfig.owner,
-        repo: envConfig.repo,
-        token: envConfig.token,
-        issues_per_page: envConfig.issues_per_page
-      });
-
-    if (insertError) {
-      return {
-        error: NextResponse.json(
-          {
-            error: 'Config creation failed',
-            details: {
-              deliveryId,
-              message: `Failed to create config: ${insertError.message}`,
-              code: insertError.code,
-              hint: insertError.hint,
-              details: insertError.details,
-              event,
-              owner,
-              repo
-            }
-          },
-          { status: 500 }
-        )
-      };
-    }
-
-    return { config: envConfig };
-  }
-
   if (!existingConfig) {
     return {
       error: NextResponse.json(
@@ -114,11 +86,10 @@ async function checkConfig(deliveryId: string | null, event: string | null, owne
           error: 'Config not found',
           details: {
             deliveryId,
-            message: 'No configuration found for this repository',
+            message: 'No valid configuration found for this repository',
             event,
             owner,
-            repo,
-            suggestion: 'Please set up repository configuration first'
+            repo
           }
         },
         { status: 400 }
@@ -265,15 +236,15 @@ export async function POST(request: Request) {
             );
           }
 
-          // ���录同步历史
+          // 记录同步历史
           try {
             await recordSync(
               owner,
               repo,
               'success',
-              existingIssue ? 1 : 0,  // 如果是更新操作计数1，新增操作计数0
+              1,  // 每次webhook都是处理单个issue
               undefined,
-              existingIssue ? 'add' : 'full'  // 如果是更新操作使用'add'，新增操作使用'full'
+              'add'  // webhook总是增量更新
             );
           } catch (error) {
             console.error('Failed to record sync history:', error);

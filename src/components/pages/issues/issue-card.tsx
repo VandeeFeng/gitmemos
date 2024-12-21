@@ -53,7 +53,7 @@ export function IssueCard({
               <span>#{issue.number}</span>
               <span>·</span>
               <span>
-                <FormattedDate date={issue.created_at} />
+                <FormattedDate date={issue.github_created_at} />
               </span>
             </div>
             {issue.labels.length > 0 && (

@@ -80,7 +80,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
     };
   }, []);
 
-  // 添加日期点击处理函数
+  // 添加日期点击���理函数
   const handleDateClick = (dateKey: string) => {
     if (typeof window === 'undefined') return;
     
@@ -109,7 +109,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
 
   // Group issues by month and year, and then by day
   const groupedIssues = localIssues.reduce((groups: Record<string, Record<string, Issue[]>>, issue) => {
-    const date = new Date(issue.created_at);
+    const date = new Date(issue.github_created_at);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     const dayKey = date.toISOString().split('T')[0];
     
@@ -240,7 +240,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
 
                   // Sort issues within the day by creation time in descending order
                   const sortedIssues = [...filteredDayIssues].sort((a, b) => 
-                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+                    new Date(b.github_created_at).getTime() - new Date(a.github_created_at).getTime()
                   );
 
                   return (

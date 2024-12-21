@@ -10,6 +10,7 @@ export interface Issue {
   title: string;
   body: string | null;
   created_at: string;
+  github_created_at: string;
   state: string;
   labels: Label[];
 }

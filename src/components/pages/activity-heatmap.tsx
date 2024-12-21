@@ -39,7 +39,7 @@ export function ActivityHeatmap({ issues, year, month, onDateClick }: ActivityHe
     let max = 0;
 
     issues.forEach(issue => {
-      const date = new Date(issue.created_at);
+      const date = new Date(issue.github_created_at);
       const dateKey = date.toISOString().split('T')[0];
       
       if (!data[dateKey]) {

@@ -27,7 +27,7 @@ export function ShareCard({ issue }: ShareCardProps) {
             <span>#{issue.number}</span>
             <span>·</span>
             <span>
-              <FormattedDate date={issue.created_at} />
+              <FormattedDate date={issue.github_created_at} />
             </span>
           </div>
         </div>

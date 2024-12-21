@@ -70,6 +70,18 @@
 ## Supabase 设置
 参考 [doc/supabase_SQL.md](./doc/supabase_SQL.md)
 
+在 supabase 里有四个表，分别是 configs, issues, labels, sync_history
+
+configs 表是用来存储用户配置的，包括 owner, repo, password
+
+issues 表是用来存储 issues 的，包括 owner, repo, issue_number, title, body, state, labels, github_created_at, updated_at, created_at
+
+labels 表是用来存储 labels 的，包括 owner, repo, name, color, description, updated_at, created_at
+
+sync_history 表是用来存储同步历史的，包括 owner, repo, last_sync_at, issues_synced, status, error_message, created_at, updated_at
+
+这部分可以根据自己的需求进行修改，比如添加更多的字段，或者修改表结构。
+
 ## TODO
 - [x] 搜索功能 
 - [x] 数据库

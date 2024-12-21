@@ -291,7 +291,7 @@ export async function recordSync(
   status: SyncStatus,
   issuesSynced: number,
   errorMessage?: string,
-  sync_type: 'webhook' | 'full' = 'full'
+  sync_type: 'webhook' | 'full' | 'add' = 'full'
 ): Promise<boolean> {
   try {
     const response = await fetch('/api/supabase/sync', {

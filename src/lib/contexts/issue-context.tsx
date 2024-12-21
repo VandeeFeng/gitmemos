@@ -114,21 +114,33 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         cacheManager?.remove(CACHE_KEYS.LABELS(configRef.current.owner, configRef.current.repo));
       }
 
-      // 然后同步 issues
-      const { data } = await octokit.rest.issues.listForRepo({
+      // 获取上次同步状态
+      const syncStatus = await checkSyncStatus(configRef.current.owner, configRef.current.repo);
+      const isFullSync = !syncStatus?.lastSyncAt;
+
+      // 同步 issues
+      console.log(isFullSync ? 'Performing full sync...' : `Performing incremental sync since ${syncStatus.lastSyncAt}`);
+      
+      const params: any = {
         owner: configRef.current.owner,
         repo: configRef.current.repo,
         state: 'all',
         per_page: configRef.current.issuesPerPage || 50,
         page: 1,
-        sort: 'created',
+        sort: 'updated',
         direction: 'desc'
-      });
+      };
+
+      if (!isFullSync && syncStatus?.lastSyncAt) {
+        params.since = syncStatus.lastSyncAt;
+      }
+
+      const { data } = await octokit.rest.issues.listForRepo(params);
 
       const issues = data.map(issue => ({
         number: issue.number,
         title: issue.title,
-        body: issue.body || '',
+        body: issue.body ?? null,
         created_at: issue.created_at,
         github_created_at: issue.created_at,
         state: issue.state,
@@ -153,8 +165,16 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       setState(prev => {
         if (!prev.config) return prev;
 
+        // 如果是增量同步，合并现有issues和新issues
+        let updatedIssues = issues;
+        if (!isFullSync && prev.issues) {
+          const existingIssues = new Map(prev.issues.map(issue => [issue.number, issue]));
+          issues.forEach(issue => existingIssues.set(issue.number, issue));
+          updatedIssues = Array.from(existingIssues.values());
+        }
+
         const newState: CacheData = {
-          issues,
+          issues: updatedIssues,
           config: prev.config,
         };
         
@@ -166,7 +186,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
 
         return { 
           ...prev,
-          issues,
+          issues: updatedIssues,
           loading: false 
         };
       });
@@ -178,7 +198,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         'success',
         issues.length,
         undefined,
-        'full'
+        isFullSync ? 'full' : 'add'
       );
 
       console.log(`Synced ${issues.length} issues from GitHub to database`);

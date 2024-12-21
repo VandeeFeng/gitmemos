@@ -125,7 +125,8 @@ export async function getIssues(
   page: number = 1, 
   labels?: string, 
   forceSync: boolean = false,
-  existingConfig?: GitHubConfig
+  existingConfig?: GitHubConfig,
+  since?: string
 ) {
   const config = existingConfig || await getGitHubConfig();
 
@@ -195,24 +196,41 @@ export async function getIssues(
       // Check if GitHub API sync is needed
       const needsGitHubSync = await checkNeedsSync(config.owner, config.repo, forceSync);
 
-      if (needsGitHubSync) {
+      if (needsGitHubSync || forceSync) {
+        console.log(`[${requestId}] Syncing with GitHub...`);
         try {
-          console.log(`[${requestId}] Starting GitHub API sync...`);
-          
-          // Use Octokit for GitHub API calls
           const octokit = new Octokit({ auth: config.token });
-          const { data } = await octokit.rest.issues.listForRepo({
+
+          // 获取上次成功同步的时间
+          const syncStatus = await checkSyncStatus(config.owner, config.repo);
+          const lastSyncAt = syncStatus?.lastSyncAt;
+          
+          // 如果是增量同步且有上次同步时间，使用since参数
+          const params: any = {
             owner: config.owner,
             repo: config.repo,
             state: 'all',
-            per_page: config.issuesPerPage || 50,
+            per_page: 100,
             page,
-            sort: 'created',
-            direction: 'desc',
-            labels: labels || undefined
-          });
+            sort: 'updated', // 改为按更新时间排序
+            direction: 'desc'
+          };
+          
+          if (!forceSync && lastSyncAt && !labels) {
+            params.since = lastSyncAt;
+            console.log(`[${requestId}] Performing incremental sync since ${lastSyncAt}`);
+          } else {
+            console.log(`[${requestId}] Performing full sync`);
+          }
 
-          const issues = data.map(issue => ({
+          if (labels) {
+            params.labels = labels;
+          }
+
+          const { data: githubIssues } = await octokit.rest.issues.listForRepo(params);
+          
+          // 将GitHub API响应映射到我们的Issue类型
+          const issues = githubIssues.map(issue => ({
             number: issue.number,
             title: issue.title,
             body: issue.body || '',
@@ -229,13 +247,20 @@ export async function getIssues(
                 description: label.description,
               }))
           }));
-
-          // Update cache
+          
+          // 更新缓存
           const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, page, labels || '');
           cacheManager?.set(cacheKey, { issues }, { expiry: CACHE_EXPIRY.ISSUES });
 
-          // Record successful sync
-          await recordSync(config.owner, config.repo, 'success', issues.length);
+          // 记录同步状态
+          await recordSync(
+            config.owner, 
+            config.repo, 
+            'success', 
+            issues.length,
+            undefined,
+            forceSync ? 'full' : 'add'
+          );
 
           return {
             issues,

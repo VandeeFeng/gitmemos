@@ -3,8 +3,7 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { headers } from 'next/headers';
 import crypto from 'crypto';
 import { Issue, Label } from '@/types/github';
-import { Database } from '@/types/supabase';
-import { recordSync, saveIssue } from '@/lib/api';
+import { recordSync, saveIssue, saveLabel } from '@/lib/api';
 
 // GitHub webhook payload类型定义
 interface GitHubWebhookPayload {
@@ -74,8 +73,12 @@ export async function POST(request: Request) {
           break;
         
         case 'label':
-          // 当label变化时，我们需要更新所有包含该label的issue
+          // 当label变化时，我们需要更新label数据和相关的issue
           if (data.label) {
+            // 保存label数据
+            await saveLabel(owner, repo, data.label);
+
+            // 更新包含该label的issue的更新时间
             const { data: affectedIssues, error: fetchError } = await supabaseServer
               .from('issues')
               .select('*')

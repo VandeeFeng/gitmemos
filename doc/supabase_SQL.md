@@ -28,7 +28,7 @@ create table issues (
   unique(owner, repo, issue_number)
 );
 
--- 修改 labels 表，添加 owner 和 repo 字段
+-- 修��� labels 表，添加 owner 和 repo 字段
 create table labels (
   id bigint primary key generated always as identity,
   owner text not null,
@@ -71,6 +71,10 @@ create trigger update_labels_updated_at
 create index idx_issues_owner_repo_created on issues(owner, repo, github_created_at desc);
 create index idx_issues_labels on issues using gin(labels);
 create index idx_labels_owner_repo_name on labels(owner, repo, name);
+
+-- 添加唯一约束
+ALTER TABLE issues
+ADD CONSTRAINT unique_owner_repo_issue_number UNIQUE (owner, repo, issue_number);
 ```
 
 ```sql

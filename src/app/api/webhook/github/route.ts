@@ -143,13 +143,14 @@ export async function POST(request: Request) {
         const { error: issueError } = await supabaseServer
           .from('issues')
           .upsert(issueData, {
-            onConflict: 'owner,repo,issue_number'
+            onConflict: 'unique_owner_repo_issue_number'
           });
 
         if (issueError) {
           console.error('Error saving issue to Supabase:', {
             error: issueError,
-            data: issueData
+            data: issueData,
+            constraint: 'unique_owner_repo_issue_number'
           });
           throw issueError;
         }

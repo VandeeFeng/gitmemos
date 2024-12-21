@@ -2,6 +2,20 @@ import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
 import { headers } from 'next/headers';
 import crypto from 'crypto';
+import { Issue, Label } from '@/types/github';
+import { Database } from '@/types/supabase';
+
+// GitHub webhook payload类型定义
+interface GitHubWebhookPayload {
+  repository: {
+    owner: {
+      login: string;
+    };
+    name: string;
+  };
+  issue?: Issue;
+  label?: Label;
+}
 
 // 验证GitHub webhook签名
 function verifyGitHubWebhook(payload: string, signature: string): boolean {
@@ -20,24 +34,24 @@ function verifyGitHubWebhook(payload: string, signature: string): boolean {
 }
 
 // 更新issue记录
-async function updateIssue(owner: string, repo: string, issue: any) {
-  const { data: existingIssue, error: fetchError } = await supabaseServer
+async function updateIssue(owner: string, repo: string, githubIssue: Issue) {
+  const { data: existingIssue } = await supabaseServer
     .from('issues')
     .select('*')
     .eq('owner', owner)
     .eq('repo', repo)
-    .eq('issue_number', issue.number)
+    .eq('issue_number', githubIssue.number)
     .single();
 
-  const issueData = {
+  const issueData: Database['public']['Tables']['issues']['Insert'] = {
     owner,
     repo,
-    issue_number: issue.number,
-    title: issue.title,
-    body: issue.body,
-    state: issue.state,
-    labels: issue.labels.map((label: any) => label.name),
-    github_created_at: issue.created_at,
+    issue_number: githubIssue.number,
+    title: githubIssue.title,
+    body: githubIssue.body,
+    state: githubIssue.state,
+    labels: githubIssue.labels.map(label => label.name),
+    github_created_at: githubIssue.created_at,
     updated_at: new Date().toISOString()
   };
 
@@ -56,7 +70,7 @@ async function updateIssue(owner: string, repo: string, issue: any) {
       .update(issueData)
       .eq('owner', owner)
       .eq('repo', repo)
-      .eq('issue_number', issue.number);
+      .eq('issue_number', githubIssue.number);
 
     if (updateError) {
       console.error('Error updating issue:', updateError);
@@ -88,7 +102,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const data = JSON.parse(payload);
+    const data = JSON.parse(payload) as GitHubWebhookPayload;
     const { repository } = data;
     const owner = repository.owner.login;
     const repo = repository.name;
@@ -97,6 +111,9 @@ export async function POST(request: Request) {
     try {
       switch (event) {
         case 'issues':
+          if (!data.issue) {
+            throw new Error('Missing issue data');
+          }
           await updateIssue(owner, repo, data.issue);
           // 使用API记录同步历史
           await fetch('/api/supabase/sync', {

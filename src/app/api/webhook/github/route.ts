@@ -44,6 +44,47 @@ async function checkConfig(deliveryId: string | null, event: string | null, owne
   };
 
   if (envConfig.owner && envConfig.repo && envConfig.token) {
+    // 如果使用环境变量配置，确保在数据库中也有对应的配置
+    const { data: existingConfig, error: configError } = await supabaseServer
+      .from('configs')
+      .select('*')
+      .eq('owner', envConfig.owner)
+      .eq('repo', envConfig.repo)
+      .single();
+
+    if (!existingConfig && !configError) {
+      // 如果配置不存在，创建一个新的配置
+      const { error: insertError } = await supabaseServer
+        .from('configs')
+        .insert({
+          owner: envConfig.owner,
+          repo: envConfig.repo,
+          token: envConfig.token,
+          issues_per_page: envConfig.issues_per_page
+        });
+
+      if (insertError) {
+        return {
+          error: NextResponse.json(
+            {
+              error: 'Config creation failed',
+              details: {
+                deliveryId,
+                message: `Failed to create config: ${insertError.message}`,
+                code: insertError.code,
+                hint: insertError.hint,
+                details: insertError.details,
+                event,
+                owner,
+                repo
+              }
+            },
+            { status: 500 }
+          )
+        };
+      }
+    }
+
     return { config: envConfig };
   }
 
@@ -51,7 +92,8 @@ async function checkConfig(deliveryId: string | null, event: string | null, owne
   const { data: config, error: configError } = await supabaseServer
     .from('configs')
     .select('*')
-    .limit(1)
+    .eq('owner', owner)
+    .eq('repo', repo)
     .single();
 
   if (configError) {
@@ -210,7 +252,7 @@ export async function POST(request: Request) {
               ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: now }),
               updated_at: now
             }, {
-              onConflict: 'owner,repo,issue_number'
+              onConflict: 'unique_owner_repo_issue_number'
             });
 
           if (saveError) {

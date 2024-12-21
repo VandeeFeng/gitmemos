@@ -50,6 +50,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
   const initializingRef = useRef(false);
   const initializePromiseRef = useRef<Promise<void>>();
   const configRef = useRef<GitHubConfig | null>(null);
+  const lastSyncTimeRef = useRef<number>(0);
 
   // Memoize these functions to prevent unnecessary re-renders
   const syncIssues = useCallback(async () => {
@@ -57,8 +58,18 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       throw new Error('GitHub configuration is missing. Please configure your settings first.');
     }
 
+    // Check if last sync was less than 1 minute ago
+    const now = Date.now();
+    const timeSinceLastSync = now - lastSyncTimeRef.current;
+    if (timeSinceLastSync < 60000) { // 60000ms = 1 minute
+      throw new Error(`Please wait ${Math.ceil((60000 - timeSinceLastSync) / 1000)} seconds before syncing again.`);
+    }
+
     setState(prev => ({ ...prev, loading: true }));
     try {
+      // Update last sync time
+      lastSyncTimeRef.current = now;
+
       // Use Octokit for direct GitHub API calls
       const octokit = new Octokit({ auth: configRef.current.token });
 

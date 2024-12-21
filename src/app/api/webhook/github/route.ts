@@ -265,9 +265,16 @@ export async function POST(request: Request) {
             );
           }
 
-          // 记录同步历史
+          // ���录同步历史
           try {
-            await recordSync(owner, repo, 'success', 1, undefined, 'webhook');
+            await recordSync(
+              owner,
+              repo,
+              'success',
+              existingIssue ? 1 : 0,  // 如果是更新操作计数1，新增操作计数0
+              undefined,
+              existingIssue ? 'add' : 'full'  // 如果是更新操作使用'add'，新增操作使用'full'
+            );
           } catch (error) {
             console.error('Failed to record sync history:', error);
             // Continue processing even if sync history recording fails
@@ -280,7 +287,7 @@ export async function POST(request: Request) {
               event,
               owner,
               repo,
-              action: `issue_${data.issue.state}`,
+              action: existingIssue ? `issue_updated` : `issue_created`,
               issue: {
                 number: data.issue.number,
                 title: data.issue.title,

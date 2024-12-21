@@ -140,7 +140,7 @@ export async function POST(request: Request) {
               ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: now }),
               updated_at: now
             }, {
-              onConflict: 'issues_issue_number_key'
+              onConflict: 'owner,repo,issue_number'
             });
 
           if (saveError) {

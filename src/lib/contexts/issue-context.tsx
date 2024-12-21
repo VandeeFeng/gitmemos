@@ -176,7 +176,9 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         configRef.current.owner,
         configRef.current.repo,
         'success',
-        issues.length
+        issues.length,
+        undefined,
+        'full'
       );
 
       console.log(`Synced ${issues.length} issues from GitHub to database`);
@@ -195,7 +197,8 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           configRef.current.repo,
           'failed',
           0,
-          error instanceof Error ? error.message : 'Unknown error'
+          error instanceof Error ? error.message : 'Unknown error',
+          'full'
         );
       }
       

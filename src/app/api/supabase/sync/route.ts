@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { owner, repo, status, issuesSynced, errorMessage } = await request.json();
+    const { owner, repo, status, issuesSynced, errorMessage, sync_type } = await request.json();
     
     if (!owner || !repo || !status) {
       return NextResponse.json(
@@ -70,6 +70,7 @@ export async function POST(request: Request) {
         status,
         issues_synced: issuesSynced,
         error_message: errorMessage,
+        sync_type: sync_type || 'full',
         last_sync_at: new Date().toISOString()
       });
 

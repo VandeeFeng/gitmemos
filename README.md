@@ -67,6 +67,9 @@
 2. 生成新的 token，找到仓库，勾选 `issue` 读写权限
 3. 将 token 添加到 `.env.local` 文件中
 
+## Supabase 设置
+参考 [doc/supabase_SQL.md](./doc/supabase_SQL.md)
+
 ## TODO
 - [x] 搜索功能 
 - [x] 数据库

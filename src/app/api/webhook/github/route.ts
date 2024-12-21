@@ -135,7 +135,7 @@ export async function POST(request: Request) {
 
     const payload = await request.text();
     
-    // 验证webhook签名
+    // 验证webhook�����名
     if (!verifyGitHubWebhook(payload, signature)) {
       return NextResponse.json(
         { 
@@ -244,14 +244,44 @@ export async function POST(request: Request) {
 
           // 记录同步历史
           try {
-            await recordSync(
-              owner,
-              repo,
-              'success',
-              1,  // 每次webhook都是处理单个issue
-              undefined,
-              'add'  // webhook总是增量更新
-            );
+            const now = new Date().toISOString();
+            const { error: syncError } = await supabaseServer
+              .from('sync_history')
+              .insert({
+                owner,
+                repo,
+                status: 'success',
+                issues_synced: 1,
+                sync_type: 'webhook',
+                last_sync_at: now
+              });
+
+            if (syncError) {
+              console.error('Failed to record sync history:', syncError);
+            }
+
+            // 清理旧记录
+            const { data: allRecords } = await supabaseServer
+              .from('sync_history')
+              .select('id, last_sync_at')
+              .eq('owner', owner)
+              .eq('repo', repo)
+              .order('last_sync_at', { ascending: false });
+
+            // 如果记录数超过20条，删除多余的记录
+            if (allRecords && allRecords.length > 20) {
+              const recordsToDelete = allRecords.slice(20);
+              const idsToDelete = recordsToDelete.map(record => record.id);
+
+              const { error: deleteError } = await supabaseServer
+                .from('sync_history')
+                .delete()
+                .in('id', idsToDelete);
+
+              if (deleteError) {
+                console.error('Error cleaning up old sync records:', deleteError);
+              }
+            }
           } catch (error) {
             console.error('Failed to record sync history:', error);
             // Continue processing even if sync history recording fails
@@ -416,7 +446,44 @@ export async function POST(request: Request) {
 
           // 记录同步历史
           try {
-            await recordSync(owner, repo, 'success', affectedIssues?.length || 1, undefined, 'webhook');
+            const now = new Date().toISOString();
+            const { error: syncError } = await supabaseServer
+              .from('sync_history')
+              .insert({
+                owner,
+                repo,
+                status: 'success',
+                issues_synced: affectedIssues?.length || 1,
+                sync_type: 'webhook',
+                last_sync_at: now
+              });
+
+            if (syncError) {
+              console.error('Failed to record sync history:', syncError);
+            }
+
+            // 清理旧记录
+            const { data: allRecords } = await supabaseServer
+              .from('sync_history')
+              .select('id, last_sync_at')
+              .eq('owner', owner)
+              .eq('repo', repo)
+              .order('last_sync_at', { ascending: false });
+
+            // 如果记录数超过20条，删除多余的记录
+            if (allRecords && allRecords.length > 20) {
+              const recordsToDelete = allRecords.slice(20);
+              const idsToDelete = recordsToDelete.map(record => record.id);
+
+              const { error: deleteError } = await supabaseServer
+                .from('sync_history')
+                .delete()
+                .in('id', idsToDelete);
+
+              if (deleteError) {
+                console.error('Error cleaning up old sync records:', deleteError);
+              }
+            }
           } catch (error) {
             console.error('Failed to record sync history:', error);
             // Continue processing even if sync history recording fails

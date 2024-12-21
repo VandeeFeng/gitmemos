@@ -125,8 +125,7 @@ export async function getIssues(
   page: number = 1, 
   labels?: string, 
   forceSync: boolean = false,
-  existingConfig?: GitHubConfig,
-  since?: string
+  existingConfig?: GitHubConfig
 ) {
   const config = existingConfig || await getGitHubConfig();
 
@@ -206,13 +205,13 @@ export async function getIssues(
           const lastSyncAt = syncStatus?.lastSyncAt;
           
           // 如果是增量同步且有上次同步时间，使用since参数
-          const params: any = {
+          const params: Parameters<typeof octokit.rest.issues.listForRepo>[0] = {
             owner: config.owner,
             repo: config.repo,
             state: 'all',
             per_page: 100,
             page,
-            sort: 'updated', // 改为按更新时间排序
+            sort: 'updated',
             direction: 'desc'
           };
           

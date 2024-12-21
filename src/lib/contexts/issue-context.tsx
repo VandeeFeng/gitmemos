@@ -121,7 +121,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       // 同步 issues
       console.log(isFullSync ? 'Performing full sync...' : `Performing incremental sync since ${syncStatus.lastSyncAt}`);
       
-      const params: any = {
+      const params: Parameters<typeof octokit.rest.issues.listForRepo>[0] = {
         owner: configRef.current.owner,
         repo: configRef.current.repo,
         state: 'all',

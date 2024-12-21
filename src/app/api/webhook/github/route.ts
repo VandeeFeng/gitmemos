@@ -140,7 +140,7 @@ export async function POST(request: Request) {
         console.log('Saving issue data to Supabase:', JSON.stringify(issueData, null, 2));
 
         // 使用 upsert 保存到 Supabase
-        const { data: upsertData, error: issueError } = await supabaseServer
+        const { error: issueError } = await supabaseServer
           .from('issues')
           .upsert(issueData, {
             onConflict: 'issues_owner_repo_issue_number_key'

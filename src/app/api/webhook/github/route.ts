@@ -117,7 +117,7 @@ export async function POST(request: Request) {
         // 检查 issue 是否已存在
         const { data: existingIssue } = await supabaseServer
           .from('issues')
-          .select('id, created_at')
+          .select('issue_number, created_at')
           .eq('owner', owner)
           .eq('repo', repo)
           .eq('issue_number', issue.number)
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
           repo,
           issue_number: issue.number,
           title: issue.title,
-          body: issue.body || '',
+          body: issue.body,
           state: issue.state,
           labels: issue.labels.map((label: Label) => label.name),
           github_created_at: issue.created_at,
@@ -163,7 +163,7 @@ export async function POST(request: Request) {
               title: issue.title
             },
             existingIssue: existingIssue ? {
-              id: existingIssue.id,
+              issue_number: existingIssue.issue_number,
               created_at: existingIssue.created_at
             } : null
           };
@@ -229,7 +229,8 @@ export async function POST(request: Request) {
           const { error: labelError } = await supabaseServer
             .from('labels')
             .upsert(labelData, {
-              onConflict: 'owner,repo,name'
+              onConflict: 'owner,repo,name',
+              ignoreDuplicates: false
             });
 
           if (labelError) {

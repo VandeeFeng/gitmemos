@@ -284,28 +284,112 @@ CREATE UNIQUE INDEX idx_single_config ON configs ((true));
 ```
 
 ```sql
--- 为 issues 表添加 upsert 触发器
-create or replace function handle_issues_upsert()
-returns trigger as $$
-begin
-    -- 如果是插入操作，设置 created_at 和 updated_at
-    if TG_OP = 'INSERT' then
-        new.created_at = current_timestamp;
-        new.updated_at = current_timestamp;
-    -- 如果是更新操作，只更新 updated_at
-    elsif TG_OP = 'UPDATE' then
-        -- 保持原有的 created_at
-        new.created_at = old.created_at;
-        new.updated_at = current_timestamp;
-    end if;
-    return new;
-end;
-$$ language plpgsql;
+-- 完整重建 issues 表
+BEGIN;
 
-create trigger handle_issues_timestamps
-    before insert or update on issues
-    for each row
-    execute function handle_issues_upsert();
+-- 1. 备份现有数据
+CREATE TEMP TABLE issues_backup AS SELECT * FROM issues;
+
+-- 2. 删除现有表及其所有依赖
+DROP TABLE IF EXISTS issues CASCADE;
+
+-- 3. 重新创建 issues 表
+CREATE TABLE issues (
+    id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+    owner TEXT NOT NULL,
+    repo TEXT NOT NULL,
+    issue_number INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT,
+    state TEXT NOT NULL,
+    labels TEXT[] DEFAULT '{}',
+    github_created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- 添加复合唯一约束
+    CONSTRAINT unique_owner_repo_issue_number UNIQUE (owner, repo, issue_number)
+);
+
+-- 4. 创建索引
+CREATE INDEX idx_issues_owner_repo_created ON issues(owner, repo, github_created_at DESC);
+CREATE INDEX idx_issues_labels ON issues USING GIN(labels);
+
+-- 5. 删除旧的触发器和函数（如果存在）
+DROP TRIGGER IF EXISTS update_issues_updated_at ON issues;
+DROP TRIGGER IF EXISTS handle_issues_timestamps ON issues;
+DROP FUNCTION IF EXISTS handle_issues_upsert();
+
+-- 6. 创建新的触发器函数
+CREATE OR REPLACE FUNCTION handle_issues_upsert()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- 如果是插入操作，且没有指定 created_at，则设置 created_at
+    IF TG_OP = 'INSERT' AND NEW.created_at IS NULL THEN
+        NEW.created_at = CURRENT_TIMESTAMP;
+    END IF;
+    
+    -- 如果没有指定 updated_at，则设置 updated_at
+    IF NEW.updated_at IS NULL THEN
+        NEW.updated_at = CURRENT_TIMESTAMP;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 7. 创建触发器
+CREATE TRIGGER handle_issues_timestamps
+    BEFORE INSERT OR UPDATE ON issues
+    FOR EACH ROW
+    EXECUTE FUNCTION handle_issues_upsert();
+
+-- 8. 恢复数据
+INSERT INTO issues (
+    owner,
+    repo,
+    issue_number,
+    title,
+    body,
+    state,
+    labels,
+    github_created_at,
+    created_at,
+    updated_at
+)
+SELECT 
+    owner,
+    repo,
+    issue_number,
+    title,
+    body,
+    state,
+    labels,
+    github_created_at,
+    created_at,
+    updated_at
+FROM issues_backup;
+
+-- 9. 启用 RLS
+ALTER TABLE issues ENABLE ROW LEVEL SECURITY;
+
+-- 10. 添加 RLS 策略
+CREATE POLICY "Enable read access for all users" ON issues
+    FOR SELECT
+    USING (true);
+
+CREATE POLICY "Enable insert access for authenticated users" ON issues
+    FOR INSERT
+    WITH CHECK (true);
+
+CREATE POLICY "Enable update access for authenticated users" ON issues
+    FOR UPDATE
+    USING (true)
+    WITH CHECK (true);
+
+-- 11. 删除临时表
+DROP TABLE IF EXISTS issues_backup;
+
+COMMIT;
 ```
 
 ```sql

@@ -114,6 +114,19 @@ export async function POST(request: Request) {
           throw new Error('Missing required issue fields');
         }
 
+        // 先检查 configs 是否存在
+        const { data: config, error: configError } = await supabaseServer
+          .from('configs')
+          .select('id')
+          .eq('owner', owner)
+          .eq('repo', repo)
+          .single();
+
+        if (configError || !config) {
+          console.error('Config not found for repository:', { owner, repo });
+          throw new Error('Repository not configured');
+        }
+
         // 检查 issue 是否已存在
         const { data: existingIssue } = await supabaseServer
           .from('issues')
@@ -200,6 +213,19 @@ export async function POST(request: Request) {
       } else if (eventType === 'label') {
         const label = event.label as Label;
         const action = event.action;
+
+        // 先检查 configs 是否存在
+        const { data: config, error: configError } = await supabaseServer
+          .from('configs')
+          .select('id')
+          .eq('owner', owner)
+          .eq('repo', repo)
+          .single();
+
+        if (configError || !config) {
+          console.error('Config not found for repository:', { owner, repo });
+          throw new Error('Repository not configured');
+        }
 
         if (action === 'deleted') {
           // 删除标签

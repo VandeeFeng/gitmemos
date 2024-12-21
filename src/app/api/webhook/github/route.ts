@@ -4,7 +4,6 @@ import { headers } from 'next/headers';
 import crypto from 'crypto';
 import { Issue, Label } from '@/types/github';
 import { recordSync } from '@/lib/api';
-import { saveIssue, saveLabel } from '@/lib/api';
 
 // GitHub webhook payload类型定义
 interface GitHubWebhookPayload {
@@ -93,46 +92,175 @@ export async function POST(request: Request) {
             throw new Error('Missing issue data in webhook payload');
           }
 
-          // 使用 saveIssue 函数保存 issue
-          const issue = {
-            number: data.issue.number,
-            title: data.issue.title,
-            body: data.issue.body || '',
-            created_at: data.issue.created_at,
-            github_created_at: data.issue.created_at,
-            state: data.issue.state,
-            labels: data.issue.labels.map(label => ({
-              id: label.id,
-              name: label.name,
-              color: label.color,
-              description: label.description
-            }))
-          };
+          // 先检查 issue 是否已存在
+          const { data: existingIssue, error: checkError } = await supabaseServer
+            .from('issues')
+            .select('id, created_at')
+            .eq('owner', owner)
+            .eq('repo', repo)
+            .eq('issue_number', data.issue.number)
+            .single();
 
-          const issueSaved = await saveIssue(owner, repo, issue);
-          if (!issueSaved) {
-            throw new Error(`Failed to save issue #${issue.number} (${issue.title})`);
+          if (checkError && checkError.code !== 'PGRST116') {
+            return NextResponse.json(
+              {
+                error: 'Database check failed',
+                details: {
+                  deliveryId,
+                  message: `Failed to check existing issue: ${checkError.message}`,
+                  code: checkError.code,
+                  hint: checkError.hint,
+                  details: checkError.details,
+                  event,
+                  owner,
+                  repo,
+                  issue: {
+                    number: data.issue.number,
+                    title: data.issue.title
+                  }
+                }
+              },
+              { status: 500 }
+            );
           }
 
-          await recordSync(owner, repo, 'success', 1, undefined, 'webhook');
-          break;
-        
+          // 保存 issue
+          const now = new Date().toISOString();
+          const { error: saveError } = await supabaseServer
+            .from('issues')
+            .upsert({
+              owner,
+              repo,
+              issue_number: data.issue.number,
+              title: data.issue.title,
+              body: data.issue.body || '',
+              state: data.issue.state,
+              labels: data.issue.labels.map(label => label.name),
+              github_created_at: data.issue.created_at,
+              ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: now }),
+              updated_at: now
+            }, {
+              onConflict: 'owner,repo,issue_number'
+            });
+
+          if (saveError) {
+            return NextResponse.json(
+              {
+                error: 'Database save failed',
+                details: {
+                  deliveryId,
+                  message: `Failed to save issue to database: ${saveError.message}`,
+                  code: saveError.code,
+                  hint: saveError.hint,
+                  details: saveError.details,
+                  event,
+                  owner,
+                  repo,
+                  issue: {
+                    number: data.issue.number,
+                    title: data.issue.title,
+                    state: data.issue.state,
+                    labels: data.issue.labels.map(l => l.name)
+                  }
+                }
+              },
+              { status: 500 }
+            );
+          }
+
+          // 记录同步历史
+          const syncResult = await recordSync(owner, repo, 'success', 1, undefined, 'webhook');
+          if (!syncResult) {
+            return NextResponse.json(
+              {
+                error: 'Sync record failed',
+                details: {
+                  deliveryId,
+                  message: 'Failed to record sync history',
+                  event,
+                  owner,
+                  repo,
+                  issue: {
+                    number: data.issue.number,
+                    title: data.issue.title
+                  }
+                }
+              },
+              { status: 500 }
+            );
+          }
+
+          return NextResponse.json({
+            success: true,
+            details: {
+              deliveryId,
+              event,
+              owner,
+              repo,
+              action: `issue_${data.issue.state}`,
+              issue: {
+                number: data.issue.number,
+                title: data.issue.title,
+                state: data.issue.state,
+                labels: data.issue.labels.map(l => l.name)
+              },
+              processedAt: now
+            }
+          });
+
         case 'label':
           if (!data.label) {
-            throw new Error('Missing label data in webhook payload');
+            return NextResponse.json(
+              {
+                error: 'Invalid payload',
+                details: {
+                  deliveryId,
+                  message: 'Missing label data in webhook payload',
+                  event,
+                  owner,
+                  repo
+                }
+              },
+              { status: 400 }
+            );
           }
 
-          // 使用 saveLabel 函数保存 label
-          const label = {
-            id: data.label.id,
-            name: data.label.name,
-            color: data.label.color,
-            description: data.label.description
-          };
+          // ���存 label
+          const { error: labelError } = await supabaseServer
+            .from('labels')
+            .upsert({
+              owner,
+              repo,
+              name: data.label.name,
+              color: data.label.color,
+              description: data.label.description,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }, {
+              onConflict: 'owner,repo,name'
+            });
 
-          const labelSaved = await saveLabel(owner, repo, label);
-          if (!labelSaved) {
-            throw new Error(`Failed to save label "${label.name}" (${label.color})`);
+          if (labelError) {
+            return NextResponse.json(
+              {
+                error: 'Database save failed',
+                details: {
+                  deliveryId,
+                  message: `Failed to save label to database: ${labelError.message}`,
+                  code: labelError.code,
+                  hint: labelError.hint,
+                  details: labelError.details,
+                  event,
+                  owner,
+                  repo,
+                  label: {
+                    name: data.label.name,
+                    color: data.label.color
+                  }
+                }
+              },
+              { status: 500 }
+            );
           }
 
           // 更新包含该label的issue的更新时间
@@ -144,67 +272,131 @@ export async function POST(request: Request) {
             .contains('labels', [data.label.name]);
 
           if (fetchError) {
-            throw new Error(`Failed to fetch issues with label "${label.name}": ${fetchError.message}`);
+            return NextResponse.json(
+              {
+                error: 'Database query failed',
+                details: {
+                  deliveryId,
+                  message: `Failed to fetch affected issues: ${fetchError.message}`,
+                  code: fetchError.code,
+                  hint: fetchError.hint,
+                  details: fetchError.details,
+                  event,
+                  owner,
+                  repo,
+                  label: {
+                    name: data.label.name,
+                    color: data.label.color
+                  }
+                }
+              },
+              { status: 500 }
+            );
           }
 
-          // 更新每个受影响的issue
+          // 更新受影响的issues
+          const updateTime = new Date().toISOString();
           if (affectedIssues) {
             for (const issue of affectedIssues) {
               const { error: updateError } = await supabaseServer
                 .from('issues')
                 .update({
-                  updated_at: new Date().toISOString()
+                  updated_at: updateTime
                 })
                 .eq('owner', owner)
                 .eq('repo', repo)
                 .eq('issue_number', issue.issue_number);
 
               if (updateError) {
-                throw new Error(`Failed to update issue #${issue.issue_number} with label "${label.name}": ${updateError.message}`);
+                return NextResponse.json(
+                  {
+                    error: 'Database update failed',
+                    details: {
+                      deliveryId,
+                      message: `Failed to update issue #${issue.issue_number}: ${updateError.message}`,
+                      code: updateError.code,
+                      hint: updateError.hint,
+                      details: updateError.details,
+                      event,
+                      owner,
+                      repo,
+                      label: {
+                        name: data.label.name,
+                        color: data.label.color
+                      },
+                      issue: {
+                        number: issue.issue_number,
+                        title: issue.title
+                      }
+                    }
+                  },
+                  { status: 500 }
+                );
               }
             }
           }
 
-          await recordSync(owner, repo, 'success', 1, undefined, 'webhook');
-          break;
+          // 记录同步历史
+          const labelSyncResult = await recordSync(owner, repo, 'success', affectedIssues?.length || 1, undefined, 'webhook');
+          if (!labelSyncResult) {
+            return NextResponse.json(
+              {
+                error: 'Sync record failed',
+                details: {
+                  deliveryId,
+                  message: 'Failed to record sync history',
+                  event,
+                  owner,
+                  repo,
+                  label: {
+                    name: data.label.name,
+                    color: data.label.color
+                  }
+                }
+              },
+              { status: 500 }
+            );
+          }
+
+          return NextResponse.json({
+            success: true,
+            details: {
+              deliveryId,
+              event,
+              owner,
+              repo,
+              action: 'label_updated',
+              label: {
+                name: data.label.name,
+                color: data.label.color
+              },
+              affectedIssues: affectedIssues?.length || 0,
+              processedAt: updateTime
+            }
+          });
 
         default:
           return NextResponse.json(
-            { 
-              error: 'Unsupported event type',
+            {
+              error: 'Unsupported event',
               details: {
                 deliveryId,
-                event,
+                message: `Unsupported event type: ${event}`,
                 supportedEvents: ['issues', 'label'],
-                payload: {
-                  repository: {
-                    owner: owner,
-                    name: repo
-                  }
-                }
+                event,
+                owner,
+                repo
               }
             },
             { status: 400 }
           );
       }
-
-      return NextResponse.json({ 
-        success: true,
-        details: {
-          deliveryId,
-          event,
-          owner,
-          repo,
-          action: data.issue ? `issue_${data.issue.state}` : (data.label ? 'label_updated' : 'unknown'),
-          processedAt: new Date().toISOString()
-        }
-      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       await recordSync(owner, repo, 'failed', 0, errorMessage, 'webhook');
       
       return NextResponse.json(
-        { 
+        {
           error: 'Webhook processing failed',
           details: {
             deliveryId,
@@ -235,7 +427,7 @@ export async function POST(request: Request) {
     const headersList = await headers();
     
     return NextResponse.json(
-      { 
+      {
         error: 'Webhook processing error',
         details: {
           deliveryId: headersList.get('x-github-delivery'),

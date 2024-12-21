@@ -364,45 +364,50 @@ export async function POST(request: Request) {
             );
           }
 
-          // 更新受影响的issues
+          // 批量更新受影响的issues
           const updateTime = new Date().toISOString();
-          if (affectedIssues) {
-            for (const issue of affectedIssues) {
-              const { error: updateError } = await supabaseServer
-                .from('issues')
-                .update({
+          if (affectedIssues && affectedIssues.length > 0) {
+            const { error: updateError } = await supabaseServer
+              .from('issues')
+              .upsert(
+                affectedIssues.map(issue => ({
+                  owner,
+                  repo,
+                  issue_number: issue.issue_number,
+                  title: issue.title,
+                  body: issue.body,
+                  state: issue.state,
+                  labels: issue.labels,
+                  github_created_at: issue.github_created_at,
                   updated_at: updateTime
-                })
-                .eq('owner', owner)
-                .eq('repo', repo)
-                .eq('issue_number', issue.issue_number);
+                })),
+                {
+                  onConflict: 'owner,repo,issue_number'
+                }
+              );
 
-              if (updateError) {
-                return NextResponse.json(
-                  {
-                    error: 'Database update failed',
-                    details: {
-                      deliveryId,
-                      message: `Failed to update issue #${issue.issue_number}: ${updateError.message}`,
-                      code: updateError.code,
-                      hint: updateError.hint,
-                      details: updateError.details,
-                      event,
-                      owner,
-                      repo,
-                      label: {
-                        name: data.label.name,
-                        color: data.label.color
-                      },
-                      issue: {
-                        number: issue.issue_number,
-                        title: issue.title
-                      }
-                    }
-                  },
-                  { status: 500 }
-                );
-              }
+            if (updateError) {
+              return NextResponse.json(
+                {
+                  error: 'Database update failed',
+                  details: {
+                    deliveryId,
+                    message: `Failed to update affected issues: ${updateError.message}`,
+                    code: updateError.code,
+                    hint: updateError.hint,
+                    details: updateError.details,
+                    event,
+                    owner,
+                    repo,
+                    label: {
+                      name: data.label.name,
+                      color: data.label.color
+                    },
+                    affectedIssues: affectedIssues.length
+                  }
+                },
+                { status: 500 }
+              );
             }
           }
 

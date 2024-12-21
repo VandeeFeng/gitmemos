@@ -187,6 +187,7 @@ export async function POST(request: Request) {
           const { error: saveError } = await supabaseServer
             .from('issues')
             .upsert({
+              ...(existingIssue ? { id: existingIssue.id } : {}),
               owner,
               repo,
               issue_number: data.issue.number,

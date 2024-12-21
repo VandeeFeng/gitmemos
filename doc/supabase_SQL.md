@@ -75,6 +75,23 @@ create index idx_labels_owner_repo_name on labels(owner, repo, name);
 -- 添加唯一约束
 ALTER TABLE issues
 ADD CONSTRAINT unique_owner_repo_issue_number UNIQUE (owner, repo, issue_number);
+
+-- 启用 RLS
+alter table issues enable row level security;
+
+-- 添加 RLS 策略
+create policy "Enable read access for all users" on issues
+  for select
+  using (true);
+
+create policy "Enable insert access for authenticated users" on issues
+  for insert
+  with check (true);
+
+create policy "Enable update access for authenticated users" on issues
+  for update
+  using (true)
+  with check (true);
 ```
 
 ```sql
@@ -111,7 +128,7 @@ create trigger update_sync_history_updated_at
 create index idx_sync_history_owner_repo on sync_history(owner, repo);
 create index idx_sync_history_last_sync on sync_history(owner, repo, last_sync_at desc);
 
--- 添加外键约束（可选，如果你想确保只有存在的仓库配置才能有同步记录）
+-- 添加外键约束（可选如果你想确保只有存在的仓库配置才能有同步记录）
 alter table sync_history
   add constraint fk_sync_history_config
   foreign key (owner, repo)
@@ -264,4 +281,95 @@ DROP TABLE IF EXISTS configs_backup;
 
 -- 8. 添加唯一约束（确保只有一条配置记录）
 CREATE UNIQUE INDEX idx_single_config ON configs ((true));
+```
+
+```sql
+-- 为 issues 表添加 upsert 触发器
+create or replace function handle_issues_upsert()
+returns trigger as $$
+begin
+    -- 如果是插入操作，设置 created_at 和 updated_at
+    if TG_OP = 'INSERT' then
+        new.created_at = current_timestamp;
+        new.updated_at = current_timestamp;
+    -- 如果是更新操作，只更新 updated_at
+    elsif TG_OP = 'UPDATE' then
+        -- 保持原有的 created_at
+        new.created_at = old.created_at;
+        new.updated_at = current_timestamp;
+    end if;
+    return new;
+end;
+$$ language plpgsql;
+
+create trigger handle_issues_timestamps
+    before insert or update on issues
+    for each row
+    execute function handle_issues_upsert();
+```
+
+```sql
+-- 检查当前约束
+SELECT
+    tc.constraint_name,
+    tc.constraint_type,
+    kcu.column_name,
+    tc.table_name
+FROM information_schema.table_constraints tc
+JOIN information_schema.key_column_usage kcu 
+    ON tc.constraint_name = kcu.constraint_name
+WHERE tc.table_name = 'issues'
+ORDER BY tc.constraint_type, tc.constraint_name;
+
+-- 修复 issues 表的约束
+BEGIN;
+
+-- 1. 先备份数据（以防万一）
+CREATE TEMP TABLE issues_backup AS SELECT * FROM issues;
+
+-- 2. 删除现有的约束
+ALTER TABLE issues DROP CONSTRAINT IF EXISTS issues_pkey CASCADE;
+ALTER TABLE issues DROP CONSTRAINT IF EXISTS unique_owner_repo_issue_number CASCADE;
+ALTER TABLE issues DROP CONSTRAINT IF EXISTS issues_owner_repo_issue_number_key CASCADE;
+
+-- 3. 重新添加主键约束（保留 id 列的 identity 属性）
+ALTER TABLE issues
+ADD CONSTRAINT issues_pkey PRIMARY KEY (id);
+
+-- 4. 添加复合唯一约束
+ALTER TABLE issues 
+ADD CONSTRAINT unique_owner_repo_issue_number 
+UNIQUE (owner, repo, issue_number);
+
+-- 5. 确保索引存在
+DROP INDEX IF EXISTS idx_issues_owner_repo_created;
+CREATE INDEX idx_issues_owner_repo_created ON issues(owner, repo, github_created_at DESC);
+
+DROP INDEX IF EXISTS idx_issues_labels;
+CREATE INDEX idx_issues_labels ON issues USING gin(labels);
+
+COMMIT;
+
+-- 验证修改后的约束
+SELECT
+    tc.constraint_name,
+    tc.constraint_type,
+    kcu.column_name,
+    tc.table_name
+FROM information_schema.table_constraints tc
+JOIN information_schema.key_column_usage kcu 
+    ON tc.constraint_name = kcu.constraint_name
+WHERE tc.table_name = 'issues'
+ORDER BY tc.constraint_type, tc.constraint_name;
+
+-- 验证列的属性
+SELECT 
+    column_name,
+    data_type,
+    is_nullable,
+    column_default,
+    identity_generation
+FROM information_schema.columns 
+WHERE table_name = 'issues'
+ORDER BY ordinal_position;
 ```

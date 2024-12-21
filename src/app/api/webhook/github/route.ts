@@ -240,7 +240,6 @@ export async function POST(request: Request) {
           const { error: saveError } = await supabaseServer
             .from('issues')
             .upsert({
-              ...(existingIssue ? { id: existingIssue.id } : {}),
               owner,
               repo,
               issue_number: data.issue.number,
@@ -249,7 +248,6 @@ export async function POST(request: Request) {
               state: data.issue.state,
               labels: data.issue.labels.map(label => label.name),
               github_created_at: data.issue.created_at,
-              ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: now }),
               updated_at: now
             }, {
               onConflict: 'owner,repo,issue_number'
@@ -281,25 +279,11 @@ export async function POST(request: Request) {
           }
 
           // 记录同步历史
-          const syncResult = await recordSync(owner, repo, 'success', 1, undefined, 'webhook');
-          if (!syncResult) {
-            return NextResponse.json(
-              {
-                error: 'Sync record failed',
-                details: {
-                  deliveryId,
-                  message: 'Failed to record sync history',
-                  event,
-                  owner,
-                  repo,
-                  issue: {
-                    number: data.issue.number,
-                    title: data.issue.title
-                  }
-                }
-              },
-              { status: 500 }
-            );
+          try {
+            await recordSync(owner, repo, 'success', 1, undefined, 'webhook');
+          } catch (error) {
+            console.error('Failed to record sync history:', error);
+            // Continue processing even if sync history recording fails
           }
 
           return NextResponse.json({
@@ -455,25 +439,11 @@ export async function POST(request: Request) {
           }
 
           // 记录同步历史
-          const labelSyncResult = await recordSync(owner, repo, 'success', affectedIssues?.length || 1, undefined, 'webhook');
-          if (!labelSyncResult) {
-            return NextResponse.json(
-              {
-                error: 'Sync record failed',
-                details: {
-                  deliveryId,
-                  message: 'Failed to record sync history',
-                  event,
-                  owner,
-                  repo,
-                  label: {
-                    name: data.label.name,
-                    color: data.label.color
-                  }
-                }
-              },
-              { status: 500 }
-            );
+          try {
+            await recordSync(owner, repo, 'success', affectedIssues?.length || 1, undefined, 'webhook');
+          } catch (error) {
+            console.error('Failed to record sync history:', error);
+            // Continue processing even if sync history recording fails
           }
 
           return NextResponse.json({

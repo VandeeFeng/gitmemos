@@ -121,7 +121,7 @@ export async function POST(request: Request) {
         state: issue.state,
         labels: issue.labels.map((label: Label) => label.name),
         github_created_at: issue.created_at,
-        ...(existingIssue ? {} : { created_at: now }), // 只在新建时设置 created_at
+        ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: now }), // 保留原始的 created_at
         updated_at: now
       }, {
         onConflict: 'owner,repo,issue_number'

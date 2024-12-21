@@ -112,8 +112,6 @@ export async function POST(request: Request) {
           throw new Error('Missing required issue fields');
         }
 
-        const now = new Date().toISOString();
-
         // 检查 issue 是否已存在
         const { data: existingIssue } = await supabaseServer
           .from('issues')
@@ -122,6 +120,8 @@ export async function POST(request: Request) {
           .eq('repo', repo)
           .eq('issue_number', issue.number)
           .single();
+
+        const now = new Date().toISOString();
 
         // 准备要保存到 Supabase 的数据
         const issueData = {
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
 
         console.log('Saving issue data to Supabase:', JSON.stringify(issueData, null, 2));
 
-        // 保存到 Supabase
+        // 使用 upsert 保存到 Supabase
         const { error: issueError } = await supabaseServer
           .from('issues')
           .upsert(issueData, {

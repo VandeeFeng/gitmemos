@@ -124,6 +124,64 @@ export async function POST(request: Request) {
             );
           }
 
+          // 检查配置是否存在
+          const { data: existingConfig, error: configError } = await supabaseServer
+            .from('configs')
+            .select('id')
+            .eq('owner', owner)
+            .eq('repo', repo)
+            .single();
+
+          if (configError && configError.code !== 'PGRST116') {
+            return NextResponse.json(
+              {
+                error: 'Config check failed',
+                details: {
+                  deliveryId,
+                  message: `Failed to check config: ${configError.message}`,
+                  code: configError.code,
+                  hint: configError.hint,
+                  details: configError.details,
+                  event,
+                  owner,
+                  repo
+                }
+              },
+              { status: 500 }
+            );
+          }
+
+          // 如果配置不存在，创建一个新的配置
+          if (!existingConfig) {
+            const { error: createConfigError } = await supabaseServer
+              .from('configs')
+              .insert({
+                owner,
+                repo,
+                token: process.env.GITHUB_TOKEN || '',
+                issues_per_page: 30
+              });
+
+            if (createConfigError) {
+              return NextResponse.json(
+                {
+                  error: 'Config creation failed',
+                  details: {
+                    deliveryId,
+                    message: `Failed to create config: ${createConfigError.message}`,
+                    code: createConfigError.code,
+                    hint: createConfigError.hint,
+                    details: createConfigError.details,
+                    event,
+                    owner,
+                    repo
+                  }
+                },
+                { status: 500 }
+              );
+            }
+          }
+
           // 保存 issue
           const now = new Date().toISOString();
           const { error: saveError } = await supabaseServer
@@ -223,6 +281,64 @@ export async function POST(request: Request) {
               },
               { status: 400 }
             );
+          }
+
+          // 检查配置是否存在
+          const { data: existingLabelConfig, error: labelConfigError } = await supabaseServer
+            .from('configs')
+            .select('id')
+            .eq('owner', owner)
+            .eq('repo', repo)
+            .single();
+
+          if (labelConfigError && labelConfigError.code !== 'PGRST116') {
+            return NextResponse.json(
+              {
+                error: 'Config check failed',
+                details: {
+                  deliveryId,
+                  message: `Failed to check config: ${labelConfigError.message}`,
+                  code: labelConfigError.code,
+                  hint: labelConfigError.hint,
+                  details: labelConfigError.details,
+                  event,
+                  owner,
+                  repo
+                }
+              },
+              { status: 500 }
+            );
+          }
+
+          // 如果配置不存在，创建一个新的配置
+          if (!existingLabelConfig) {
+            const { error: createConfigError } = await supabaseServer
+              .from('configs')
+              .insert({
+                owner,
+                repo,
+                token: process.env.GITHUB_TOKEN || '',
+                issues_per_page: 30
+              });
+
+            if (createConfigError) {
+              return NextResponse.json(
+                {
+                  error: 'Config creation failed',
+                  details: {
+                    deliveryId,
+                    message: `Failed to create config: ${createConfigError.message}`,
+                    code: createConfigError.code,
+                    hint: createConfigError.hint,
+                    details: createConfigError.details,
+                    event,
+                    owner,
+                    repo
+                  }
+                },
+                { status: 500 }
+              );
+            }
           }
 
           // 存 label

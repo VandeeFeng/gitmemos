@@ -247,6 +247,28 @@ export async function getIssues(
               }))
           }));
           
+          // 增量同步时，如果没有更新的内容，直接返回
+          const isIncrementalSync = !forceSync && lastSyncAt && !labels;
+          if (isIncrementalSync && issues.length === 0) {
+            console.log(`[${requestId}] No updates found since last sync`);
+            await recordSync(
+              config.owner,
+              config.repo,
+              'success',
+              0,
+              undefined,
+              'add'
+            );
+            return {
+              issues: [],
+              syncStatus: {
+                success: true,
+                totalSynced: 0,
+                lastSyncAt: new Date().toISOString()
+              }
+            };
+          }
+          
           // 更新缓存
           const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, page, labels || '');
           cacheManager?.set(cacheKey, { issues }, { expiry: CACHE_EXPIRY.ISSUES });

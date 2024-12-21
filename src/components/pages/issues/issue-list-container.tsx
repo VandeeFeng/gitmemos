@@ -10,7 +10,11 @@ import { toast } from 'sonner';
 interface IssueListContainerProps {
   initialIssues: Issue[];
   initialConfig: GitHubConfig;
-  onSync: () => Promise<{ success: boolean; totalSynced: number } | undefined>;
+  onSync: () => Promise<{
+    success: boolean;
+    totalSynced: number;
+    syncType: 'full' | 'add';
+  }>;
 }
 
 export function IssueListContainer({ initialIssues, onSync }: IssueListContainerProps) {
@@ -59,7 +63,12 @@ export function IssueListContainer({ initialIssues, onSync }: IssueListContainer
     try {
       const result = await onSync();
       if (result?.success) {
-        toast.success(`Successfully synced ${result.totalSynced} issues from GitHub`);
+        if (result.totalSynced === 0) {
+          toast.success('No updates found since last sync');
+        } else {
+          const syncTypeText = result.syncType === 'full' ? 'Full sync:' : 'Incremental sync:';
+          toast.success(`${syncTypeText} Successfully synced ${result.totalSynced} issues from GitHub`);
+        }
       } else {
         toast.error('Failed to sync with GitHub');
       }

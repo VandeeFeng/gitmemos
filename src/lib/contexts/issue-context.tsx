@@ -14,7 +14,7 @@ interface IssueContextType {
   loading: boolean;
   initialized: boolean;
   isInitializing: boolean;
-  syncIssues: () => Promise<{ success: boolean; totalSynced: number }>;
+  syncIssues: () => Promise<{ success: boolean; totalSynced: number; syncType: 'full' | 'add' }>;
   updateIssues: (newIssues: Issue[]) => void;
   refreshIssues: () => Promise<void>;
 }
@@ -25,7 +25,7 @@ const IssueContext = createContext<IssueContextType>({
   loading: true,
   initialized: false,
   isInitializing: false,
-  syncIssues: async () => ({ success: false, totalSynced: 0 }),
+  syncIssues: async () => ({ success: false, totalSynced: 0, syncType: 'add' }),
   updateIssues: () => {},
   refreshIssues: async () => {}
 });
@@ -42,7 +42,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     loading: true,
     initialized: false,
     isInitializing: false,
-    syncIssues: async () => ({ success: false, totalSynced: 0 }),
+    syncIssues: async () => ({ success: false, totalSynced: 0, syncType: 'add' }),
     updateIssues: () => {},
     refreshIssues: async () => {}
   });
@@ -155,6 +155,24 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           }))
       }));
 
+      // 增量同步时，如果没有更新的内容，直接返回
+      if (!isFullSync && issues.length === 0) {
+        console.log('No updates found since last sync');
+        await recordSync(
+          configRef.current.owner,
+          configRef.current.repo,
+          'success',
+          0,
+          undefined,
+          'add'
+        );
+        return {
+          success: true,
+          totalSynced: 0,
+          syncType: 'add' as const
+        };
+      }
+
       // 批量保存 issues 到数据库
       const saveResult = await saveIssues(configRef.current.owner, configRef.current.repo, issues);
       if (!saveResult) {
@@ -205,7 +223,8 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       
       return {
         success: true,
-        totalSynced: issues.length
+        totalSynced: issues.length,
+        syncType: isFullSync ? 'full' as const : 'add' as const
       };
     } catch (error) {
       console.error('Error syncing from GitHub:', error);

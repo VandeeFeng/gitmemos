@@ -202,6 +202,30 @@ export async function saveIssue(owner: string, repo: string, issue: Issue): Prom
   }
 }
 
+export async function saveIssues(owner: string, repo: string, issues: Issue[]): Promise<boolean> {
+  try {
+    const response = await fetch('/api/supabase/issues', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ owner, repo, issues }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save issues');
+    }
+
+    // 清除相关缓存
+    cacheManager?.remove(CACHE_KEYS.ISSUES(owner, repo, 1));
+    
+    return true;
+  } catch (error) {
+    console.error('Error saving issues:', error);
+    return false;
+  }
+}
+
 // Labels API
 export async function getLabels(owner: string, repo: string): Promise<Label[] | null> {
   try {

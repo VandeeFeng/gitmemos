@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { Issue, GitHubConfig } from '@/types/github';
 import { getIssues as getGitHubIssues, getGitHubConfig } from '@/lib/github';
-import { checkSyncStatus, recordSync, saveIssue, saveLabel } from '@/lib/api';
+import { checkSyncStatus, recordSync, saveIssue, saveLabel, saveIssues } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 import { getIssues as getIssuesFromApi } from '@/lib/api';
 import { Octokit } from 'octokit';
@@ -131,9 +131,10 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           }))
       }));
 
-      // Save each issue to database
-      for (const issue of issues) {
-        await saveIssue(configRef.current.owner, configRef.current.repo, issue);
+      // 批量保存 issues 到数据库
+      const saveResult = await saveIssues(configRef.current.owner, configRef.current.repo, issues);
+      if (!saveResult) {
+        throw new Error('Failed to save issues to database');
       }
 
       // Update state and cache
@@ -262,7 +263,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // 检查��步状态
+        // 检查步状态
         const syncStatus = await checkSyncStatus(config.owner, config.repo);
         if (syncStatus?.lastSyncAt) {
           console.log(

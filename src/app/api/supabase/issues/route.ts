@@ -90,11 +90,65 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { owner, repo, issue } = await request.json();
+    const body = await request.json();
+    const { owner, repo, issue, issues } = body;
     
-    if (!owner || !repo || !issue) {
+    if (!owner || !repo) {
       return NextResponse.json(
-        { error: 'Missing required parameters' },
+        { error: 'Missing owner or repo parameter' },
+        { status: 400 }
+      );
+    }
+
+    // 批量处理多个 issues
+    if (Array.isArray(issues)) {
+      const now = new Date().toISOString();
+      
+      // 首先获取所有已存在的 issues
+      const { data: existingIssues } = await supabaseServer
+        .from('issues')
+        .select('issue_number, created_at')
+        .eq('owner', owner)
+        .eq('repo', repo)
+        .in('issue_number', issues.map(i => i.number));
+
+      // 准备 upsert 数据
+      const upsertData = issues.map(issue => {
+        const existingIssue = existingIssues?.find(e => e.issue_number === issue.number);
+        return {
+          owner,
+          repo,
+          issue_number: issue.number,
+          title: issue.title,
+          body: issue.body,
+          state: issue.state,
+          labels: issue.labels.map((label: Label) => label.name),
+          github_created_at: issue.created_at,
+          ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: now }),
+          updated_at: now
+        };
+      });
+
+      const { error } = await supabaseServer
+        .from('issues')
+        .upsert(upsertData, {
+          onConflict: 'owner,repo,issue_number'
+        });
+
+      if (error) {
+        return NextResponse.json(
+          { error: error.message },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ success: true, count: upsertData.length });
+    }
+
+    // 处理单个 issue
+    if (!issue) {
+      return NextResponse.json(
+        { error: 'Missing issue data' },
         { status: 400 }
       );
     }
@@ -121,7 +175,7 @@ export async function POST(request: Request) {
         state: issue.state,
         labels: issue.labels.map((label: Label) => label.name),
         github_created_at: issue.created_at,
-        ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: now }), // 保留原始的 created_at
+        ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: now }),
         updated_at: now
       }, {
         onConflict: 'owner,repo,issue_number'

@@ -3,7 +3,7 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { headers } from 'next/headers';
 import crypto from 'crypto';
 import { Issue, Label } from '@/types/github';
-import { recordSync, saveIssue, saveLabel } from '@/lib/api';
+import { recordSync } from '@/lib/api';
 
 // GitHub webhook payload类型定义
 interface GitHubWebhookPayload {
@@ -68,15 +68,71 @@ export async function POST(request: Request) {
           if (!data.issue) {
             throw new Error('Missing issue data');
           }
-          await saveIssue(owner, repo, data.issue);
+
+          // 直接使用 supabaseServer 保存 issue
+          const now = new Date().toISOString();
+          const { data: existingIssue } = await supabaseServer
+            .from('issues')
+            .select('id, created_at')
+            .eq('owner', owner)
+            .eq('repo', repo)
+            .eq('issue_number', data.issue.number)
+            .single();
+
+          const { error: issueError } = await supabaseServer
+            .from('issues')
+            .upsert({
+              owner,
+              repo,
+              issue_number: data.issue.number,
+              title: data.issue.title,
+              body: data.issue.body,
+              state: data.issue.state,
+              labels: data.issue.labels.map((label: Label) => label.name),
+              github_created_at: data.issue.created_at,
+              ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: now }),
+              updated_at: now
+            }, {
+              onConflict: 'owner,repo,issue_number'
+            });
+
+          if (issueError) {
+            throw issueError;
+          }
+
           await recordSync(owner, repo, 'success', 1, undefined, 'webhook');
           break;
         
         case 'label':
           // 当label变化时，我们需要更新label数据和相关的issue
           if (data.label) {
-            // 保存label数据
-            await saveLabel(owner, repo, data.label);
+            // 直接使用 supabaseServer 保存 label
+            const now = new Date().toISOString();
+            const { data: existingLabel } = await supabaseServer
+              .from('labels')
+              .select('*')
+              .eq('owner', owner)
+              .eq('repo', repo)
+              .eq('name', data.label.name)
+              .single();
+
+            const { error: labelError } = await supabaseServer
+              .from('labels')
+              .upsert({
+                owner,
+                repo,
+                name: data.label.name,
+                color: data.label.color,
+                description: data.label.description,
+                ...(existingLabel ? { created_at: existingLabel.created_at } : { created_at: now }),
+                updated_at: now
+              }, {
+                onConflict: 'owner,repo,name'
+              });
+
+            if (labelError) {
+              throw labelError;
+            }
 
             // 更新包含该label的issue的更新时间
             const { data: affectedIssues, error: fetchError } = await supabaseServer

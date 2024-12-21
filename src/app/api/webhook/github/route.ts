@@ -33,7 +33,8 @@ async function recordSync(
   repo: string,
   status: 'success' | 'failed',
   issuesSynced: number,
-  errorMessage?: string
+  errorMessage?: string,
+  sync_type: 'webhook' | 'full' = 'webhook'  // 默认为 webhook
 ) {
   try {
     // 插入新记录
@@ -43,6 +44,7 @@ async function recordSync(
         owner,
         repo,
         status,
+        sync_type,
         issues_synced: issuesSynced,
         error_message: errorMessage,
         last_sync_at: new Date().toISOString()
@@ -174,7 +176,8 @@ export async function POST(request: Request) {
             repo,
             'failed',
             0,
-            `Failed to save issue: ${JSON.stringify(errorDetails)}`
+            `Failed to save issue: ${JSON.stringify(errorDetails)}`,
+            'webhook'
           );
           
           throw issueError;
@@ -193,7 +196,7 @@ export async function POST(request: Request) {
         cacheManager?.remove(singleIssueCacheKey);
 
         // 记录成功的同步
-        await recordSync(owner, repo, 'success', 1);
+        await recordSync(owner, repo, 'success', 1, undefined, 'webhook');
       } else if (eventType === 'label') {
         const label = event.label as Label;
         const action = event.action;
@@ -235,7 +238,7 @@ export async function POST(request: Request) {
         }
 
         // 记录成功的同步
-        await recordSync(owner, repo, 'success', 0);
+        await recordSync(owner, repo, 'success', 0, undefined, 'webhook');
       }
 
       return NextResponse.json({ success: true });
@@ -246,7 +249,8 @@ export async function POST(request: Request) {
         repo,
         'failed',
         0,
-        error instanceof Error ? error.message : 'Unknown error'
+        error instanceof Error ? error.message : 'Unknown error',
+        'webhook'
       );
       throw error;
     }

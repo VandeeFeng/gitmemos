@@ -95,6 +95,7 @@ create table sync_history (
   last_sync_at timestamp with time zone default timezone('utc'::text, now()) not null,
   issues_synced integer not null default 0,
   status text not null check (status in ('success', 'failed')),
+  sync_type text not null check (sync_type in ('webhook', 'full')),
   error_message text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
@@ -141,6 +142,7 @@ create table sync_history (
   last_sync_at timestamp with time zone default timezone('utc'::text, now()) not null,
   issues_synced integer not null default 0,
   status text not null check (status in ('success', 'failed')),
+  sync_type text not null check (sync_type in ('webhook', 'full')),
   error_message text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null,
@@ -205,6 +207,7 @@ CREATE TABLE sync_history (
     last_sync_at TIMESTAMP WITH TIME ZONE NOT NULL,
     issues_synced INTEGER NOT NULL,
     status VARCHAR(10) NOT NULL CHECK (status IN ('success', 'failed')),
+    sync_type VARCHAR(10) NOT NULL CHECK (sync_type IN ('webhook', 'full')),
     error_message TEXT,
     config_id INTEGER REFERENCES configs(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -237,6 +240,7 @@ INSERT INTO sync_history (
     last_sync_at,
     issues_synced,
     status,
+    sync_type,
     error_message,
     config_id,
     created_at
@@ -247,6 +251,7 @@ SELECT
     sh.last_sync_at,
     sh.issues_synced,
     sh.status,
+    sh.sync_type,
     sh.error_message,
     c.id,
     sh.created_at

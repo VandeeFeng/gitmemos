@@ -135,7 +135,7 @@ export async function POST(request: Request) {
 
     const payload = await request.text();
     
-    // 验证webhook名
+    // 验证webhook���
     if (!verifyGitHubWebhook(payload, signature)) {
       return NextResponse.json(
         { 
@@ -194,8 +194,8 @@ export async function POST(request: Request) {
               state: data.issue.state,
               labels: data.issue.labels.map(label => label.name),
               github_created_at: data.issue.created_at,
-              ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: new Date().toISOString() }),
-              updated_at: new Date().toISOString()
+              ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: now }),
+              updated_at: now
             }, {
               onConflict: 'owner,repo,issue_number'
             });
@@ -397,7 +397,7 @@ export async function POST(request: Request) {
                   state: issue.state,
                   labels: issue.labels,
                   github_created_at: issue.github_created_at,
-                  created_at: issue.created_at,
+                  ...(issue.created_at ? { created_at: issue.created_at } : { created_at: now }),
                   updated_at: now
                 })),
                 {

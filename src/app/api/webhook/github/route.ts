@@ -135,7 +135,7 @@ export async function POST(request: Request) {
 
     const payload = await request.text();
     
-    // 验证webhook�����名
+    // 验证webhook���名
     if (!verifyGitHubWebhook(payload, signature)) {
       return NextResponse.json(
         { 
@@ -171,51 +171,25 @@ export async function POST(request: Request) {
             return configResult.error;
           }
 
-          // 先检查 issue 是否已存在
-          const { data: existingIssue } = await supabaseServer
-            .from('issues')
-            .select('*')
-            .eq('owner', owner)
-            .eq('repo', repo)
-            .eq('issue_number', data.issue.number)
-            .single();
-
           const now = new Date().toISOString();
           
-          let saveError;
-          if (existingIssue) {
-            // 如果issue存在，只更新可能发生变化的字段
-            const { error } = await supabaseServer
-              .from('issues')
-              .update({
-                title: data.issue.title,
-                body: data.issue.body || '',
-                state: data.issue.state,
-                labels: data.issue.labels.map(label => label.name),
-                updated_at: now
-              })
-              .eq('owner', owner)
-              .eq('repo', repo)
-              .eq('issue_number', data.issue.number);
-            saveError = error;
-          } else {
-            // 如果issue不存在，创建新记录
-            const { error } = await supabaseServer
-              .from('issues')
-              .insert({
-                owner,
-                repo,
-                issue_number: data.issue.number,
-                title: data.issue.title,
-                body: data.issue.body || '',
-                state: data.issue.state,
-                labels: data.issue.labels.map(label => label.name),
-                github_created_at: data.issue.created_at,
-                created_at: now,
-                updated_at: now
-              });
-            saveError = error;
-          }
+          // 直接使用upsert，不需要先检查是否存在
+          const { error: saveError } = await supabaseServer
+            .from('issues')
+            .upsert({
+              owner,
+              repo,
+              issue_number: data.issue.number,
+              title: data.issue.title,
+              body: data.issue.body || '',
+              state: data.issue.state,
+              labels: data.issue.labels.map(label => label.name),
+              github_created_at: data.issue.created_at,
+              created_at: now,
+              updated_at: now
+            }, {
+              onConflict: 'owner,repo,issue_number'
+            });
 
           if (saveError) {
             return NextResponse.json(
@@ -294,7 +268,7 @@ export async function POST(request: Request) {
               event,
               owner,
               repo,
-              action: existingIssue ? `issue_updated` : `issue_created`,
+              action: 'issue_created',
               issue: {
                 number: data.issue.number,
                 title: data.issue.title,

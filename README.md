@@ -99,4 +99,5 @@ sync_history 表是用来存储同步历史的，包括 owner, repo, last_sync_a
 - [x] 分享功能
 - [x] 实时更新，配置了GitHub webhook
 - [x] 移动端适配
-- [ ] 优化数据处理
+- [x] 优化数据处理
+- [ ] AI 功能

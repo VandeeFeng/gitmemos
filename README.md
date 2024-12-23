@@ -77,7 +77,7 @@
 6. 点击 `Add webhook`
 
 ## Supabase 设置
-参考 [doc/supabase_SQL.md](./doc/supabase_SQL.md)
+参考 [doc/supabase_init.md](./doc/supabase_init.md)
 
 在 supabase 里有四个表，分别是 configs, issues, labels, sync_history
 

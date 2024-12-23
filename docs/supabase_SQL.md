@@ -323,15 +323,18 @@ DROP FUNCTION IF EXISTS handle_issues_upsert();
 CREATE OR REPLACE FUNCTION handle_issues_upsert()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- 如果是插入操作，且没有指定 created_at，则设置 created_at
+    -- 只在纯 INSERT 操作时设置 created_at（不是 upsert 的一部分）
     IF TG_OP = 'INSERT' AND NEW.created_at IS NULL THEN
-        NEW.created_at = CURRENT_TIMESTAMP;
+        -- 如果 github_created_at 存在，使用它
+        IF NEW.github_created_at IS NOT NULL THEN
+            NEW.created_at = NEW.github_created_at;
+        ELSE
+            NEW.created_at = CURRENT_TIMESTAMP;
+        END IF;
     END IF;
     
-    -- 如果没有指定 updated_at，则设置 updated_at
-    IF NEW.updated_at IS NULL THEN
-        NEW.updated_at = CURRENT_TIMESTAMP;
-    END IF;
+    -- 总是更新 updated_at
+    NEW.updated_at = CURRENT_TIMESTAMP;
     
     RETURN NEW;
 END;

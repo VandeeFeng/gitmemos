@@ -135,7 +135,7 @@ export async function POST(request: Request) {
 
     const payload = await request.text();
     
-    // 验证webhook���名
+    // 验证webhook�����名
     if (!verifyGitHubWebhook(payload, signature)) {
       return NextResponse.json(
         { 
@@ -171,6 +171,15 @@ export async function POST(request: Request) {
             return configResult.error;
           }
 
+          // 检查 issue 是否已存在
+          const { data: existingIssue } = await supabaseServer
+            .from('issues')
+            .select('id, created_at')
+            .eq('owner', owner)
+            .eq('repo', repo)
+            .eq('issue_number', data.issue.number)
+            .single();
+
           const now = new Date().toISOString();
           
           // 直接使用upsert，不需要先检查是否存在
@@ -185,7 +194,7 @@ export async function POST(request: Request) {
               state: data.issue.state,
               labels: data.issue.labels.map(label => label.name),
               github_created_at: data.issue.created_at,
-              created_at: now,
+              ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: data.issue.created_at }),
               updated_at: now
             }, {
               onConflict: 'owner,repo,issue_number'

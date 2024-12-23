@@ -135,7 +135,7 @@ export async function POST(request: Request) {
 
     const payload = await request.text();
     
-    // 验证webhook���
+    // 验证webhook
     if (!verifyGitHubWebhook(payload, signature)) {
       return NextResponse.json(
         { 
@@ -237,8 +237,7 @@ export async function POST(request: Request) {
                 issues_synced: 1,
                 sync_type: 'webhook',
                 last_sync_at: now,
-                created_at: now,
-                updated_at: now
+                created_at: now
               });
 
             if (syncError) {
@@ -442,6 +441,7 @@ export async function POST(request: Request) {
                 issues_synced: affectedIssues?.length || 1,
                 sync_type: 'webhook',
                 last_sync_at: now,
+                created_at: now
               });
 
             if (syncError) {

@@ -442,8 +442,6 @@ export async function POST(request: Request) {
                 issues_synced: affectedIssues?.length || 1,
                 sync_type: 'webhook',
                 last_sync_at: now,
-                created_at: now,
-                updated_at: now
               });
 
             if (syncError) {

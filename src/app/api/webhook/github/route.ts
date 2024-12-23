@@ -135,7 +135,7 @@ export async function POST(request: Request) {
 
     const payload = await request.text();
     
-    // 验证webhook�����名
+    // 验证webhook名
     if (!verifyGitHubWebhook(payload, signature)) {
       return NextResponse.json(
         { 
@@ -186,7 +186,7 @@ export async function POST(request: Request) {
           const { error: saveError } = await supabaseServer
             .from('issues')
             .upsert({
-              owner,
+              owner: owner.toLowerCase(),
               repo,
               issue_number: data.issue.number,
               title: data.issue.title,
@@ -194,8 +194,8 @@ export async function POST(request: Request) {
               state: data.issue.state,
               labels: data.issue.labels.map(label => label.name),
               github_created_at: data.issue.created_at,
-              ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: data.issue.created_at }),
-              updated_at: now
+              ...(existingIssue ? { created_at: existingIssue.created_at } : { created_at: new Date().toISOString() }),
+              updated_at: new Date().toISOString()
             }, {
               onConflict: 'owner,repo,issue_number'
             });
@@ -231,12 +231,14 @@ export async function POST(request: Request) {
             const { error: syncError } = await supabaseServer
               .from('sync_history')
               .insert({
-                owner,
+                owner: owner.toLowerCase(),
                 repo,
                 status: 'success',
                 issues_synced: 1,
                 sync_type: 'webhook',
-                last_sync_at: now
+                last_sync_at: now,
+                created_at: now,
+                updated_at: now
               });
 
             if (syncError) {
@@ -381,13 +383,13 @@ export async function POST(request: Request) {
           }
 
           // 批量更新受影响的issues
-          const updateTime = new Date().toISOString();
           if (affectedIssues && affectedIssues.length > 0) {
+            const now = new Date().toISOString();
             const { error: updateError } = await supabaseServer
               .from('issues')
               .upsert(
                 affectedIssues.map(issue => ({
-                  owner,
+                  owner: owner.toLowerCase(),
                   repo,
                   issue_number: issue.issue_number,
                   title: issue.title,
@@ -395,7 +397,8 @@ export async function POST(request: Request) {
                   state: issue.state,
                   labels: issue.labels,
                   github_created_at: issue.github_created_at,
-                  updated_at: updateTime
+                  created_at: issue.created_at,
+                  updated_at: now
                 })),
                 {
                   onConflict: 'owner,repo,issue_number'
@@ -433,12 +436,14 @@ export async function POST(request: Request) {
             const { error: syncError } = await supabaseServer
               .from('sync_history')
               .insert({
-                owner,
+                owner: owner.toLowerCase(),
                 repo,
                 status: 'success',
                 issues_synced: affectedIssues?.length || 1,
                 sync_type: 'webhook',
-                last_sync_at: now
+                last_sync_at: now,
+                created_at: now,
+                updated_at: now
               });
 
             if (syncError) {
@@ -485,7 +490,7 @@ export async function POST(request: Request) {
                 color: data.label.color
               },
               affectedIssues: affectedIssues?.length || 0,
-              processedAt: updateTime
+              processedAt: new Date().toISOString()
             }
           });
 

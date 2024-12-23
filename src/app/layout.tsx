@@ -6,10 +6,10 @@ import { Toaster } from 'sonner'
 
 const inter = Inter({ subsets: ['latin'] })
 
-let url = "https://memo.vandee.art/";
-let title = "Git Memo";
-let description = "A memo application based on GitHub issues";
-let sitename = "memo.vandee.art";
+const url = "https://memo.vandee.art/";
+const title = "Git Memo";
+const description = "A memo application based on GitHub issues";
+const sitename = "memo.vandee.art";
 
 export const metadata: Metadata = {
   metadataBase: new URL(url),

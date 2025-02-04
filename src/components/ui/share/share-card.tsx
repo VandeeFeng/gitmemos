@@ -20,10 +20,10 @@ export function ShareCard({ issue }: ShareCardProps) {
     <div className={`p-6 ${isDark ? 'bg-[#2d333b]' : 'bg-white'}`}>
       <div className="space-y-4">
         <div className="space-y-1">
-          <h1 className={`text-2xl font-bold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+          <h1 className="text-2xl font-bold text-text-primary">
             {issue.title}
           </h1>
-          <div className={`flex items-center gap-2 text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+          <div className="flex items-center gap-2 text-xs text-text-secondary whitespace-nowrap">
             <span>#{issue.number}</span>
             <span>·</span>
             <span>
@@ -49,13 +49,14 @@ export function ShareCard({ issue }: ShareCardProps) {
         
         <div className={`prose max-w-none ${
           isDark 
-            ? 'dark:prose-invert prose-pre:bg-bg-secondary dark:prose-pre:bg-bg-tertiary prose-code:text-text-primary dark:prose-code:text-text-primary' 
-            : 'prose-pre:bg-bg-secondary prose-code:text-text-primary'
-        } prose-pre:p-4 prose-pre:rounded-lg prose-pre:my-4 prose-code:before:content-none prose-code:after:content-none prose-p:leading-relaxed bg-inherit`}>
+            ? 'dark:prose-invert prose-pre:bg-bg-secondary dark:prose-pre:bg-bg-tertiary prose-code:text-text-primary dark:prose-code:text-text-primary prose-headings:text-text-primary dark:prose-headings:text-text-primary' 
+            : 'prose-pre:bg-bg-secondary prose-code:text-text-primary prose-headings:text-text-primary'
+        } prose-pre:p-4 prose-pre:rounded-lg prose-pre:my-4 prose-code:before:content-none prose-code:after:content-none prose-p:leading-relaxed bg-inherit text-text-primary`}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeRaw, rehypeSanitize]}
             components={shareMarkdownComponents}
+            className="text-text-primary"
           >
             {issue.body || ""}
           </ReactMarkdown>

@@ -1,17 +1,14 @@
 import { NextResponse } from 'next/server';
 import { Octokit } from 'octokit';
-import { getGitHubConfig } from '@/lib/github';
+import { getGitHubConfig, getGitHubToken } from '@/lib/github';
 import { Issue, CreateIssueInput, UpdateIssueInput, GitHubApiError } from '@/types/github';
 import { getIssues, saveIssue } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 
 // Helper function to get Octokit instance
 async function getOctokit() {
-  const config = await getGitHubConfig();
-  if (!config.token) {
-    throw new Error('GitHub token is missing');
-  }
-  return new Octokit({ auth: config.token });
+  const token = await getGitHubToken();
+  return new Octokit({ auth: token });
 }
 
 // GET /api/github/issues
@@ -23,7 +20,8 @@ export async function GET(request: Request) {
     const issueNumber = searchParams.get('number');
 
     const config = await getGitHubConfig();
-    console.log('GitHub config:', { owner: config.owner, repo: config.repo, hasToken: !!config.token });
+    const token = await getGitHubToken();
+    console.log('GitHub config:', { owner: config.owner, repo: config.repo, hasToken: !!token });
 
     if (!config.owner || !config.repo) {
       console.error('Missing owner or repo in config');
@@ -33,8 +31,8 @@ export async function GET(request: Request) {
       );
     }
 
-    if (!config.token) {
-      console.error('Missing GitHub token in config');
+    if (!token) {
+      console.error('Missing GitHub token');
       return NextResponse.json(
         { error: 'GitHub token is missing' },
         { status: 401 }
@@ -75,8 +73,8 @@ export async function GET(request: Request) {
           cacheManager?.set(singleIssueCacheKey, issueFromDb, { expiry: CACHE_EXPIRY.ISSUES });
           return NextResponse.json(issueFromDb);
         }
-      } catch (error) {
-        console.warn('Failed to check database for issue:', error);
+      } catch (err) {
+        console.warn('Failed to check database for issue:', err);
       }
 
       // If not found in cache or database, fetch from GitHub API
@@ -122,11 +120,11 @@ export async function GET(request: Request) {
         await saveIssue(config.owner, config.repo, issue);
 
         return NextResponse.json(issue);
-      } catch (error) {
-        console.error('GitHub API error (single issue):', (error as GitHubApiError).response?.data || error);
+      } catch (err) {
+        console.error('GitHub API error (single issue):', (err as GitHubApiError).response?.data || err);
         return NextResponse.json(
-          { error: (error as GitHubApiError).response?.data?.message || 'Failed to fetch issue from GitHub' },
-          { status: (error as GitHubApiError).response?.status || 500 }
+          { error: (err as GitHubApiError).response?.data?.message || 'Failed to fetch issue from GitHub' },
+          { status: (err as GitHubApiError).response?.status || 500 }
         );
       }
     } else {
@@ -173,18 +171,18 @@ export async function GET(request: Request) {
         }
 
         return NextResponse.json(issues);
-      } catch (error) {
-        console.error('GitHub API error (issues list):', (error as GitHubApiError).response?.data || error);
+      } catch (err) {
+        console.error('GitHub API error (issues list):', (err as GitHubApiError).response?.data || err);
         return NextResponse.json(
-          { error: (error as GitHubApiError).response?.data?.message || 'Failed to fetch issues from GitHub' },
-          { status: (error as GitHubApiError).response?.status || 500 }
+          { error: (err as GitHubApiError).response?.data?.message || 'Failed to fetch issues from GitHub' },
+          { status: (err as GitHubApiError).response?.status || 500 }
         );
       }
     }
-  } catch (error) {
-    console.error('Error in issues route:', error);
+  } catch (err) {
+    console.error('Error in issues route:', err);
     return NextResponse.json(
-      { error: (error as Error).message || 'Failed to fetch issues' },
+      { error: (err as Error).message || 'Failed to fetch issues' },
       { status: 500 }
     );
   }
@@ -195,6 +193,7 @@ export async function POST(request: Request) {
   try {
     const body: CreateIssueInput = await request.json();
     const config = await getGitHubConfig();
+    const token = await getGitHubToken();
 
     if (!config.owner || !config.repo) {
       return NextResponse.json(
@@ -203,7 +202,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!config.token) {
+    if (!token) {
       return NextResponse.json(
         { error: 'GitHub token is missing' },
         { status: 401 }
@@ -243,17 +242,17 @@ export async function POST(request: Request) {
       await saveIssue(config.owner, config.repo, issue);
 
       return NextResponse.json(issue);
-    } catch (error) {
-      console.error('GitHub API error:', (error as GitHubApiError).response?.data || error);
+    } catch (err) {
+      console.error('GitHub API error:', (err as GitHubApiError).response?.data || err);
       return NextResponse.json(
-        { error: (error as GitHubApiError).response?.data?.message || 'Failed to create issue on GitHub' },
-        { status: (error as GitHubApiError).response?.status || 500 }
+        { error: (err as GitHubApiError).response?.data?.message || 'Failed to create issue on GitHub' },
+        { status: (err as GitHubApiError).response?.status || 500 }
       );
     }
-  } catch (error) {
-    console.error('Error in create issue route:', error);
+  } catch (err) {
+    console.error('Error in create issue route:', err);
     return NextResponse.json(
-      { error: (error as Error).message || 'Failed to create issue' },
+      { error: (err as Error).message || 'Failed to create issue' },
       { status: 500 }
     );
   }
@@ -264,7 +263,8 @@ export async function PATCH(request: Request) {
   try {
     const body: UpdateIssueInput = await request.json();
     const config = await getGitHubConfig();
-    console.log('Update issue - GitHub config:', { owner: config.owner, repo: config.repo, hasToken: !!config.token });
+    const token = await getGitHubToken();
+    console.log('Update issue - GitHub config:', { owner: config.owner, repo: config.repo, hasToken: !!token });
 
     if (!config.owner || !config.repo) {
       console.error('Missing owner or repo in config');
@@ -274,8 +274,8 @@ export async function PATCH(request: Request) {
       );
     }
 
-    if (!config.token) {
-      console.error('Missing GitHub token in config');
+    if (!token) {
+      console.error('Missing GitHub token');
       return NextResponse.json(
         { error: 'GitHub token is missing' },
         { status: 401 }
@@ -320,17 +320,17 @@ export async function PATCH(request: Request) {
       console.log('Successfully synced updated issue to database');
 
       return NextResponse.json(issue);
-    } catch (error) {
-      console.error('GitHub API error:', (error as GitHubApiError).response?.data || error);
+    } catch (err) {
+      console.error('GitHub API error:', (err as GitHubApiError).response?.data || err);
       return NextResponse.json(
-        { error: (error as GitHubApiError).response?.data?.message || 'Failed to update issue on GitHub' },
-        { status: (error as GitHubApiError).response?.status || 500 }
+        { error: (err as GitHubApiError).response?.data?.message || 'Failed to update issue on GitHub' },
+        { status: (err as GitHubApiError).response?.status || 500 }
       );
     }
-  } catch (error) {
-    console.error('Error in update issue route:', error);
+  } catch (err) {
+    console.error('Error in update issue route:', err);
     return NextResponse.json(
-      { error: (error as Error).message || 'Failed to update issue' },
+      { error: (err as Error).message || 'Failed to update issue' },
       { status: 500 }
     );
   }

@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { Issue, GitHubConfig } from '@/types/github';
-import { getIssues as getGitHubIssues, getGitHubConfig } from '@/lib/github';
+import { getIssues as getGitHubIssues, getGitHubConfig, getGitHubToken } from '@/lib/github';
 import { checkSyncStatus, recordSync, saveLabel, saveIssues } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 import { getIssues as getIssuesFromApi } from '@/lib/api';
@@ -70,8 +70,12 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       // Update last sync time
       lastSyncTimeRef.current = now;
 
-      // Use Octokit for direct GitHub API calls
-      const octokit = new Octokit({ auth: configRef.current.token });
+      // Get GitHub token and initialize Octokit
+      const token = await getGitHubToken();
+      if (!token) {
+        throw new Error('GitHub token not found');
+      }
+      const octokit = new Octokit({ auth: token });
 
       // 首先同步标签
       console.log('Syncing labels from GitHub...');

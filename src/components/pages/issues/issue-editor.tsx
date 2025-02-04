@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import MDEditor from '@uiw/react-md-editor';
 import { Button } from '@/components/ui/button';
 import { EditableIssue, GitHubConfig } from '@/types/github';
-import { getGitHubConfig } from '@/lib/github';
+import { getGitHubConfig, getGitHubToken } from '@/lib/github';
 import { createIssue, updateIssue, createLabel } from '@/lib/github';
 import { LABEL_COLORS } from '@/lib/colors';
 import { useLabels } from '@/lib/contexts/label-context';
@@ -56,6 +56,7 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
         setConfig(githubConfig);
       } catch (error) {
         console.error('Error getting GitHub config:', error);
+        toast.error('Failed to get GitHub configuration');
       }
     }
     initConfig();
@@ -79,18 +80,24 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
   }, []);
 
   const handleSave = async () => {
-    if (!config || !config.token || !config.owner || !config.repo) {
-      alert('Please configure your GitHub settings first');
-      return;
-    }
-
-    if (!title.trim()) {
-      alert('Please enter a title');
-      return;
-    }
-
-    setSaving(true);
     try {
+      if (!config || !config.owner || !config.repo) {
+        toast.error('Missing GitHub configuration');
+        return;
+      }
+
+      const token = await getGitHubToken();
+      if (!token) {
+        toast.error('GitHub token not found');
+        return;
+      }
+
+      if (!title.trim()) {
+        toast.error('Please enter a title');
+        return;
+      }
+
+      setSaving(true);
       if (issue?.number) {
         await updateIssue(issue.number, title, content, selectedLabels);
         toast.success('Issue updated successfully');
@@ -111,12 +118,25 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
 
   const handleCreateLabel = async () => {
     if (!newLabel.name.trim()) {
-      alert('Please enter a label name');
+      toast.error('Please enter a label name');
       return;
     }
 
     setCreatingLabel(true);
     try {
+      const config = await getGitHubConfig();
+      const token = await getGitHubToken();
+
+      if (!config || !config.owner || !config.repo) {
+        toast.error('Missing GitHub configuration');
+        return;
+      }
+
+      if (!token) {
+        toast.error('GitHub token is missing');
+        return;
+      }
+
       const createdLabel = await createLabel(
         newLabel.name,
         newLabel.color,
@@ -130,9 +150,10 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
       setSelectedLabels(prev => [...prev, createdLabel.name]);
       setShowNewLabelForm(false);
       setNewLabel({ name: '', color: LABEL_COLORS[0].color, description: '' });
+      toast.success('Label created successfully');
     } catch (error) {
       console.error('Error creating label:', error);
-      alert('Failed to create label');
+      toast.error(error instanceof Error ? error.message : 'Failed to create label');
     } finally {
       setCreatingLabel(false);
     }

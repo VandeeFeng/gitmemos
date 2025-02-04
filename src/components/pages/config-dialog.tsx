@@ -16,7 +16,6 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
   const [config, setConfig] = useState<GitHubConfig>({
     owner: '',
     repo: '',
-    token: '',
     issuesPerPage: 10
   });
   const [password, setPassword] = useState('');
@@ -26,7 +25,18 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
 
   useEffect(() => {
     if (isOpen) {
-      getGitHubConfig().then(setConfig);
+      getGitHubConfig()
+        .then(config => {
+          setConfig(prev => ({
+            ...prev,
+            owner: config.owner,
+            repo: config.repo,
+            issuesPerPage: config.issuesPerPage
+          }));
+        })
+        .catch(() => {
+          toast.error('Failed to load configuration');
+        });
       setPasswordVerified(isPasswordVerified());
     }
   }, [isOpen]);
@@ -47,8 +57,7 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
       } else {
         toast.error('Invalid password');
       }
-    } catch (error) {
-      console.error('Error verifying password:', error);
+    } catch {
       toast.error('Failed to verify password');
     } finally {
       setVerifying(false);
@@ -56,7 +65,7 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
   };
 
   const handleSave = async () => {
-    if (!config.owner || !config.repo || !config.token) {
+    if (!config.owner || !config.repo) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -68,8 +77,7 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
       onClose();
       // 刷新页面以应用新配置
       window.location.reload();
-    } catch (error) {
-      console.error('Error saving config:', error);
+    } catch {
       toast.error('Failed to save configuration');
     } finally {
       setSaving(false);
@@ -84,6 +92,7 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
         {/* 标题 */}
         <div className="px-6 py-4 border-b border-default bg-bg-primary dark:bg-bg-secondary">
           <h2 className="text-xl font-semibold text-text-primary">Repository Settings</h2>
+          <p className="mt-1 text-sm text-text-secondary">Configure your GitHub repository settings</p>
         </div>
 
         {/* 表单内容 */}
@@ -114,23 +123,6 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
               className="w-full px-3 py-2 text-sm border border-default rounded-lg bg-bg-primary dark:bg-bg-tertiary focus:outline-none focus:ring-1 focus:ring-secondary dark:focus:ring-secondary transition-shadow"
               placeholder="e.g. hello-world"
             />
-          </div>
-
-          {/* GitHub Token */}
-          <div>
-            <label className="block text-sm font-medium text-text-secondary mb-1.5">
-              GitHub Token <span className="text-error">*</span>
-            </label>
-            <input
-              type="password"
-              value={config.token}
-              onChange={(e) => setConfig(prev => ({ ...prev, token: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-default rounded-lg bg-bg-primary dark:bg-bg-tertiary focus:outline-none focus:ring-1 focus:ring-secondary dark:focus:ring-secondary transition-shadow"
-              placeholder="ghp_xxxxxxxxxxxx"
-            />
-            <p className="mt-1.5 text-xs text-text-secondary">
-              Need a token? <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" className="text-secondary hover:underline">Create one here</a>
-            </p>
           </div>
 
           {/* Password */}

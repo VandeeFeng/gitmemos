@@ -1,3 +1,5 @@
+import { BaseGitHubConfig, GitHubConfig, ServerGitHubConfig, DbConfig } from "./config";
+
 export interface Label {
   id: number;
   name: string;
@@ -15,13 +17,6 @@ export interface Issue {
   labels: Label[];
 }
 
-export interface GitHubConfig {
-  owner: string;
-  repo: string;
-  token: string;
-  issuesPerPage: number;
-}
-
 export interface GitHubApiError {
   response?: {
     data?: {
@@ -32,15 +27,8 @@ export interface GitHubApiError {
   message?: string;
 }
 
-export interface DbConfig {
-  owner: string;
-  repo: string;
-  token: string;
-  issues_per_page: number;
-}
-
 // 用于编辑器的 Issue 类型，body 必须是 string
-export interface EditableIssue extends Omit<Issue, 'body'> {
+export interface EditableIssue extends Omit<Issue, "body"> {
   body: string;
 }
 
@@ -54,4 +42,6 @@ export interface CreateIssueInput {
 // 用于更新 Issue 的类型
 export interface UpdateIssueInput extends CreateIssueInput {
   number: number;
-} 
+}
+
+export type { BaseGitHubConfig, GitHubConfig, ServerGitHubConfig, DbConfig };

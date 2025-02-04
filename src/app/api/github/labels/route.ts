@@ -1,24 +1,22 @@
 import { NextResponse } from 'next/server';
 import { Octokit } from 'octokit';
-import { getGitHubConfig } from '@/lib/github';
+import { getGitHubConfig, getGitHubToken } from '@/lib/github';
 import { Label, GitHubApiError } from '@/types/github';
 import { getLabels, saveLabel } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 
 // Helper function to get Octokit instance
 async function getOctokit() {
-  const config = await getGitHubConfig();
-  if (!config.token) {
-    throw new Error('GitHub token is missing');
-  }
-  return new Octokit({ auth: config.token });
+  const token = await getGitHubToken();
+  return new Octokit({ auth: token });
 }
 
 // GET /api/github/labels
 export async function GET() {
   try {
     const config = await getGitHubConfig();
-    console.log('GitHub config:', { owner: config.owner, repo: config.repo, hasToken: !!config.token });
+    const token = await getGitHubToken();
+    console.log('GitHub config:', { owner: config.owner, repo: config.repo, hasToken: !!token });
 
     if (!config.owner || !config.repo) {
       console.error('Missing owner or repo in config');
@@ -28,8 +26,8 @@ export async function GET() {
       );
     }
 
-    if (!config.token) {
-      console.error('Missing GitHub token in config');
+    if (!token) {
+      console.error('Missing GitHub token');
       return NextResponse.json(
         { error: 'GitHub token is missing' },
         { status: 401 }
@@ -38,10 +36,10 @@ export async function GET() {
 
     // First check cache
     const cacheKey = CACHE_KEYS.LABELS(config.owner, config.repo);
-    const cachedLabels = cacheManager?.get<Label[]>(cacheKey);
-    if (cachedLabels) {
-      console.log('Using cached labels data');
-      return NextResponse.json(cachedLabels);
+    const cached = cacheManager?.get<Label[]>(cacheKey);
+    if (cached) {
+      console.log('Using cached labels');
+      return NextResponse.json(cached);
     }
 
     // Then check database
@@ -54,15 +52,14 @@ export async function GET() {
         cacheManager?.set(cacheKey, dbLabels, { expiry: CACHE_EXPIRY.LABELS });
         return NextResponse.json(dbLabels);
       }
-    } catch (error) {
-      console.warn('Failed to check database for labels:', error);
+    } catch (err) {
+      console.warn('Failed to check database for labels:', err);
     }
 
-    // If not found in cache or database, fetch from GitHub API
-    console.log('Fetching labels from GitHub API...');
-    const client = await getOctokit();
-    
+    // If not in cache or database, fetch from GitHub API
     try {
+      console.log('Fetching labels from GitHub API...');
+      const client = await getOctokit();
       const { data } = await client.rest.issues.listLabelsForRepo({
         owner: config.owner,
         repo: config.repo,
@@ -84,19 +81,17 @@ export async function GET() {
       }
 
       return NextResponse.json(labels);
-    } catch (error: unknown) {
-      const err = error as GitHubApiError;
-      console.error('GitHub API error:', err.response?.data || error);
+    } catch (err) {
+      console.error('GitHub API error:', (err as GitHubApiError).response?.data || err);
       return NextResponse.json(
-        { error: err.response?.data?.message || 'Failed to fetch labels from GitHub' },
-        { status: err.response?.status || 500 }
+        { error: (err as GitHubApiError).response?.data?.message || 'Failed to fetch labels from GitHub' },
+        { status: (err as GitHubApiError).response?.status || 500 }
       );
     }
-  } catch (error: unknown) {
-    const err = error as Error;
-    console.error('Error in labels route:', error);
+  } catch (err) {
+    console.error('Error in labels route:', err);
     return NextResponse.json(
-      { error: err.message || 'Failed to fetch labels' },
+      { error: (err as Error).message || 'Failed to fetch labels' },
       { status: 500 }
     );
   }
@@ -105,8 +100,9 @@ export async function GET() {
 // POST /api/github/labels
 export async function POST(request: Request) {
   try {
-    const { name, color, description } = await request.json();
+    const body = await request.json();
     const config = await getGitHubConfig();
+    const token = await getGitHubToken();
 
     if (!config.owner || !config.repo) {
       return NextResponse.json(
@@ -115,7 +111,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!config.token) {
+    if (!token) {
       return NextResponse.json(
         { error: 'GitHub token is missing' },
         { status: 401 }
@@ -128,43 +124,33 @@ export async function POST(request: Request) {
       const { data } = await client.rest.issues.createLabel({
         owner: config.owner,
         repo: config.repo,
-        name,
-        color: color.replace('#', ''), // GitHub API expects color without #
-        description
+        name: body.name,
+        color: body.color,
+        description: body.description
       });
 
       const label: Label = {
         id: data.id,
         name: data.name,
         color: data.color,
-        description: data.description || null
+        description: data.description,
       };
 
       // Save to database
       await saveLabel(config.owner, config.repo, label);
 
-      // Update cache if it exists
-      const cacheKey = CACHE_KEYS.LABELS(config.owner, config.repo);
-      const cachedLabels = cacheManager?.get<Label[]>(cacheKey);
-      if (cachedLabels) {
-        const updatedLabels = [...cachedLabels, label];
-        cacheManager?.set(cacheKey, updatedLabels, { expiry: CACHE_EXPIRY.LABELS });
-      }
-
       return NextResponse.json(label);
-    } catch (error: unknown) {
-      const err = error as GitHubApiError;
-      console.error('GitHub API error:', err.response?.data || error);
+    } catch (err) {
+      console.error('GitHub API error:', (err as GitHubApiError).response?.data || err);
       return NextResponse.json(
-        { error: err.response?.data?.message || 'Failed to create label on GitHub' },
-        { status: err.response?.status || 500 }
+        { error: (err as GitHubApiError).response?.data?.message || 'Failed to create label on GitHub' },
+        { status: (err as GitHubApiError).response?.status || 500 }
       );
     }
-  } catch (error: unknown) {
-    const err = error as Error;
-    console.error('Error in create label route:', error);
+  } catch (err) {
+    console.error('Error in create label route:', err);
     return NextResponse.json(
-      { error: err.message || 'Failed to create label' },
+      { error: (err as Error).message || 'Failed to create label' },
       { status: 500 }
     );
   }

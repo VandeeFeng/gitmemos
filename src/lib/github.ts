@@ -1,4 +1,4 @@
-import { GitHubConfig, Issue, Label, DbConfig, GitHubApiError } from '@/types/github';
+import { GitHubConfig, Issue, Label, DbConfig } from '@/types/github';
 import { getConfig, saveConfig, getIssues as getIssuesFromApi, checkSyncStatus, recordSync, getLabels as getLabelsFromDb, saveLabel, saveIssue } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 import { Octokit } from 'octokit';
@@ -9,16 +9,14 @@ function convertDbConfigToGitHubConfig(dbConfig: DbConfig): GitHubConfig {
   return {
     owner: dbConfig.owner,
     repo: dbConfig.repo,
-    token: dbConfig.token,
     issuesPerPage: dbConfig.issues_per_page
   };
 }
 
-function convertGitHubConfigToDbConfig(githubConfig: GitHubConfig): DbConfig {
+function convertGitHubConfigToDbConfig(githubConfig: GitHubConfig): Omit<DbConfig, 'token'> {
   return {
     owner: githubConfig.owner,
     repo: githubConfig.repo,
-    token: githubConfig.token,
     issues_per_page: githubConfig.issuesPerPage
   };
 }
@@ -26,7 +24,11 @@ function convertGitHubConfigToDbConfig(githubConfig: GitHubConfig): DbConfig {
 export async function setGitHubConfig(newConfig: GitHubConfig) {
   config = newConfig;
   // Save to database via API
-  await saveConfig(convertGitHubConfigToDbConfig(newConfig));
+  const dbConfig = {
+    ...convertGitHubConfigToDbConfig(newConfig),
+    token: process.env.GITHUB_TOKEN || ''
+  };
+  await saveConfig(dbConfig);
   // Update cache
   cacheManager?.set(
     CACHE_KEYS.CONFIG(newConfig.owner, newConfig.repo),
@@ -39,32 +41,48 @@ export async function getGitHubConfig(): Promise<GitHubConfig> {
   try {
     // 1. Use runtime config first
     if (config) {
-      console.log('Using runtime config:', { owner: config.owner, repo: config.repo, hasToken: !!config.token });
+      console.log('Using runtime config:', { 
+        owner: config.owner, 
+        repo: config.repo,
+        issuesPerPage: config.issuesPerPage 
+      });
       return config;
     }
 
     // 2. Get from cache/API
     const dbConfig = await getConfig();
-    console.log('Got config from API:', dbConfig ? { owner: dbConfig.owner, repo: dbConfig.repo, hasToken: !!dbConfig.token } : 'null');
+    console.log('Got config from API:', dbConfig ? { 
+      owner: dbConfig.owner, 
+      repo: dbConfig.repo,
+      issuesPerPage: dbConfig.issues_per_page 
+    } : 'null');
     
     if (!dbConfig) {
       throw new Error('Failed to get GitHub configuration');
     }
 
-    if (!dbConfig.owner || !dbConfig.repo || !dbConfig.token) {
+    if (!dbConfig.owner || !dbConfig.repo) {
       throw new Error('Incomplete GitHub configuration. Please check your settings.');
     }
 
     const cacheKey = CACHE_KEYS.CONFIG(dbConfig.owner, dbConfig.repo);
     const cached = cacheManager?.get<GitHubConfig>(cacheKey);
     if (cached) {
-      console.log('Using cached config:', { owner: cached.owner, repo: cached.repo, hasToken: !!cached.token });
+      console.log('Using cached config:', { 
+        owner: cached.owner, 
+        repo: cached.repo,
+        issuesPerPage: cached.issuesPerPage 
+      });
       config = cached;
       return cached;
     }
     
     const githubConfig = convertDbConfigToGitHubConfig(dbConfig);
-    console.log('Created new GitHub config:', { owner: githubConfig.owner, repo: githubConfig.repo, hasToken: !!githubConfig.token });
+    console.log('Created new GitHub config:', { 
+      owner: githubConfig.owner, 
+      repo: githubConfig.repo,
+      issuesPerPage: githubConfig.issuesPerPage 
+    });
     config = githubConfig;
     cacheManager?.set(cacheKey, githubConfig, { expiry: CACHE_EXPIRY.CONFIG });
     return githubConfig;
@@ -120,6 +138,26 @@ function getNextRequestId() {
   return `req_${++requestCounter}`;
 }
 
+// Helper function to get GitHub token from environment or database
+export async function getGitHubToken(): Promise<string> {
+  try {
+    const response = await fetch('/api/github/token');
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to get GitHub token');
+    }
+
+    if (!data.token) {
+      throw new Error('GitHub token not found');
+    }
+
+    return data.token;
+  } catch {
+    throw new Error('Failed to get GitHub token');
+  }
+}
+
 // Optimized getIssues function
 export async function getIssues(
   page: number = 1, 
@@ -133,9 +171,8 @@ export async function getIssues(
     throw new Error('Missing owner or repo in config');
   }
 
-  if (!config.token) {
-    throw new Error('GitHub token is missing');
-  }
+  // Get token from environment or database
+  const token = await getGitHubToken();
 
   const lockKey = getRequestLockKey(config.owner, config.repo, page, labels);
 
@@ -198,7 +235,7 @@ export async function getIssues(
       if (needsGitHubSync || forceSync) {
         console.log(`[${requestId}] Syncing with GitHub...`);
         try {
-          const octokit = new Octokit({ auth: config.token });
+          const octokit = new Octokit({ auth: token });
 
           // 获取上次成功同步的时间
           const syncStatus = await checkSyncStatus(config.owner, config.repo);
@@ -291,25 +328,9 @@ export async function getIssues(
               lastSyncAt: new Date().toISOString()
             }
           };
-        } catch (error) {
-          console.error(`[${requestId}] GitHub API sync failed:`, (error as GitHubApiError).response?.data || error);
-          
-          // Record failed sync
-          await recordSync(
-            config.owner, 
-            config.repo, 
-            'failed',
-            0,
-            (error as GitHubApiError).response?.data?.message || (error as Error).message
-          );
-          
-          // Enhance error message with more details
-          const errorMessage = (error as GitHubApiError).response?.data?.message || (error as Error).message;
-          const enhancedError = new Error(`GitHub API sync failed: ${errorMessage}`);
-          if ((error as GitHubApiError).response?.status) {
-            (enhancedError as GitHubApiError).response = (error as GitHubApiError).response;
-          }
-          throw enhancedError;
+        } catch (err) {
+          console.error(`[${requestId}] Error syncing with GitHub:`, err);
+          throw err;
         }
       }
 
@@ -337,9 +358,9 @@ export async function getIssues(
           lastSyncAt: syncStatus.lastSyncAt || new Date().toISOString()
         } : null
       };
-    } catch (error) {
-      console.error(`[${requestId}] Error in getIssues:`, error);
-      throw error;
+    } catch (err) {
+      console.error(`[${requestId}] Error in getIssues:`, err);
+      throw err;
     } finally {
       delete requestLocks[lockKey];
     }
@@ -447,17 +468,12 @@ export async function getIssue(issueNumber: number, forceSync: boolean = false):
 }
 
 export async function createIssue(title: string, body: string, labels: string[]): Promise<Issue> {
-  console.log('Creating issue using GitHub API:', { title, labels });
-  
   const config = await getGitHubConfig();
-  if (!config.token || !config.owner || !config.repo) {
-    throw new Error('GitHub configuration is incomplete');
-  }
+  const token = await getGitHubToken();
 
-  const client = new Octokit({ auth: config.token });
-  
   try {
-    const { data } = await client.rest.issues.create({
+    const octokit = new Octokit({ auth: token });
+    const { data } = await octokit.rest.issues.create({
       owner: config.owner,
       repo: config.repo,
       title,
@@ -488,9 +504,9 @@ export async function createIssue(title: string, body: string, labels: string[])
     console.log('Issue created successfully:', { number: issue.number, title: issue.title });
     
     return issue;
-  } catch (error) {
-    console.error('GitHub API error:', error);
-    throw new Error(error instanceof Error ? error.message : 'Failed to create issue');
+  } catch (err) {
+    console.error('Error creating issue:', err);
+    throw err;
   }
 }
 
@@ -500,17 +516,12 @@ export async function updateIssue(
   body: string,
   labels: string[]
 ): Promise<Issue> {
-  console.log('Updating issue using GitHub API:', { issueNumber, title, labels });
-  
   const config = await getGitHubConfig();
-  if (!config.token || !config.owner || !config.repo) {
-    throw new Error('GitHub configuration is incomplete');
-  }
+  const token = await getGitHubToken();
 
-  const client = new Octokit({ auth: config.token });
-  
   try {
-    const { data } = await client.rest.issues.update({
+    const octokit = new Octokit({ auth: token });
+    const { data } = await octokit.rest.issues.update({
       owner: config.owner,
       repo: config.repo,
       issue_number: issueNumber,
@@ -542,20 +553,21 @@ export async function updateIssue(
     console.log('Issue updated successfully:', { number: issue.number, title: issue.title });
     
     return issue;
-  } catch (error) {
-    console.error('GitHub API error:', error);
-    throw new Error(error instanceof Error ? error.message : 'Failed to update issue');
+  } catch (err) {
+    console.error('Error updating issue:', err);
+    throw err;
   }
 }
 
 export async function getLabels(forceSync: boolean = false): Promise<Label[]> {
   const config = await getGitHubConfig();
+  const token = await getGitHubToken();
 
   if (!config.owner || !config.repo) {
     throw new Error('Missing owner or repo in config');
   }
 
-  if (!config.token) {
+  if (!token) {
     throw new Error('GitHub token is missing');
   }
 
@@ -577,14 +589,14 @@ export async function getLabels(forceSync: boolean = false): Promise<Label[]> {
         cacheManager?.set(cacheKey, dbLabels, { expiry: CACHE_EXPIRY.LABELS });
         return dbLabels;
       }
-    } catch (error) {
-      console.warn('Failed to check database for labels:', error);
+    } catch (err) {
+      console.warn('Failed to check database for labels:', err);
     }
   }
 
   try {
     console.log('Fetching labels from GitHub API...');
-    const octokit = new Octokit({ auth: config.token });
+    const octokit = new Octokit({ auth: token });
     const { data } = await octokit.rest.issues.listLabelsForRepo({
       owner: config.owner,
       repo: config.repo,
@@ -607,26 +619,34 @@ export async function getLabels(forceSync: boolean = false): Promise<Label[]> {
     }
 
     return labels;
-  } catch (error) {
-    console.error('GitHub API error:', (error as GitHubApiError).response?.data || error);
-    throw new Error(
-      `Failed to fetch labels: ${(error as GitHubApiError).response?.data?.message || (error as Error).message}`
-    );
+  } catch (err) {
+    console.error('Error fetching labels:', err);
+    throw err;
   }
 }
 
 export async function createLabel(name: string, color: string, description?: string): Promise<Label> {
-  const response = await fetch('/api/github/labels', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ name, color, description }),
-  });
+  const config = await getGitHubConfig();
+  const token = await getGitHubToken();
 
-  if (!response.ok) {
-    throw new Error(`Failed to create label: ${response.statusText}`);
+  try {
+    const octokit = new Octokit({ auth: token });
+    const { data } = await octokit.rest.issues.createLabel({
+      owner: config.owner,
+      repo: config.repo,
+      name,
+      color,
+      description
+    });
+
+    return {
+      id: data.id,
+      name: data.name,
+      color: data.color,
+      description: data.description,
+    };
+  } catch (err) {
+    console.error('Error creating label:', err);
+    throw err;
   }
-
-  return response.json();
 }

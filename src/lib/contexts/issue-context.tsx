@@ -113,11 +113,6 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         console.log(`Successfully synced ${labels.length} labels`);
       }
 
-      // 清除标签缓存
-      if (configRef.current) {
-        cacheManager?.remove(CACHE_KEYS.LABELS(configRef.current.owner, configRef.current.repo));
-      }
-
       // 获取上次同步状态
       const syncStatus = await checkSyncStatus(configRef.current.owner, configRef.current.repo);
       const isFullSync = !syncStatus?.lastSyncAt;
@@ -195,6 +190,22 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           updatedIssues = Array.from(existingIssues.values());
         }
 
+        // 清理所有相关缓存
+        console.log('Clearing all related caches after sync...');
+        if (configRef.current) {
+          const { owner, repo } = configRef.current;
+          const stats = cacheManager?.getStats();
+          if (stats) {
+            stats.keys.forEach(key => {
+              if (key.includes(`${owner}:${repo}`)) {
+                cacheManager?.remove(key);
+                console.log(`Cleared cache: ${key}`);
+              }
+            });
+          }
+        }
+
+        // 设置新的缓存
         const newState: CacheData = {
           issues: updatedIssues,
           config: prev.config,
@@ -205,6 +216,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           newState,
           { expiry: CACHE_EXPIRY.ISSUES }
         );
+        console.log('New cache set successfully');
 
         return { 
           ...prev,

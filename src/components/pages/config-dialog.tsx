@@ -2,18 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { getGitHubConfig, setGitHubConfig } from '@/lib/github';
-import { verifyPassword, isPasswordVerified, setPasswordVerified as setPasswordVerifiedState } from '@/lib/api';
+import { getGitHubConfig } from '@/lib/github';
+import { verifyPassword, isPasswordVerified, setPasswordVerified as setPasswordVerifiedState } from '@/lib/supabase-client';
 import { GitHubConfig } from '@/types/github';
 import { toast } from 'sonner';
 
 interface ConfigDialogProps {
   isOpen: boolean;
   onClose: () => void;
+  onSave: (config: GitHubConfig) => Promise<void>;
 }
 
-export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
-  const [config, setConfig] = useState<GitHubConfig>({
+export function ConfigDialog({ isOpen, onClose, onSave }: ConfigDialogProps) {
+  const [config, setConfigState] = useState<GitHubConfig>({
     owner: '',
     repo: '',
     issuesPerPage: 10
@@ -27,7 +28,7 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
     if (isOpen) {
       getGitHubConfig()
         .then(config => {
-          setConfig(prev => ({
+          setConfigState(prev => ({
             ...prev,
             owner: config.owner,
             repo: config.repo,
@@ -72,12 +73,11 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
 
     setSaving(true);
     try {
-      await setGitHubConfig(config);
-      toast.success('Configuration saved successfully');
+      await onSave(config);
+      toast.success('Configuration saved');
       onClose();
-      // 刷新页面以应用新配置
-      window.location.reload();
-    } catch {
+    } catch (error) {
+      console.error('Failed to save config:', error);
       toast.error('Failed to save configuration');
     } finally {
       setSaving(false);
@@ -105,7 +105,7 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
             <input
               type="text"
               value={config.owner}
-              onChange={(e) => setConfig(prev => ({ ...prev, owner: e.target.value }))}
+              onChange={(e) => setConfigState(prev => ({ ...prev, owner: e.target.value }))}
               className="w-full px-3 py-2 text-sm border border-default rounded-lg bg-bg-primary dark:bg-bg-tertiary focus:outline-none focus:ring-1 focus:ring-secondary dark:focus:ring-secondary transition-shadow"
               placeholder="e.g. octocat"
             />
@@ -119,7 +119,7 @@ export function ConfigDialog({ isOpen, onClose }: ConfigDialogProps) {
             <input
               type="text"
               value={config.repo}
-              onChange={(e) => setConfig(prev => ({ ...prev, repo: e.target.value }))}
+              onChange={(e) => setConfigState(prev => ({ ...prev, repo: e.target.value }))}
               className="w-full px-3 py-2 text-sm border border-default rounded-lg bg-bg-primary dark:bg-bg-tertiary focus:outline-none focus:ring-1 focus:ring-secondary dark:focus:ring-secondary transition-shadow"
               placeholder="e.g. hello-world"
             />

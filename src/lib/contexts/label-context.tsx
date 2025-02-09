@@ -35,8 +35,8 @@ export function LabelProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
-      const labelsData = await getLabels(true); // Force sync
-      setLabels(labelsData);
+      const labelsData = await getLabels();
+      setLabels(labelsData || []);
     } catch (error) {
       console.error('Error syncing labels:', error);
       setError(error instanceof Error ? error.message : 'Failed to sync labels');
@@ -68,7 +68,7 @@ export function LabelProvider({ children }: { children: ReactNode }) {
         setLoading(true);
         setError(null);
         const labelsData = await getLabels();
-        setLabels(labelsData);
+        setLabels(labelsData || []);
       } catch (error) {
         console.error('Error initializing labels:', error);
         setError(error instanceof Error ? error.message : 'Failed to initialize labels');

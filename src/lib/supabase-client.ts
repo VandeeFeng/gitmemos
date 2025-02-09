@@ -1,13 +1,14 @@
 import { Issue, Label } from '@/types/github';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY, authStore } from './cache';
 import { BaseGitHubConfig, ServerGitHubConfig } from '@/types/config';
+import { getApiUrl } from './utils';
 
 type SyncStatus = 'success' | 'failed';
 
 // Auth API
 export async function verifyPassword(password: string): Promise<boolean> {
   try {
-    const response = await fetch('/api/supabase/auth', {
+    const response = await fetch(getApiUrl('/api/supabase/auth'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -41,55 +42,8 @@ export function isPasswordVerified(): boolean {
 // Config API
 export async function getConfig(): Promise<ServerGitHubConfig | null> {
   try {
-    console.log('Getting config from environment variables...');
-    
-    // First try to get config from environment variables
-    const envConfig: Partial<ServerGitHubConfig> = {
-      owner: process.env.GITHUB_OWNER,
-      repo: process.env.GITHUB_REPO,
-      token: process.env.GITHUB_TOKEN,
-      issuesPerPage: 10
-    };
-
-    // Log environment config (without sensitive info)
-    const safeConfig: Partial<BaseGitHubConfig> = {
-      owner: envConfig.owner,
-      repo: envConfig.repo,
-      issuesPerPage: envConfig.issuesPerPage
-    };
-    
-    console.log('Environment config:', {
-      ...safeConfig,
-      hasToken: !!envConfig.token
-    });
-
-    // If we have complete environment config, use it
-    if (envConfig.owner && envConfig.repo && envConfig.token) {
-      // Create safe config for caching (without sensitive info)
-      const cacheConfig: BaseGitHubConfig = {
-        owner: envConfig.owner,
-        repo: envConfig.repo,
-        issuesPerPage: envConfig.issuesPerPage || 10
-      };
-      
-      // Cache only safe config
-      cacheManager?.set(
-        CACHE_KEYS.CONFIG(cacheConfig.owner, cacheConfig.repo),
-        cacheConfig,
-        { expiry: CACHE_EXPIRY.CONFIG }
-      );
-      
-      // Return full config including token (only for internal use)
-      return {
-        ...cacheConfig,
-        token: envConfig.token
-      };
-    }
-
-    console.log('Environment config incomplete, trying API...');
-
-    // If environment config is incomplete, try API
-    const response = await fetch('/api/supabase/config');
+    // Try to get config from API
+    const response = await fetch(getApiUrl('/api/supabase/config'));
     if (!response.ok) {
       throw new Error('Failed to fetch config from API');
     }
@@ -121,18 +75,14 @@ export async function getConfig(): Promise<ServerGitHubConfig | null> {
   }
 }
 
-export async function saveConfig(config: Omit<ServerGitHubConfig, 'issuesPerPage'>): Promise<ServerGitHubConfig | null> {
+export async function saveConfig(config: BaseGitHubConfig): Promise<boolean> {
   try {
-    const response = await fetch('/api/supabase/config', {
+    const response = await fetch(getApiUrl('/api/supabase/config'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        owner: config.owner,
-        repo: config.repo,
-        token: config.token
-      }),
+      body: JSON.stringify(config),
     });
     
     if (!response.ok) {
@@ -155,10 +105,10 @@ export async function saveConfig(config: Omit<ServerGitHubConfig, 'issuesPerPage
       );
     }
     
-    return data;
+    return true;
   } catch (error) {
     console.error('Error saving config:', error);
-    return null;
+    return false;
   }
 }
 
@@ -195,7 +145,7 @@ export async function getIssues(
     }
 
     console.log('API: Fetching issues from Supabase...');
-    const response = await fetch(`/api/supabase/issues?${params}`);
+    const response = await fetch(getApiUrl(`/api/supabase/issues?${params}`));
     if (!response.ok) {
       throw new Error('Failed to fetch issues');
     }
@@ -227,7 +177,7 @@ export async function getIssues(
 
 export async function saveIssue(owner: string, repo: string, issue: Issue): Promise<boolean> {
   try {
-    const response = await fetch('/api/supabase/issues', {
+    const response = await fetch(getApiUrl('/api/supabase/issues'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -251,7 +201,7 @@ export async function saveIssue(owner: string, repo: string, issue: Issue): Prom
 
 export async function saveIssues(owner: string, repo: string, issues: Issue[]): Promise<boolean> {
   try {
-    const response = await fetch('/api/supabase/issues', {
+    const response = await fetch(getApiUrl('/api/supabase/issues'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -284,7 +234,7 @@ export async function getLabels(owner: string, repo: string): Promise<Label[] | 
     }
 
     const params = new URLSearchParams({ owner, repo });
-    const response = await fetch(`/api/supabase/labels?${params}`);
+    const response = await fetch(getApiUrl(`/api/supabase/labels?${params}`));
     
     if (!response.ok) {
       throw new Error('Failed to fetch labels');
@@ -304,7 +254,7 @@ export async function getLabels(owner: string, repo: string): Promise<Label[] | 
 
 export async function saveLabel(owner: string, repo: string, label: Label): Promise<boolean> {
   try {
-    const response = await fetch('/api/supabase/labels', {
+    const response = await fetch(getApiUrl('/api/supabase/labels'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -341,7 +291,7 @@ export async function recordSync(
   sync_type: 'webhook' | 'full' | 'add' = 'full'
 ): Promise<boolean> {
   try {
-    const response = await fetch('/api/supabase/sync', {
+    const response = await fetch(getApiUrl('/api/supabase/sync'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -375,7 +325,7 @@ export async function checkSyncStatus(owner: string, repo: string): Promise<{
   issuesSynced?: number;
 } | null> {
   try {
-    const response = await fetch(`/api/supabase/sync?owner=${owner}&repo=${repo}`);
+    const response = await fetch(getApiUrl(`/api/supabase/sync?owner=${owner}&repo=${repo}`));
     
     if (!response.ok) {
       throw new Error('Failed to check sync status');
@@ -385,5 +335,27 @@ export async function checkSyncStatus(owner: string, repo: string): Promise<{
   } catch (error) {
     console.error('Error checking sync status:', error);
     return null;
+  }
+}
+
+export async function syncIssues(owner: string, repo: string): Promise<SyncStatus> {
+  try {
+    const response = await fetch(getApiUrl('/api/supabase/sync'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ owner, repo }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to sync issues');
+    }
+
+    const data = await response.json();
+    return data.status;
+  } catch (error) {
+    console.error('Error syncing issues:', error);
+    throw error;
   }
 }

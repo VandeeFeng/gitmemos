@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { Octokit } from 'octokit';
 
 // Helper function to verify request origin
 async function isValidOrigin(request: Request) {
@@ -14,6 +15,19 @@ async function isValidOrigin(request: Request) {
   return allowedOrigins.some(allowed => 
     origin === allowed || referer?.startsWith(allowed || '')
   );
+}
+
+// Helper function to validate GitHub token
+async function validateGitHubToken(token: string): Promise<boolean> {
+  try {
+    const octokit = new Octokit({ auth: token });
+    // Try to get the authenticated user to verify token
+    await octokit.rest.users.getAuthenticated();
+    return true;
+  } catch (error) {
+    console.error('Token validation failed:', error);
+    return false;
+  }
 }
 
 export async function GET(request: Request) {
@@ -36,16 +50,26 @@ export async function GET(request: Request) {
       );
     }
 
+    // Validate the token
+    const isValid = await validateGitHubToken(token);
+    if (!isValid) {
+      console.error('Invalid GitHub token');
+      return NextResponse.json(
+        { error: 'Invalid GitHub token' },
+        { status: 401 }
+      );
+    }
+
     // Only return a masked version of the token for verification purposes
     const maskedToken = `${token.substring(0, 4)}...${token.substring(token.length - 4)}`;
 
     return NextResponse.json({ 
-      token,
       masked: maskedToken,
       // Add additional security-related information
       expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
       scope: 'repo',
-      type: 'bearer'
+      type: 'bearer',
+      isValid: true
     });
   } catch (error) {
     console.error('Error getting GitHub token:', error);

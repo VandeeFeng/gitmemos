@@ -1,36 +1,21 @@
 import { NextResponse } from 'next/server';
-import { Octokit } from 'octokit';
-import { getGitHubConfig, getGitHubToken } from '@/lib/github';
-import { Label, GitHubApiError } from '@/types/github';
-import { getLabels, saveLabel } from '@/lib/api';
+import { getGitHubConfig } from '@/lib/github';
+import { Label } from '@/types/github';
+import { getLabels, saveLabel } from '@/lib/supabase-client';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
-
-// Helper function to get Octokit instance
-async function getOctokit() {
-  const token = await getGitHubToken();
-  return new Octokit({ auth: token });
-}
+import { fetchLabels, createGitHubLabel } from '@/lib/github-api';
 
 // GET /api/github/labels
 export async function GET() {
   try {
     const config = await getGitHubConfig();
-    const token = await getGitHubToken();
-    console.log('GitHub config:', { owner: config.owner, repo: config.repo, hasToken: !!token });
+    console.log('GitHub config:', { owner: config.owner, repo: config.repo });
 
     if (!config.owner || !config.repo) {
       console.error('Missing owner or repo in config');
       return NextResponse.json(
         { error: 'Missing owner or repo in config' },
         { status: 400 }
-      );
-    }
-
-    if (!token) {
-      console.error('Missing GitHub token');
-      return NextResponse.json(
-        { error: 'GitHub token is missing' },
-        { status: 401 }
       );
     }
 
@@ -56,21 +41,10 @@ export async function GET() {
       console.warn('Failed to check database for labels:', err);
     }
 
-    // If not in cache or database, fetch from GitHub API
+    // If not found in cache or database, fetch from GitHub API
     try {
       console.log('Fetching labels from GitHub API...');
-      const client = await getOctokit();
-      const { data } = await client.rest.issues.listLabelsForRepo({
-        owner: config.owner,
-        repo: config.repo,
-      });
-
-      const labels = data.map(label => ({
-        id: label.id,
-        name: label.name,
-        color: label.color,
-        description: label.description,
-      }));
+      const labels = await fetchLabels(config.owner, config.repo);
 
       // Update cache
       cacheManager?.set(cacheKey, labels, { expiry: CACHE_EXPIRY.LABELS });
@@ -82,16 +56,16 @@ export async function GET() {
 
       return NextResponse.json(labels);
     } catch (err) {
-      console.error('GitHub API error:', (err as GitHubApiError).response?.data || err);
+      console.error('GitHub API error:', err);
       return NextResponse.json(
-        { error: (err as GitHubApiError).response?.data?.message || 'Failed to fetch labels from GitHub' },
-        { status: (err as GitHubApiError).response?.status || 500 }
+        { error: 'Failed to fetch labels from GitHub' },
+        { status: 500 }
       );
     }
   } catch (err) {
     console.error('Error in labels route:', err);
     return NextResponse.json(
-      { error: (err as Error).message || 'Failed to fetch labels' },
+      { error: 'Failed to process request' },
       { status: 500 }
     );
   }
@@ -102,7 +76,6 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const config = await getGitHubConfig();
-    const token = await getGitHubToken();
 
     if (!config.owner || !config.repo) {
       return NextResponse.json(
@@ -111,46 +84,30 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!token) {
-      return NextResponse.json(
-        { error: 'GitHub token is missing' },
-        { status: 401 }
-      );
-    }
-
-    const client = await getOctokit();
-
     try {
-      const { data } = await client.rest.issues.createLabel({
-        owner: config.owner,
-        repo: config.repo,
-        name: body.name,
-        color: body.color,
-        description: body.description
-      });
-
-      const label: Label = {
-        id: data.id,
-        name: data.name,
-        color: data.color,
-        description: data.description,
-      };
+      const label = await createGitHubLabel(
+        config.owner,
+        config.repo,
+        body.name,
+        body.color,
+        body.description
+      );
 
       // Save to database
       await saveLabel(config.owner, config.repo, label);
 
       return NextResponse.json(label);
     } catch (err) {
-      console.error('GitHub API error:', (err as GitHubApiError).response?.data || err);
+      console.error('GitHub API error:', err);
       return NextResponse.json(
-        { error: (err as GitHubApiError).response?.data?.message || 'Failed to create label on GitHub' },
-        { status: (err as GitHubApiError).response?.status || 500 }
+        { error: 'Failed to create label on GitHub' },
+        { status: 500 }
       );
     }
   } catch (err) {
     console.error('Error in create label route:', err);
     return NextResponse.json(
-      { error: (err as Error).message || 'Failed to create label' },
+      { error: 'Failed to create label' },
       { status: 500 }
     );
   }

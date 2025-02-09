@@ -41,7 +41,10 @@ export const CACHE_KEYS = {
     `labels:${owner}:${repo}`,
   
   CONFIG: (owner: string, repo: string) =>
-    `config:${owner}:${repo}`
+    `config:${owner}:${repo}`,
+    
+  SINGLE_ISSUE: (owner: string, repo: string, issueNumber: number) =>
+    `issue:${owner}:${repo}:${issueNumber}`
 } as const;
 
 // 缓存过期时间常量

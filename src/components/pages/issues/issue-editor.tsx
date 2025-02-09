@@ -3,14 +3,14 @@
 import { useState, useEffect, useRef } from 'react';
 import MDEditor from '@uiw/react-md-editor';
 import { Button } from '@/components/ui/button';
-import { EditableIssue, GitHubConfig } from '@/types/github';
-import { getGitHubConfig, getGitHubToken } from '@/lib/github';
+import { EditableIssue, GitHubConfig, Label } from '@/types/github';
+import { getGitHubConfig, getToken } from '@/lib/github';
 import { createIssue, updateIssue, createLabel } from '@/lib/github';
 import { LABEL_COLORS } from '@/lib/colors';
 import { useLabels } from '@/lib/contexts/label-context';
 import { useIssues } from '@/lib/contexts/issue-context';
 import { useTheme } from 'next-themes';
-import { isPasswordVerified } from '@/lib/api';
+import { isPasswordVerified } from '@/lib/supabase-client';
 import { toast } from 'sonner';
 
 interface IssueEditorProps {
@@ -34,26 +34,26 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
   });
   const [saving, setSaving] = useState(false);
   const [creatingLabel, setCreatingLabel] = useState(false);
-  const [passwordVerified, setPasswordVerified] = useState(false);
-  const [config, setConfig] = useState<GitHubConfig | null>(null);
+  const passwordVerifiedRef = useRef(false);
+  const configRef = useRef<GitHubConfig | null>(null);
   const labelDropdownRef = useRef<HTMLDivElement>(null);
   const labelButtonRef = useRef<HTMLButtonElement>(null);
   
   // Use the LabelContext and IssueContext
-  const { labels: availableLabels, updateLabels } = useLabels();
+  const { labels: availableLabels = [], updateLabels } = useLabels();
   const { refreshIssues } = useIssues();
 
   const { theme } = useTheme();
 
   useEffect(() => {
-    setPasswordVerified(isPasswordVerified());
+    passwordVerifiedRef.current = isPasswordVerified();
   }, []);
 
   useEffect(() => {
     async function initConfig() {
       try {
         const githubConfig = await getGitHubConfig();
-        setConfig(githubConfig);
+        configRef.current = githubConfig;
       } catch (error) {
         console.error('Error getting GitHub config:', error);
         toast.error('Failed to get GitHub configuration');
@@ -81,12 +81,12 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
 
   const handleSave = async () => {
     try {
-      if (!config || !config.owner || !config.repo) {
+      if (!configRef.current || !configRef.current.owner || !configRef.current.repo) {
         toast.error('Missing GitHub configuration');
         return;
       }
 
-      const token = await getGitHubToken();
+      const token = await getToken();
       if (!token) {
         toast.error('GitHub token not found');
         return;
@@ -102,7 +102,16 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
         await updateIssue(issue.number, title, content, selectedLabels);
         toast.success('Issue updated successfully');
       } else {
-        await createIssue(title, content, selectedLabels);
+        await createIssue(configRef.current.owner, configRef.current.repo, {
+          title,
+          body: content,
+          labels: selectedLabels.map(name => ({
+            id: 0,
+            name,
+            color: availableLabels.find(l => l.name === name)?.color || '',
+            description: availableLabels.find(l => l.name === name)?.description || null
+          }))
+        });
         toast.success('Issue created successfully');
       }
       // Refresh issues after successful save
@@ -124,36 +133,51 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
 
     setCreatingLabel(true);
     try {
-      const config = await getGitHubConfig();
-      const token = await getGitHubToken();
-
-      if (!config || !config.owner || !config.repo) {
+      if (!configRef.current || !configRef.current.owner || !configRef.current.repo) {
         toast.error('Missing GitHub configuration');
         return;
       }
 
+      const token = await getToken();
       if (!token) {
         toast.error('GitHub token is missing');
         return;
       }
 
-      const createdLabel = await createLabel(
-        newLabel.name,
-        newLabel.color,
-        newLabel.description || undefined
-      );
-      
-      // Update the LabelContext
-      updateLabels([...availableLabels, createdLabel]);
-      
-      // Update local state
-      setSelectedLabels(prev => [...prev, createdLabel.name]);
-      setShowNewLabelForm(false);
-      setNewLabel({ name: '', color: LABEL_COLORS[0].color, description: '' });
-      toast.success('Label created successfully');
+      const success = await createLabel(configRef.current.owner, configRef.current.repo, {
+        id: 0, // GitHub will assign the correct ID
+        name: newLabel.name,
+        color: newLabel.color.replace('#', ''),
+        description: newLabel.description || null
+      });
+
+      if (success) {
+        // Update the LabelContext with the new label
+        const newLabelObj: Label = {
+          id: 0, // GitHub will assign the correct ID
+          name: newLabel.name,
+          color: newLabel.color.replace('#', ''),
+          description: newLabel.description || null
+        };
+        updateLabels([...availableLabels, newLabelObj]);
+        
+        // Update selected labels
+        setSelectedLabels(prev => [...prev, newLabel.name]);
+        
+        // Reset form
+        setNewLabel({
+          name: '',
+          color: LABEL_COLORS[0].color,
+          description: ''
+        });
+        setShowNewLabelForm(false);
+        toast.success('Label created successfully');
+      } else {
+        toast.error('Failed to create label');
+      }
     } catch (error) {
       console.error('Error creating label:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to create label');
+      toast.error('Failed to create label');
     } finally {
       setCreatingLabel(false);
     }
@@ -183,7 +207,7 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
         {selectedLabels.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
             {selectedLabels.map(labelName => {
-              const label = availableLabels.find(l => l.name === labelName);
+              const label = availableLabels?.find(l => l.name === labelName);
               if (!label) return null;
               return (
                 <button
@@ -347,14 +371,14 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
           Cancel
         </Button>
         <div 
-          title={!passwordVerified ? "Please verify password in settings before creating or updating issues" : ""}
-          className={!passwordVerified ? "cursor-not-allowed" : ""}
+          title={!passwordVerifiedRef.current ? "Please verify password in settings before creating or updating issues" : ""}
+          className={!passwordVerifiedRef.current ? "cursor-not-allowed" : ""}
         >
           <Button 
             variant="success" 
             onClick={handleSave} 
-            disabled={saving || !passwordVerified}
-            className={!passwordVerified ? "opacity-50" : ""}
+            disabled={saving || !passwordVerifiedRef.current}
+            className={!passwordVerifiedRef.current ? "opacity-50" : ""}
           >
             {saving ? 'Saving...' : issue ? 'Update issue' : 'Create issue'}
           </Button>

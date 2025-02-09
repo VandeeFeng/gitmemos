@@ -5,6 +5,7 @@ import { IssueList } from '@/components/pages/issues/issue-list';
 import { PageLayout } from '@/components/layouts/page-layout';
 import { GitHubConfig, Issue } from '@/types/github';
 import { ConfigDialog } from '@/components/pages/config-dialog';
+import { setConfig } from '@/lib/github';
 import { toast } from 'sonner';
 
 interface IssueListContainerProps {
@@ -145,7 +146,17 @@ export function IssueListContainer({ initialIssues, onSync }: IssueListContainer
       </PageLayout>
       <ConfigDialog 
         isOpen={showConfig} 
-        onClose={() => setShowConfig(false)} 
+        onClose={() => setShowConfig(false)}
+        onSave={async (config) => {
+          try {
+            await setConfig(config);
+            setShowConfig(false);
+            toast.success('Configuration saved successfully');
+          } catch (error) {
+            console.error('Failed to save config:', error);
+            toast.error('Failed to save configuration');
+          }
+        }}
       />
     </>
   );

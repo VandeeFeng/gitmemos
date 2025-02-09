@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Issue } from '@/types/github';
-import { getIssues } from '@/lib/api';
+import { getIssues } from '@/lib/supabase-client';
 import { useIssues } from '@/lib/contexts/issue-context';
 
 interface BacklinksProps {

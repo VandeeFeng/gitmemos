@@ -1,5 +1,5 @@
 import { Issue, Label } from '@/types/github';
-import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from './cache';
+import { cacheManager, CACHE_KEYS, CACHE_EXPIRY, authStore } from './cache';
 import { BaseGitHubConfig, ServerGitHubConfig } from '@/types/config';
 
 type SyncStatus = 'success' | 'failed';
@@ -21,7 +21,7 @@ export async function verifyPassword(password: string): Promise<boolean> {
 
     const { isValid } = await response.json();
     if (isValid) {
-      cacheManager?.set(CACHE_KEYS.PASSWORD_VERIFIED, true, { expiry: CACHE_EXPIRY.PASSWORD });
+      authStore.setPasswordVerified(true, CACHE_EXPIRY.PASSWORD);
     }
     return isValid;
   } catch (error) {
@@ -31,15 +31,11 @@ export async function verifyPassword(password: string): Promise<boolean> {
 }
 
 export function setPasswordVerified(verified: boolean): void {
-  if (verified) {
-    cacheManager?.set(CACHE_KEYS.PASSWORD_VERIFIED, true, { expiry: CACHE_EXPIRY.PASSWORD });
-  } else {
-    cacheManager?.remove(CACHE_KEYS.PASSWORD_VERIFIED);
-  }
+  authStore.setPasswordVerified(verified, verified ? CACHE_EXPIRY.PASSWORD : undefined);
 }
 
 export function isPasswordVerified(): boolean {
-  return !!cacheManager?.get<boolean>(CACHE_KEYS.PASSWORD_VERIFIED);
+  return authStore.isPasswordVerified();
 }
 
 // Config API

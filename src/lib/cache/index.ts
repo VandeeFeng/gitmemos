@@ -1,5 +1,37 @@
 import { StorageCache } from './storage-cache';
 
+// Memory store for auth state
+class AuthStore {
+  private static instance: AuthStore;
+  private passwordVerified: boolean = false;
+  private expiryTime: number | null = null;
+
+  private constructor() {}
+
+  static getInstance(): AuthStore {
+    if (!AuthStore.instance) {
+      AuthStore.instance = new AuthStore();
+    }
+    return AuthStore.instance;
+  }
+
+  setPasswordVerified(verified: boolean, expiryInMs?: number): void {
+    this.passwordVerified = verified;
+    this.expiryTime = verified ? (expiryInMs ? Date.now() + expiryInMs : null) : null;
+  }
+
+  isPasswordVerified(): boolean {
+    if (!this.passwordVerified) return false;
+    if (this.expiryTime && Date.now() > this.expiryTime) {
+      this.setPasswordVerified(false);
+      return false;
+    }
+    return true;
+  }
+}
+
+export const authStore = AuthStore.getInstance();
+
 // 缓存键常量
 export const CACHE_KEYS = {
   ISSUES: (owner: string, repo: string, page: number, labels?: string) =>
@@ -9,9 +41,7 @@ export const CACHE_KEYS = {
     `labels:${owner}:${repo}`,
   
   CONFIG: (owner: string, repo: string) =>
-    `config:${owner}:${repo}`,
-  
-  PASSWORD_VERIFIED: 'password_verified'
+    `config:${owner}:${repo}`
 } as const;
 
 // 缓存过期时间常量

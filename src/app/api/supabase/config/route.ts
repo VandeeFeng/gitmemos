@@ -13,8 +13,8 @@ export async function GET() {
   try {
     // Log environment variables (without token for security)
     console.log('Environment variables:', {
-      GITHUB_OWNER: process.env.GITHUB_OWNER,
-      GITHUB_REPO: process.env.GITHUB_REPO,
+      GITHUB_OWNER: !!process.env.GITHUB_OWNER,
+      GITHUB_REPO: !!process.env.GITHUB_REPO,
       HAS_TOKEN: !!process.env.GITHUB_TOKEN
     });
 
@@ -26,10 +26,10 @@ export async function GET() {
       token: process.env.GITHUB_TOKEN || ''
     };
 
-    if (envConfig.owner && envConfig.repo) {
+    if (envConfig.owner && envConfig.repo && envConfig.token) {
       console.log('Using environment config:', createSafeConfig(envConfig));
-      // Only return safe config to client
-      return NextResponse.json(createSafeConfig(envConfig));
+      // Return full config including token
+      return NextResponse.json(envConfig);
     }
 
     console.log('Environment config incomplete, trying database');
@@ -49,10 +49,16 @@ export async function GET() {
       );
     }
 
-    console.log('Database config:', createSafeConfig(data as DbConfig));
+    // If we have a token in environment, use it instead of database token
+    const config = {
+      ...data,
+      token: process.env.GITHUB_TOKEN || data.token
+    } as DbConfig;
 
-    // Return safe version of config (without token)
-    return NextResponse.json(createSafeConfig(data as DbConfig));
+    console.log('Database config:', createSafeConfig(config));
+
+    // Return full config including token
+    return NextResponse.json(config);
   } catch (err) {
     console.error('Error in config route:', err);
     return NextResponse.json(

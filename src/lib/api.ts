@@ -1,8 +1,7 @@
-import { Database } from '@/types/supabase';
 import { Issue, Label } from '@/types/github';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from './cache';
+import { BaseGitHubConfig, ServerGitHubConfig } from '@/types/config';
 
-type Config = Database['public']['Tables']['configs']['Row'];
 type SyncStatus = 'success' | 'failed';
 
 // Auth API
@@ -44,53 +43,100 @@ export function isPasswordVerified(): boolean {
 }
 
 // Config API
-export async function getConfig(): Promise<Config | null> {
+export async function getConfig(): Promise<ServerGitHubConfig | null> {
   try {
-    console.log('Fetching config from API...');
-    const response = await fetch('/api/supabase/config');
+    console.log('Getting config from environment variables...');
     
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => null);
-      console.error('Config API error:', {
-        status: response.status,
-        statusText: response.statusText,
-        error: errorData?.error || 'Unknown error'
-      });
-      throw new Error('Failed to fetch config: ' + (errorData?.error || response.statusText));
-    }
+    // First try to get config from environment variables
+    const envConfig: Partial<ServerGitHubConfig> = {
+      owner: process.env.GITHUB_OWNER,
+      repo: process.env.GITHUB_REPO,
+      token: process.env.GITHUB_TOKEN,
+      issuesPerPage: 10
+    };
+
+    // Log environment config (without sensitive info)
+    const safeConfig: Partial<BaseGitHubConfig> = {
+      owner: envConfig.owner,
+      repo: envConfig.repo,
+      issuesPerPage: envConfig.issuesPerPage
+    };
     
-    const data = await response.json();
-    console.log('Config API response:', {
-      hasData: !!data,
-      hasOwner: !!data?.owner,
-      hasRepo: !!data?.repo,
-      hasToken: !!data?.token
+    console.log('Environment config:', {
+      ...safeConfig,
+      hasToken: !!envConfig.token
     });
-    
-    // 缓存配置
-    if (data) {
+
+    // If we have complete environment config, use it
+    if (envConfig.owner && envConfig.repo && envConfig.token) {
+      // Create safe config for caching (without sensitive info)
+      const cacheConfig: BaseGitHubConfig = {
+        owner: envConfig.owner,
+        repo: envConfig.repo,
+        issuesPerPage: envConfig.issuesPerPage || 10
+      };
+      
+      // Cache only safe config
       cacheManager?.set(
-        CACHE_KEYS.CONFIG(data.owner, data.repo),
-        data,
+        CACHE_KEYS.CONFIG(cacheConfig.owner, cacheConfig.repo),
+        cacheConfig,
         { expiry: CACHE_EXPIRY.CONFIG }
       );
+      
+      // Return full config including token (only for internal use)
+      return {
+        ...cacheConfig,
+        token: envConfig.token
+      };
     }
+
+    console.log('Environment config incomplete, trying API...');
+
+    // If environment config is incomplete, try API
+    const response = await fetch('/api/supabase/config');
+    if (!response.ok) {
+      throw new Error('Failed to fetch config from API');
+    }
+
+    const data = await response.json();
     
-    return data;
+    // Create safe config for caching (without sensitive info)
+    const cacheConfig: BaseGitHubConfig = {
+      owner: data.owner,
+      repo: data.repo,
+      issuesPerPage: data.issues_per_page || 10
+    };
+    
+    // Cache only safe config
+    cacheManager?.set(
+      CACHE_KEYS.CONFIG(cacheConfig.owner, cacheConfig.repo),
+      cacheConfig,
+      { expiry: CACHE_EXPIRY.CONFIG }
+    );
+    
+    // Return full config including token (only for internal use)
+    return {
+      ...cacheConfig,
+      token: data.token
+    };
   } catch (error) {
-    console.error('Error fetching config:', error);
+    console.error('Error in getConfig:', error);
     throw error;
   }
 }
 
-export async function saveConfig(config: Omit<Config, 'id' | 'created_at' | 'updated_at'>): Promise<Config | null> {
+export async function saveConfig(config: Omit<ServerGitHubConfig, 'issuesPerPage'>): Promise<ServerGitHubConfig | null> {
   try {
     const response = await fetch('/api/supabase/config', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(config),
+      body: JSON.stringify({
+        owner: config.owner,
+        repo: config.repo,
+        token: config.token
+      }),
     });
     
     if (!response.ok) {
@@ -99,11 +145,16 @@ export async function saveConfig(config: Omit<Config, 'id' | 'created_at' | 'upd
     
     const data = await response.json();
     
-    // 更新缓存
+    // 更新缓存 (只缓存安全配置)
     if (data) {
+      const safeConfig: BaseGitHubConfig = {
+        owner: data.owner,
+        repo: data.repo,
+        issuesPerPage: 10
+      };
       cacheManager?.set(
         CACHE_KEYS.CONFIG(data.owner, data.repo),
-        data,
+        safeConfig,
         { expiry: CACHE_EXPIRY.CONFIG }
       );
     }

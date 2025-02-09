@@ -1,33 +1,15 @@
-import { GitHubConfig, Issue, Label, DbConfig } from '@/types/github';
+import { GitHubConfig, Issue, Label } from '@/types/github';
 import { getConfig, saveConfig, getIssues as getIssuesFromApi, checkSyncStatus, recordSync, getLabels as getLabelsFromDb, saveLabel, saveIssue } from '@/lib/api';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 import { Octokit } from 'octokit';
+import { toGitHubConfig, toDbConfig } from '@/types/config';
 
 let config: GitHubConfig | null = null;
-
-function convertDbConfigToGitHubConfig(dbConfig: DbConfig): GitHubConfig {
-  return {
-    owner: dbConfig.owner,
-    repo: dbConfig.repo,
-    issuesPerPage: dbConfig.issues_per_page
-  };
-}
-
-function convertGitHubConfigToDbConfig(githubConfig: GitHubConfig): Omit<DbConfig, 'token'> {
-  return {
-    owner: githubConfig.owner,
-    repo: githubConfig.repo,
-    issues_per_page: githubConfig.issuesPerPage
-  };
-}
 
 export async function setGitHubConfig(newConfig: GitHubConfig) {
   config = newConfig;
   // Save to database via API
-  const dbConfig = {
-    ...convertGitHubConfigToDbConfig(newConfig),
-    token: process.env.GITHUB_TOKEN || ''
-  };
+  const dbConfig = toDbConfig(newConfig, process.env.GITHUB_TOKEN);
   await saveConfig(dbConfig);
   // Update cache
   cacheManager?.set(
@@ -51,11 +33,16 @@ export async function getGitHubConfig(): Promise<GitHubConfig> {
 
     // 2. Get from cache/API
     const dbConfig = await getConfig();
-    console.log('Got config from API:', dbConfig ? { 
-      owner: dbConfig.owner, 
-      repo: dbConfig.repo,
-      issuesPerPage: dbConfig.issues_per_page 
-    } : 'null');
+    if (dbConfig) {
+      const safeConfig = toGitHubConfig(dbConfig);
+      console.log('Got config from API:', { 
+        owner: safeConfig.owner, 
+        repo: safeConfig.repo,
+        issuesPerPage: safeConfig.issuesPerPage 
+      });
+    } else {
+      console.log('Got config from API: null');
+    }
     
     if (!dbConfig) {
       throw new Error('Failed to get GitHub configuration');
@@ -77,7 +64,7 @@ export async function getGitHubConfig(): Promise<GitHubConfig> {
       return cached;
     }
     
-    const githubConfig = convertDbConfigToGitHubConfig(dbConfig);
+    const githubConfig = toGitHubConfig(dbConfig);
     console.log('Created new GitHub config:', { 
       owner: githubConfig.owner, 
       repo: githubConfig.repo,

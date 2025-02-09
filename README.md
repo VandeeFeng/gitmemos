@@ -56,8 +56,8 @@
    - `GITHUB_WEBHOOK_SECRET`: GitHub webhook 密钥（可选）
 
    ### Supabase 配置
-   - `NEXT_PUBLIC_SUPABASE_URL`: Supabase 项目 URL
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase 匿名密钥
+   - `SUPABASE_URL`: Supabase 项目 URL
+   - `SUPABASE_ANON_KEY`: Supabase 匿名密钥
    - `SUPABASE_SERVICE_ROLE_KEY`: Supabase 服务角色密钥
 
    ### 应用配置

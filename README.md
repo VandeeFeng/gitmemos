@@ -47,14 +47,23 @@
    ```
 
 2. 配置环境变量：
-   创建 `.env.local` 文件：
-   ```
-   GITHUB_TOKEN=your_github_token
-   GITHUB_OWNER=your_github_username
-   GITHUB_REPO=your_repository_name
-   SUPABASE_URL=your_supabase_url
-   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
-   ```
+   复制 `.env.example` 到 `.env.local` 并配置以下环境变量：
+
+   ### GitHub 配置
+   - `GITHUB_TOKEN`: GitHub 个人访问令牌
+   - `GITHUB_OWNER`: GitHub 用户名
+   - `GITHUB_REPO`: GitHub 仓库名
+   - `GITHUB_WEBHOOK_SECRET`: GitHub webhook 密钥（可选）
+
+   ### Supabase 配置
+   - `NEXT_PUBLIC_SUPABASE_URL`: Supabase 项目 URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase 匿名密钥
+   - `SUPABASE_SERVICE_ROLE_KEY`: Supabase 服务角色密钥
+
+   ### 应用配置
+   - `NEXT_PUBLIC_APP_URL`: 应用访问地址
+     - 开发环境: `http://localhost:3000`
+     - 生产环境: 实际域名（如 `https://your-app-url.com`）
 
 3. 启动开发服务器：
    ```bash
@@ -90,6 +99,12 @@ labels 表是用来存储 labels 的，包括 owner, repo, name, color, descript
 sync_history 表是用来存储同步历史的，包括 owner, repo, last_sync_at, issues_synced, status, error_message, created_at, updated_at
 
 这部分可以根据自己的需求进行修改，比如添加更多的字段，或者修改表结构。
+
+## 安全说明
+
+- 所有敏感 API 调用都经过来源验证
+- 带有 `NEXT_PUBLIC_` 前缀的环境变量在浏览器中可访问
+- 请确保 `.env.local` 文件的安全，永远不要将其提交到版本控制系统中
 
 ## TODO
 - [x] 搜索功能 

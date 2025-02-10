@@ -293,7 +293,7 @@ export async function getLabels(): Promise<Label[] | null> {
       throw new Error('Failed to fetch labels');
     }
     const data = await response.json();
-    return data.labels;
+    return data;
   } catch (error) {
     console.error('Error fetching labels:', error);
     return null;

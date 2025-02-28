@@ -17,7 +17,7 @@ export async function GET(request: Request) {
     const { data, error } = await supabaseServer
       .from('labels')
       .select('*')
-      .eq('owner', owner)
+      .eq('owner', owner.toLowerCase())
       .eq('repo', repo)
       .order('name');
 
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     const { data: existingLabel, error: selectError } = await supabaseServer
       .from('labels')
       .select('*')
-      .eq('owner', owner)
+      .eq('owner', owner.toLowerCase())
       .eq('repo', repo)
       .eq('name', label.name)
       .single();
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
           description: label.description,
           updated_at: new Date().toISOString()
         })
-        .eq('owner', owner)
+        .eq('owner', owner.toLowerCase())
         .eq('repo', repo)
         .eq('name', label.name)
         .select();
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
       const { error: insertError, data: insertedData } = await supabaseServer
         .from('labels')
         .insert({
-          owner,
+          owner: owner.toLowerCase(),
           repo,
           name: label.name,
           color: label.color,

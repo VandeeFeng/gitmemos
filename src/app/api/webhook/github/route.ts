@@ -329,7 +329,7 @@ export async function POST(request: Request) {
           const { error: labelError } = await supabaseServer
             .from('labels')
             .upsert({
-              owner,
+              owner: owner.toLowerCase(),
               repo,
               name: data.label.name,
               color: data.label.color,

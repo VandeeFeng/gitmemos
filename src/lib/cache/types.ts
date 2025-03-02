@@ -1,38 +1,38 @@
 export interface CacheOptions {
-  /** 缓存过期时间（毫秒） */
+  /** Cache expiration time (milliseconds) */
   expiry?: number;
-  /** 缓存版本，用于处理缓存更新 */
+  /** Cache version, used to handle cache updates */
   version?: string;
 }
 
 export interface CacheItem<T> {
-  /** 缓存的数据 */
+  /** Cache data */
   data: T;
-  /** 缓存时间戳 */
+  /** Cache timestamp */
   timestamp: number;
-  /** 缓存版本 */
+  /** Cache version */
   version: string;
-  /** 缓存过期时间（毫秒） */
+  /** Cache expiration time (milliseconds) */
   expiry: number;
 }
 
 export interface CacheManager {
-  /** 设置缓存 */
+  /** Set cache */
   set<T>(key: string, data: T, options?: Partial<CacheOptions>): void;
   
-  /** 获取缓存 */
+  /** Get cache */
   get<T>(key: string): T | null;
   
-  /** 删除缓存 */
+  /** Remove cache */
   remove(key: string): void;
   
-  /** 清除所有缓存 */
+  /** Clear all cache */
   clear(): void;
   
-  /** 检查缓存是否存在且有效 */
+  /** Check if cache exists and is valid */
   has(key: string): boolean;
   
-  /** 获取缓存状态 */
+  /** Get cache stats */
   getStats(): {
     size: number;
     keys: string[];

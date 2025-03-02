@@ -19,16 +19,16 @@ export function Backlinks({ currentIssueNumber }: BacklinksProps) {
     
     setLoading(true);
     try {
-      // 优先使用上下文中的 issues
+      // Prioritize issues from context
       let allIssues = issues;
       
-      // 如果上下文中没有 issues，则从 API 获取
+      // If no issues in context, fetch from API
       if (!allIssues || allIssues.length === 0) {
         const response = await getIssues(config.owner, config.repo);
         allIssues = response?.issues || [];
       }
       
-      // 过滤出引用了当前 issue 的其他 issues
+      // Filter issues that reference the current issue
       const linkedIssues = allIssues.filter(issue => {
         const pattern = new RegExp(`#${currentIssueNumber}\\b`);
         return issue.number !== currentIssueNumber && pattern.test(issue.body || '');
@@ -43,7 +43,7 @@ export function Backlinks({ currentIssueNumber }: BacklinksProps) {
   }, [config, issues, currentIssueNumber]);
 
   useEffect(() => {
-    // 使用 setTimeout 来延迟执行，避免在短时间内多次触发
+    // Use setTimeout to delay execution, avoiding multiple triggers in a short time
     const timer = setTimeout(fetchBacklinks, 100);
     return () => clearTimeout(timer);
   }, [fetchBacklinks]);

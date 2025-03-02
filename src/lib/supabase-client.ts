@@ -315,7 +315,7 @@ export async function saveLabel(owner: string, repo: string, label: Label): Prom
       return false;
     }
 
-    // 清除相关缓存
+    // Clear related cache
     cacheManager?.remove(CACHE_KEYS.LABELS(owner, repo));
     return true;
   } catch (error) {

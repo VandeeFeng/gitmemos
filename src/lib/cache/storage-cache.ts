@@ -70,7 +70,7 @@ export class StorageCache implements CacheManager {
         storageUsage: this.getStorageUsage()
       });
 
-      // 如果存储失败（比如 localStorage 已满），尝试清理过期缓存后重试
+      // If storage fails (e.g., localStorage is full), try cleaning up expired cache and retry
       this.cleanup();
       try {
         const serializedData = JSON.stringify(cacheItem);
@@ -211,7 +211,7 @@ export class StorageCache implements CacheManager {
             });
           }
         } catch {
-          // 如果解析失，直接删除
+          // If parsing fails, remove directly
           this.storage.removeItem(key);
           cleaned++;
           debugLog(`Cleaned up invalid cache: ${key.replace(CACHE_PREFIX, '')}`);
@@ -227,10 +227,10 @@ export class StorageCache implements CacheManager {
     let used = 0;
 
     try {
-      // 估算总容量（通常是 5-10MB）
+      // Estimate total capacity (usually 5-10MB)
       total = 5 * 1024 * 1024; // 5MB
 
-      // 计算已使用空间
+      // Calculate used space
       for (let i = 0; i < this.storage.length; i++) {
         const key = this.storage.key(i);
         if (key) {

@@ -28,13 +28,13 @@ export async function GET(request: Request) {
     const lastSyncAt = syncStatus?.lastSyncAt;
     const isFullSync = forceSync || !lastSyncAt;
 
-    // 如果不是强制同步，先尝试从缓存获取
+    // If not a forced sync, try to get from cache first
     if (!isFullSync) {
       const cacheKey = CACHE_KEYS.ISSUES(owner, repo, page, labels || '');
       const cached = cacheManager?.get<{ issues: Issue[] }>(cacheKey);
       if (cached?.issues) {
         debugLog('Using cached issues');
-        // 记录同步状态（即使使用缓存也要记录）
+        // Record sync status (even when using cache)
         const now = new Date().toISOString();
         await recordSync(owner, repo, 'success', 0, undefined, 'add');
         return NextResponse.json({
@@ -47,16 +47,16 @@ export async function GET(request: Request) {
         });
       }
 
-      // 如果没有缓存，尝试从数据库获取
+      // If no cache, try to get from database
       try {
         debugLog('Trying to find issues in database...');
         const response = await getIssues(owner, repo);
         const dbIssues = response?.issues || [];
         if (dbIssues.length > 0) {
           debugLog('Found issues in database');
-          // 更新缓存
+          // Update cache
           cacheManager?.set(cacheKey, { issues: dbIssues }, { expiry: CACHE_EXPIRY.ISSUES });
-          // 记录同步状态（即使使用数据库数据也要记录）
+          // Record sync status (even when using database data)
           const now = new Date().toISOString();
           await recordSync(owner, repo, 'success', 0, undefined, 'add');
           return NextResponse.json({
@@ -73,7 +73,7 @@ export async function GET(request: Request) {
       }
     }
 
-    // 从 GitHub API 获取数据
+    // Get data from GitHub API
     debugLog(isFullSync ? 'Performing full sync...' : `Performing incremental sync since ${lastSyncAt}`);
     const issues = await fetchIssues(
       owner,
@@ -84,11 +84,11 @@ export async function GET(request: Request) {
       lastSyncAt || undefined
     );
 
-    // 增量同步时，如果没有更新的内容
+    // For incremental sync, if no updates found
     if (!isFullSync && issues.length === 0) {
       debugLog('No updates found since last sync');
       const now = new Date().toISOString();
-      // 记录同步状态（即使没有更新也要记录）
+      // Record sync status (even when no updates)
       await recordSync(owner, repo, 'success', 0, undefined, 'add');
       return NextResponse.json({
         issues: [],
@@ -100,17 +100,17 @@ export async function GET(request: Request) {
       });
     }
 
-    // 保存到数据库
+    // Save to database
     const saveResult = await saveIssues(owner, repo, issues);
     if (!saveResult) {
       throw new Error('Failed to save issues to database');
     }
 
-    // 更新缓存
+    // Update cache
     const cacheKey = CACHE_KEYS.ISSUES(owner, repo, page, labels || '');
     cacheManager?.set(cacheKey, { issues }, { expiry: CACHE_EXPIRY.ISSUES });
 
-    // 记录同步状态
+    // Record sync status
     const now = new Date().toISOString();
     await recordSync(
       owner,
@@ -132,7 +132,7 @@ export async function GET(request: Request) {
   } catch (error) {
     errorLog('Error in GET /api/github/issues:', error);
     
-    // 记录同步失败
+    // Record sync failure
     const owner = new URL(request.url).searchParams.get('owner');
     const repo = new URL(request.url).searchParams.get('repo');
     if (owner && repo) {

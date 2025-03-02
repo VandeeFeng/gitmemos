@@ -44,7 +44,7 @@ export const markdownComponents: Components = {
   img: ({ src, alt }) => {
     if (!src) return null;
     
-    // 从 alt 文本中提取尺寸信息
+    // Extract size information from alt text
     const match = alt?.match(/^(.+?)\s*=(\d+)(?:x(\d+))?$/);
     let width, height, cleanAlt;
     

@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 先检查标签是否已存在
+    // Check if label already exists
     console.log('Checking if label exists...');
     const { data: existingLabel, error: selectError } = await supabaseServer
       .from('labels')
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
       .eq('name', label.name)
       .single();
 
-    if (selectError && selectError.code !== 'PGRST116') { // PGRST116 是"没有找到记录"的错误
+    if (selectError && selectError.code !== 'PGRST116') { // PGRST116 is "no rows found" error
       console.error('Error checking existing label:', selectError);
       return NextResponse.json(
         { error: selectError.message },
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
 
     let error;
     if (existingLabel) {
-      // 如果标签存在，更新它
+      // Update existing label
       console.log('Updating existing label:', existingLabel);
       const { error: updateError, data: updatedData } = await supabaseServer
         .from('labels')
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
       error = updateError;
       console.log('Update result:', { error: updateError, data: updatedData });
     } else {
-      // 如果标签不存在，插入新标签
+      // Insert new label
       console.log('Inserting new label');
       const now = new Date().toISOString();
       const { error: insertError, data: insertedData } = await supabaseServer

@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       );
     }
 
-    // 获取最后一次同步记录
+    // Get last sync record
     const { data, error } = await supabaseServer
       .from('sync_history')
       .select('*')
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
       .limit(1)
       .single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 是"没有找到记录"的错误
+    if (error && error.code !== 'PGRST116') { // PGRST116 means "no rows found"
       return NextResponse.json(
         { error: error.message },
         { status: 500 }
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 插入新记录
+    // Insert new record
     const { error: insertError } = await supabaseServer
       .from('sync_history')
       .insert({
@@ -81,7 +81,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 获取当前仓库的所有同步记录，按时间倒序排列
+    // Get all sync records for current repository, ordered by time descending
     const { data: allRecords, error: selectError } = await supabaseServer
       .from('sync_history')
       .select('id, last_sync_at')
@@ -91,11 +91,11 @@ export async function POST(request: Request) {
 
     if (selectError) {
       console.error('Error fetching sync records:', selectError);
-      // 不要因为清理失败而影响主流程
+      // Don't let cleanup failure affect main process
       return NextResponse.json({ success: true });
     }
 
-    // 如果记录数超过20条，删除多余的记录
+    // If more than 20 records, delete excess records
     if (allRecords && allRecords.length > 20) {
       const recordsToDelete = allRecords.slice(20);
       const idsToDelete = recordsToDelete.map(record => record.id);

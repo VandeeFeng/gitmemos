@@ -14,17 +14,17 @@ interface DayActivity {
   count: number;
 }
 
-// 获取指定月份的天数
+// Get days in a month
 function getDaysInMonth(year: number, month: number) {
   return new Date(year, month + 1, 0).getDate();
 }
 
-// 获取指定日期的星期几（0-6）
+// Get day of week (0-6) for a date
 function getFirstDayOfMonth(year: number, month: number) {
   return new Date(year, month, 1).getDay();
 }
 
-// 格式化日期为 ISO 字符串的日期部分
+// Format date to ISO string date part
 function formatDateKey(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }

@@ -13,7 +13,7 @@ const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;
 const SALT_LENGTH = 64;
 
-// 确保只在服务器端运行
+// Ensure server-side execution only
 export function ensureServer() {
   if (typeof window !== 'undefined') {
     throw new Error('Encryption operations can only be performed on the server side');

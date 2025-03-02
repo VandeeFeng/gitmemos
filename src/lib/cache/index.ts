@@ -32,7 +32,7 @@ class AuthStore {
 
 export const authStore = AuthStore.getInstance();
 
-// 缓存键常量
+// Cache key constants
 export const CACHE_KEYS = {
   ISSUES: (owner: string, repo: string, page: number, labels?: string) =>
     `issues:${owner}:${repo}:${page}:${labels || ''}`,
@@ -47,7 +47,7 @@ export const CACHE_KEYS = {
     `issue:${owner}:${repo}:${issueNumber}`
 } as const;
 
-// 缓存过期时间常量
+// Cache expiration time constants
 export const CACHE_EXPIRY = {
   ISSUES: 15 * 60 * 1000, // 15 minutes
   LABELS: 15 * 60 * 1000, // 15 minutes
@@ -55,10 +55,10 @@ export const CACHE_EXPIRY = {
   PASSWORD: 24 * 60 * 60 * 1000, // 24 hours
 } as const;
 
-// 创建缓存管理器实例
+// Create cache manager instance
 export const cacheManager = typeof window !== 'undefined' 
   ? new StorageCache(window.localStorage)
   : null;
 
-// 导出类型
+// Export types
 export type { CacheManager, CacheOptions, CacheItem } from './types'; 

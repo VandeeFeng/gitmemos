@@ -19,16 +19,16 @@ export async function generateImage({
 }: ImageGeneratorOptions): Promise<string> {
   const { toCanvas } = await import('html-to-image');
 
-  // 检查是否已经被取消
+  // Check if operation has been aborted
   if (signal?.aborted) {
     throw new DOMException('Image generation aborted', 'AbortError');
   }
 
-  // 等待所有图片加载完成
+  // Wait for all images to load
   const images = Array.from(element.getElementsByTagName('img'));
   let loadingImages = false;
 
-  // 检查是否有任何图片仍在加载
+  // Check if any images are still loading
   for (const img of images) {
     if (!img.complete) {
       loadingImages = true;
@@ -37,7 +37,7 @@ export async function generateImage({
   }
 
   if (loadingImages) {
-    // 如果有图片正在加载，等待所有图片加载完成
+    // If images are loading, wait for all images to load
     await Promise.all(
       images.map(img => {
         if (img.complete) return Promise.resolve();
@@ -68,29 +68,29 @@ export async function generateImage({
           img.addEventListener('error', handleError);
           signal?.addEventListener('abort', handleAbort);
 
-          // 设置一个超时，避免无限等待
+          // Set a timeout to avoid infinite waiting
           setTimeout(() => {
             cleanup();
             reject(new Error('Image load timeout'));
-          }, 30000); // 30秒超时
+          }, 30000); // 30 seconds timeout
         }).catch(error => {
           errorLog('Image load failed:', img.src, error);
-          // 即使图片加载失败也继续处理
+          // Continue processing even if image loading fails
           return Promise.resolve();
         });
       })
     );
   }
 
-  // 检查是否已经被取消
+  // Check if operation has been aborted
   if (signal?.aborted) {
     throw new DOMException('Image generation aborted', 'AbortError');
   }
 
-  // 等待所有图片转换为 base64
+  // Wait for all images to be converted to base64
   await preloadImages(element, signal);
 
-  // 再次检查所有图片是否都成功加载
+  // Check if all images are loaded successfully
   const allImagesLoaded = images.every(img => {
     const isLoaded = img.complete && img.naturalWidth > 0;
     if (!isLoaded) {
@@ -103,12 +103,12 @@ export async function generateImage({
     warnLog('Some images failed to load properly');
   }
 
-  // 检查是否已经被取消
+  // Check if operation has been aborted
   if (signal?.aborted) {
     throw new DOMException('Image generation aborted', 'AbortError');
   }
 
-  // 生成图片
+  // Generate image
   const dataUrl = await toCanvas(element, {
     quality: 1.0,
     pixelRatio,
@@ -118,21 +118,21 @@ export async function generateImage({
       transformOrigin: 'top left',
     },
     filter: (node) => {
-      // 过滤掉不需要的元素，比如滚动条和图片预览
+      // Filter out unwanted elements like scrollbars and image previews
       const classList = node.classList;
       if (!classList) return true;
       return !classList.contains('overflow-y-auto') && 
              !classList.contains('cursor-zoom-in');
     },
-    fontEmbedCSS: undefined, // 禁用字体嵌入
-    skipFonts: true, // 跳过字体处理
+    fontEmbedCSS: undefined, // Disable font embedding
+    skipFonts: true, // Skip font processing
   }).then(canvas => {
-    // 检查是否已经被取消
+    // Check if operation has been aborted
     if (signal?.aborted) {
       throw new DOMException('Image generation aborted', 'AbortError');
     }
 
-    // 创建一个新的 canvas 来添加圆角和内边距
+    // Create a new canvas to add rounded corners and padding
     const finalCanvas = document.createElement('canvas');
     finalCanvas.width = canvas.width + padding * 2;
     finalCanvas.height = canvas.height + padding * 2;
@@ -146,7 +146,7 @@ export async function generateImage({
     ctx.fillStyle = backgroundColor;
     ctx.fillRect(0, 0, finalCanvas.width, finalCanvas.height);
     
-    // 创建圆角路径
+    // Create rounded corner path
     ctx.beginPath();
     ctx.moveTo(padding + radius, padding);
     ctx.lineTo(finalCanvas.width - padding - radius, padding);
@@ -159,10 +159,10 @@ export async function generateImage({
     ctx.arcTo(padding, padding, padding + radius, padding, radius);
     ctx.closePath();
 
-    // 使用圆角路径作为裁剪区域
+    // Use rounded corner path as clipping area
     ctx.clip();
     
-    // 绘制内容
+    // Draw content
     ctx.drawImage(canvas, padding, padding);
 
     ctx.restore();
@@ -179,12 +179,12 @@ async function convertImageToBase64(imgUrl: string, signal?: AbortSignal): Promi
 
   while (retryCount < maxRetries) {
     try {
-      // 检查是否已经被取消
+      // Check if operation has been aborted
       if (signal?.aborted) {
         throw new DOMException('Image conversion aborted', 'AbortError');
       }
 
-      // 如果是 http 链接，使用代理
+      // Use proxy for http links
       const proxyUrl = imgUrl.startsWith('http') ? `/api/proxy/image?url=${encodeURIComponent(imgUrl)}` : imgUrl;
       
       return new Promise((resolve, reject) => {
@@ -194,7 +194,7 @@ async function convertImageToBase64(imgUrl: string, signal?: AbortSignal): Promi
         const timeoutId = setTimeout(() => {
           cleanup();
           reject(new Error('Image load timeout'));
-        }, 10000); // 10秒超时
+        }, 10000); // 10 seconds timeout
 
         const handleAbort = () => {
           cleanup();
@@ -221,7 +221,7 @@ async function convertImageToBase64(imgUrl: string, signal?: AbortSignal): Promi
         
         const handleError = () => {
           cleanup();
-          // 如果代理加载失败，尝试直接加载原始图片
+          // If proxy loading fails, try loading the original image
           if (img.src !== imgUrl) {
             img.src = imgUrl;
           } else {
@@ -243,7 +243,7 @@ async function convertImageToBase64(imgUrl: string, signal?: AbortSignal): Promi
         img.src = proxyUrl;
       });
     } catch (error) {
-      // 如果是取消操作，直接抛出错误
+      // If it's an abort operation, throw the error directly
       if (error instanceof DOMException && error.name === 'AbortError') {
         throw error;
       }
@@ -251,10 +251,10 @@ async function convertImageToBase64(imgUrl: string, signal?: AbortSignal): Promi
       retryCount++;
       if (retryCount === maxRetries) {
         errorLog('Failed to convert image after retries:', error);
-        // 返回一个占位图片的 base64
+        // Return a placeholder image base64
         return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
       }
-      // 等待一段时间后重试
+      // Wait for a while before retrying
       await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
     }
   }
@@ -271,20 +271,20 @@ async function preloadImages(element: HTMLElement, signal?: AbortSignal): Promis
       
       const base64Url = await convertImageToBase64(img.src, signal);
       
-      // 检查是否已经被取消
+      // Check if operation has been aborted
       if (signal?.aborted) {
         throw new DOMException('Image preload aborted', 'AbortError');
       }
 
       img.src = base64Url;
       
-      // 等待图片加载完成
+      // Wait for image to load
       if (!img.complete) {
         await new Promise((resolve, reject) => {
           const timeoutId = setTimeout(() => {
             cleanup();
             reject(new Error('Image load timeout'));
-          }, 10000); // 10秒超时
+          }, 10000); // 10 seconds timeout
           
           const handleAbort = () => {
             cleanup();
@@ -313,19 +313,19 @@ async function preloadImages(element: HTMLElement, signal?: AbortSignal): Promis
           signal?.addEventListener('abort', handleAbort);
         }).catch(error => {
           errorLog('Failed to load converted image:', error);
-          // 不要让单个图片的失败影响整体流程
+          // Don't let a single image failure affect the overall process
         });
       }
     } catch (error) {
-      // 如果是取消操作，抛出错误
+      // If it's an abort operation, throw the error directly
       if (error instanceof DOMException && error.name === 'AbortError') {
         throw error;
       }
       errorLog('Failed to convert image:', error);
-      // 不要让单个图片的失败影响整体流程
+      // Don't let a single image failure affect the overall process
     }
   });
   
-  // 等待所有图片处理完成，即使有些失败了
+  // Wait for all images to process, even if some fail
   await Promise.allSettled(imagePromises);
 } 

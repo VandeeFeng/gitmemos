@@ -5,7 +5,7 @@ interface FormattedDateProps {
   className?: string;
 }
 
-// 格式化日期，确保服务端和客户端渲染结果一致
+// Format date to ensure consistent rendering between server and client
 function formatDate(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }

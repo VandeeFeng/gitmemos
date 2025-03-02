@@ -241,25 +241,25 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
 
   const handleDownload = (imageUrl: string, fileName: string) => {
     try {
-      // 检测是否为 Firefox
+      // Check if browser is Firefox
       const isFirefox = navigator.userAgent.toLowerCase().includes('firefox');
-      // 检测是否为移动设备
+      // Check if device is mobile
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
       if (isFirefox && isMobile) {
-        // Firefox 移动版：直接打开图片在新标签页，用户可以长按保存
+        // Firefox mobile: open image in new tab, user can long press to save
         window.open(imageUrl, '_blank');
         toast.success("Long press the image to save");
       } else {
-        // 其他浏览器：使用 download 属性
+        // Other browsers: use download attribute
         const link = document.createElement('a');
         link.href = imageUrl;
         link.download = fileName;
-        link.target = '_blank'; // 添加 target 属性以提高兼容性
-        document.body.appendChild(link); // 某些浏览器需要元素在 DOM 中
+        link.target = '_blank'; // Add target attribute for better compatibility
+        document.body.appendChild(link); // Some browsers need element in DOM
         link.click();
         setTimeout(() => {
-          document.body.removeChild(link); // 清理 DOM
+          document.body.removeChild(link); // Clean up DOM
         }, 100);
         toast.success("Image saved successfully");
       }

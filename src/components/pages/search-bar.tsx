@@ -8,14 +8,14 @@ interface SearchBarProps {
   issues?: Issue[];
 }
 
-// 辅助函数：分词（支持中文和英文）
+// Helper function: Tokenize text (supports Chinese and English)
 const tokenize = (text: string): string[] => {
-  // 将文本按照中文字符、英文单词、数字分开
+  // Split text by Chinese characters, English words, and numbers
   const tokens = text.match(/[\u4e00-\u9fa5]+|[a-zA-Z]+|[0-9]+/g) || [];
   return tokens;
 };
 
-// 辅助函数：计算两个字符串的相似度（Levenshtein 距离）
+// Helper function: Calculate string similarity (Levenshtein distance)
 const similarity = (s1: string, s2: string): number => {
   if (s1.length < s2.length) [s1, s2] = [s2, s1];
   const costs: number[] = [];
@@ -36,7 +36,7 @@ const similarity = (s1: string, s2: string): number => {
   return 1 - costs[s2.length] / Math.max(s1.length, s2.length);
 };
 
-// 辅助函数：智能截断文本（在句子边界处截断）
+// Helper function: Smart text truncation (at sentence boundaries)
 const smartTruncate = (text: string, targetLength: number, position: number): { text: string, start: number, end: number } => {
   const sentenceEndings = [...text.matchAll(/[.!?。！？\n]+/g)];
   if (sentenceEndings.length === 0) {
@@ -70,7 +70,7 @@ const smartTruncate = (text: string, targetLength: number, position: number): { 
     }
   }
 
-  // 如果截取的内容太长，进一步缩小范围
+  // If the extracted content is too long, further narrow down the range
   if (bestEnd - bestStart > targetLength * 1.5) {
     const mid = position;
     bestStart = Math.max(bestStart, mid - targetLength / 2);
@@ -139,14 +139,14 @@ export function SearchBar({ onSearch, issues = [] }: SearchBarProps) {
   const highlightText = (text: string, query: string) => {
     if (!query || !text) return text;
 
-    // 预处理文本：保留原始换行，但清理多余的空格
+    // Preprocess text: retain original newlines but clean up extra spaces
     const cleanText = text.replace(/[^\S\n]+/g, ' ').trim();
     
-    // 对查询词和文本进行分词
+    // Tokenize query and text
     const queryTokens = tokenize(query.toLowerCase());
     const textTokens = tokenize(cleanText.toLowerCase());
     
-    // 找到所有匹配位置（包括模糊匹配）
+    // Find all matching positions (including fuzzy matching)
     const matches: Array<{ start: number, end: number, similarity: number }> = [];
     let currentPos = 0;
 
@@ -156,7 +156,7 @@ export function SearchBar({ onSearch, issues = [] }: SearchBarProps) {
 
       queryTokens.forEach(queryToken => {
         const sim = similarity(token, queryToken);
-        if (sim > 0.8) { // 相似度阈值
+        if (sim > 0.8) { // Similarity threshold
           matches.push({
             start: tokenStart,
             end: tokenStart + token.length,
@@ -168,12 +168,12 @@ export function SearchBar({ onSearch, issues = [] }: SearchBarProps) {
       currentPos = tokenStart + token.length;
     });
 
-    // 按开始位置排序并合并重叠区域
+    // Sort and merge overlapping regions
     matches.sort((a, b) => a.start - b.start);
     const mergedMatches = matches.reduce((acc, match) => {
       if (acc.length === 0) return [match];
       const last = acc[acc.length - 1];
-      if (match.start <= last.end + 1) { // +1 允许相邻字符的合并
+      if (match.start <= last.end + 1) { // +1 allows adjacent characters to merge
         last.end = Math.max(last.end, match.end);
         last.similarity = Math.max(last.similarity, match.similarity);
         return acc;
@@ -181,16 +181,16 @@ export function SearchBar({ onSearch, issues = [] }: SearchBarProps) {
       return [...acc, match];
     }, [] as typeof matches);
 
-    // 构建结果数组
+    // Build result array
     const result: (string | JSX.Element)[] = [];
     let lastEnd = 0;
 
     mergedMatches.forEach((match, index) => {
-      // 添加未匹配的文本
+      // Add unmatched text
       if (match.start > lastEnd) {
         result.push(cleanText.slice(lastEnd, match.start));
       }
-      // 添加高亮的文本，根据相似度调整样式
+      // Add highlighted text, adjust style based on similarity
       const opacity = Math.min(1, match.similarity);
       result.push(
         <span 
@@ -204,7 +204,7 @@ export function SearchBar({ onSearch, issues = [] }: SearchBarProps) {
       lastEnd = match.end;
     });
 
-    // 添加剩余的文本
+    // Add remaining text
     if (lastEnd < cleanText.length) {
       result.push(cleanText.slice(lastEnd));
     }
@@ -215,14 +215,14 @@ export function SearchBar({ onSearch, issues = [] }: SearchBarProps) {
   const getPreviewContent = (content: string, query: string) => {
     if (!content || !query) return content?.slice(0, 150) + '...';
     
-    // 预处理文本：清理多余的空格，但保留基本格式
+    // Preprocess text: clean up extra spaces but retain basic format
     const cleanContent = content.replace(/\s+/g, ' ').trim();
     
-    // 对查询词和文本进行分词
+    // Tokenize query and text
     const queryTokens = tokenize(query.toLowerCase());
     const contentLower = cleanContent.toLowerCase();
     
-    // 找到所有匹配位置（包括模糊匹配）
+    // Find all matching positions (including fuzzy matching)
     const matches: Array<{ start: number, end: number, score: number }> = [];
     
     queryTokens.forEach(queryToken => {
@@ -251,7 +251,7 @@ export function SearchBar({ onSearch, issues = [] }: SearchBarProps) {
       return truncated.text + (truncated.end < cleanContent.length ? '...' : '');
     }
 
-    // 找到得分最高的匹配区域
+    // Find the matching region with the highest score
     let bestMatch = matches[0];
     matches.forEach(match => {
       if (match.score > bestMatch.score) {
@@ -259,7 +259,7 @@ export function SearchBar({ onSearch, issues = [] }: SearchBarProps) {
       }
     });
 
-    // 智能截取包含最佳匹配的文本片段
+    // Smart text truncation to include the best matching text fragment
     const truncated = smartTruncate(cleanContent, 300, bestMatch.start);
     return (truncated.start > 0 ? '...' : '') + 
            truncated.text + 

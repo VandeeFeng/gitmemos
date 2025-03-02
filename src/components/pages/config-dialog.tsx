@@ -90,13 +90,13 @@ export function ConfigDialog({ isOpen, onClose, onSave }: ConfigDialogProps) {
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
       <div className="bg-bg-primary dark:bg-bg-secondary rounded-lg shadow-lg w-full max-w-md mx-4 overflow-hidden">
-        {/* 标题 */}
+        {/* Title */}
         <div className="px-6 py-4 border-b border-default bg-bg-primary dark:bg-bg-secondary">
           <h2 className="text-xl font-semibold text-text-primary">Repository Settings</h2>
           <p className="mt-1 text-sm text-text-secondary">Configure your GitHub repository settings</p>
         </div>
 
-        {/* 表单内容 */}
+        {/* Form content */}
         <div className="p-6 space-y-5">
           {/* Repository Owner */}
           <div>
@@ -151,7 +151,7 @@ export function ConfigDialog({ isOpen, onClose, onSave }: ConfigDialogProps) {
           </div>
         </div>
 
-        {/* 底部按钮 */}
+        {/* Bottom buttons */}
         <div className="px-6 py-4 bg-bg-primary dark:bg-bg-secondary border-t border-default flex justify-end space-x-3">
           <Button
             variant="outline"

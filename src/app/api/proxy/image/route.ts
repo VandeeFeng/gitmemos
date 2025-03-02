@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    // 从原始请求中获取重要的请求头
+    // Get important headers from original request
     const headers = new Headers();
     const importantHeaders = [
       'User-Agent',
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
       }
     });
 
-    // 添加跨域支持
+    // Add CORS support
     headers.set('Origin', new URL(request.url).origin);
 
     const response = await fetch(imageUrl, {
@@ -41,12 +41,12 @@ export async function GET(request: Request) {
     const buffer = await response.arrayBuffer();
     const responseHeaders = new Headers();
 
-    // 复制原始响应的内容类型
+    // Copy content type from original response
     const contentType = response.headers.get('Content-Type');
     if (contentType) {
       responseHeaders.set('Content-Type', contentType);
     } else {
-      // 如果没有内容类型，根据URL推测
+      // If no content type, guess from URL
       const ext = imageUrl.split('.').pop()?.toLowerCase();
       if (ext) {
         const mimeTypes: Record<string, string> = {
@@ -63,8 +63,8 @@ export async function GET(request: Request) {
       }
     }
 
-    // 设置缓存控制
-    responseHeaders.set('Cache-Control', 'public, max-age=31536000'); // 1年
+    // Set cache control
+    responseHeaders.set('Cache-Control', 'public, max-age=31536000'); // 1 year
     responseHeaders.set('Access-Control-Allow-Origin', '*');
     responseHeaders.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
     responseHeaders.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -95,7 +95,7 @@ export async function OPTIONS() {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Max-Age': '86400', // 24小时
+      'Access-Control-Max-Age': '86400', // 24 hours
     },
   });
 } 

@@ -12,12 +12,12 @@ interface GitHubIssue {
 
 // Helper function to call our API
 async function callGitHubAPI(endpoint: string, params: GitHubApiParams = {}) {
-  // 获取完整的 base URL
+  // Get complete base URL
   const baseUrl = typeof window === 'undefined' 
     ? process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     : '';
   
-  // 移除开头的斜杠以避免双斜杠问题
+  // Remove leading slash to avoid double slash issues
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
   const url = `${baseUrl}/api/github/${cleanEndpoint}`;
   
@@ -52,7 +52,7 @@ export async function fetchIssues(
   try {
     const params = new URLSearchParams();
     
-    // 添加基本参数
+    // Add basic parameters
     params.append('owner', owner);
     params.append('repo', repo);
     params.append('page', page.toString());
@@ -61,14 +61,14 @@ export async function fetchIssues(
     params.append('sort', 'updated');
     params.append('direction', 'desc');
 
-    // 添加可选参数
+    // Add optional parameters
     if (labels) {
       params.append('labels', labels);
     }
 
     if (!forceSync && lastSyncAt && !labels) {
       try {
-        // 确保日期格式正确
+        // Ensure correct date format
         const date = new Date(lastSyncAt);
         if (!isNaN(date.getTime())) {
           params.append('since', date.toISOString());

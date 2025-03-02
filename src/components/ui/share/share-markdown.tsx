@@ -43,7 +43,7 @@ export const shareMarkdownComponents: Components = {
   img: ({ src, alt }) => {
     if (!src) return null;
     
-    // 从 alt 文本中提取尺寸信息
+    // Extract size information from alt text
     const match = alt?.match(/^(.+?)\s*=(\d+)(?:x(\d+))?$/);
     let width, height, cleanAlt;
     
@@ -55,7 +55,7 @@ export const shareMarkdownComponents: Components = {
       cleanAlt = alt;
     }
     
-    // 使用代理 URL 并确保跨域处理
+    // Use proxy URL and ensure CORS handling
     const proxyUrl = src.startsWith('http') ? `/api/proxy/image?url=${encodeURIComponent(src)}` : src;
     
     return (
@@ -68,7 +68,7 @@ export const shareMarkdownComponents: Components = {
         crossOrigin="anonymous"
         loading="eager"
         onError={(e) => {
-          // 如果代理加载失败，尝试直接加载原始图片
+          // If proxy loading fails, try loading the original image
           const imgElement = e.target as HTMLImageElement;
           if (imgElement.src !== src) {
             imgElement.src = src;

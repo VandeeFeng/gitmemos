@@ -6,7 +6,7 @@ export async function GET() {
   try {
     type CountResult = { count: number };
 
-    // 检查 configs 表
+    // Check configs table
     const { data: configsData, error: configsError } = await supabaseServer
       .from('configs')
       .select('count') as { data: CountResult | null; error: PostgrestError | null };
@@ -18,7 +18,7 @@ export async function GET() {
       );
     }
     
-    // 检查 issues 表
+    // Check issues table
     const { data: issuesData, error: issuesError } = await supabaseServer
       .from('issues')
       .select('count') as { data: CountResult | null; error: PostgrestError | null };
@@ -30,7 +30,7 @@ export async function GET() {
       );
     }
     
-    // 检查 labels 表
+    // Check labels table
     const { data: labelsData, error: labelsError } = await supabaseServer
       .from('labels')
       .select('count') as { data: CountResult | null; error: PostgrestError | null };

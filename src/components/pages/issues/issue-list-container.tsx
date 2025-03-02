@@ -21,8 +21,8 @@ interface IssueListContainerProps {
 
 export function IssueListContainer({ initialIssues, onSync }: IssueListContainerProps) {
   const [issues, setIssues] = useState<Issue[]>(Array.isArray(initialIssues) ? initialIssues : []);
-  const [displayedIssues, setDisplayedIssues] = useState<Issue[]>([]);  // 用于显示的分页数据
-  const [displayCount, setDisplayCount] = useState(10);  // 初始显示10条
+  const [displayedIssues, setDisplayedIssues] = useState<Issue[]>([]);  // Data for pagination display
+  const [displayCount, setDisplayCount] = useState(10);  // Initially display 10 items
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -94,12 +94,12 @@ export function IssueListContainer({ initialIssues, onSync }: IssueListContainer
 
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
-    setDisplayCount(10);  // 重置显示数量
+    setDisplayCount(10);  // Reset display count
   }, []);
 
   const handleLabelSelect = useCallback((label: string) => {
     setSelectedLabel(label === selectedLabel ? null : label);
-    setDisplayCount(10);  // 重置显示数量
+    setDisplayCount(10);  // Reset display count
   }, [selectedLabel]);
 
   const filteredIssues = Array.isArray(issues) ? issues.filter((issue: Issue) => {

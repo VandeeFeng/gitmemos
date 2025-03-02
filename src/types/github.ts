@@ -59,19 +59,19 @@ export interface GitHubApiError {
   message?: string;
 }
 
-// 用于编辑器的 Issue 类型，body 必须是 string
+// Issue type for editor, body must be string
 export interface EditableIssue extends Omit<Issue, "body"> {
   body: string;
 }
 
-// 用于创建新 Issue 的类型
+// Type for creating new Issue
 export interface CreateIssueInput {
   title: string;
   body: string;
   labels?: string[];
 }
 
-// 用于更新 Issue 的类型
+// Type for updating Issue
 export interface UpdateIssueInput extends CreateIssueInput {
   number: number;
 }

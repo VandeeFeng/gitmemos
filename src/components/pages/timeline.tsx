@@ -13,7 +13,7 @@ interface TimelineProps {
   issues: Issue[];
 }
 
-// 格式化月份和年份，确保服务端和客户端渲染结果一致
+// Format month and year, ensuring server and client rendering results are consistent
 function formatMonthAndYear(month: number, year: number) {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return {
@@ -22,7 +22,7 @@ function formatMonthAndYear(month: number, year: number) {
   };
 }
 
-// 获取当前日期的年份和月份
+// Get current date's year and month
 function getCurrentYearMonth() {
   const now = new Date();
   return {
@@ -32,7 +32,7 @@ function getCurrentYearMonth() {
 }
 
 export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = [] }: TimelineProps) {
-  const [displayCount, setDisplayCount] = useState(10);  // 初始显示10条
+  const [displayCount, setDisplayCount] = useState(10);  // Initially display 10 items
   const [localIssues, setLocalIssues] = useState<Issue[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [{ year, month }, setYearMonth] = useState(() => getCurrentYearMonth());
@@ -52,7 +52,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
     // Debounce updates to prevent rapid re-renders
     const timer = setTimeout(() => {
       setLocalIssues(issues);
-      setDisplayCount(10);  // 重置显示数量
+      setDisplayCount(10);  // Reset display count
     }, 100);
 
     return () => clearTimeout(timer);
@@ -63,7 +63,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
     
     setLoadingMore(true);
     try {
-      // 增加显示数量
+      // Increase display count
       setDisplayCount(prev => prev + 10);
     } finally {
       setLoadingMore(false);
@@ -80,11 +80,11 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
     };
   }, []);
 
-  // 添加日期点击���理函数
+  // Add date click handler function
   const handleDateClick = (dateKey: string) => {
     if (typeof window === 'undefined') return;
     
-    // 使用 requestAnimationFrame 确保在 DOM 更新后执行
+    // Use requestAnimationFrame to ensure execution after DOM updates
     requestAnimationFrame(() => {
       const contentContainer = contentRef.current;
       const dateElement = document.querySelector(`[data-date="${dateKey}"]`);
@@ -104,7 +104,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
 
   const handleMonthChange = (newYear: number, newMonth: number) => {
     setYearMonth({ year: newYear, month: newMonth });
-    setDisplayCount(10);  // 切换月份时重置显示数量
+    setDisplayCount(10);  // Switch month resets display count
   };
 
   // Group issues by month and year, and then by day
@@ -145,7 +145,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
   const monthIssues = groupedIssues[currentMonthKey] || {};
   const hasIssues = Object.keys(monthIssues).length > 0 && filteredIssues.length > 0;
 
-  // 如果是初始加载，显示全屏加载状态
+  // If it's initial load, show full screen loading state
   if (isFirstRender.current && !hasIssues) {
     return <Loading text="Loading timeline..." />;
   }
@@ -153,7 +153,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
   // Sort days in descending order and limit the number of issues shown
   const sortedDays = Object.entries(monthIssues)
     .sort(([dayA], [dayB]) => dayB.localeCompare(dayA))
-    .slice(0, displayCount);  // 限制显示数量
+    .slice(0, displayCount);  // Limit display count
 
   return (
     <div className="space-y-8 h-[calc(100vh-150px)] relative">

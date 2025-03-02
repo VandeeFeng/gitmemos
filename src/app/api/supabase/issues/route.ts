@@ -42,7 +42,7 @@ export async function GET(request: Request) {
       );
     }
 
-    // 获取标签数据
+    // Get label data
     const { data: labels_data, error: labelsError } = await supabaseServer
       .from('labels')
       .select('*')
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
       );
     }
 
-    // 转换数据格式
+    // Format data structure
     const formattedIssues = issues.map(issue => ({
       number: issue.issue_number,
       title: issue.title,
@@ -100,11 +100,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // 批量处理多个 issues
+    // Process multiple issues in batch
     if (Array.isArray(issues)) {
       const now = new Date().toISOString();
       
-      // 首先获取所有已存在的 issues
+      // First get all existing issues
       const { data: existingIssues } = await supabaseServer
         .from('issues')
         .select('issue_number, created_at')
@@ -112,7 +112,7 @@ export async function POST(request: Request) {
         .eq('repo', repo)
         .in('issue_number', issues.map(i => i.number));
 
-      // 准备 upsert 数据
+      // Prepare upsert data
       const upsertData = issues.map(issue => {
         const existingIssue = existingIssues?.find(e => e.issue_number === issue.number);
         return {
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, count: upsertData.length });
     }
 
-    // 处理单个 issue
+    // Process single issue
     if (!issue) {
       return NextResponse.json(
         { error: 'Missing issue data' },
@@ -153,7 +153,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 检查 issue 是否已存在
+    // Check if issue already exists
     const { data: existingIssue } = await supabaseServer
       .from('issues')
       .select('id, created_at')

@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { Issue, Label } from '@/types/github';
 import { encryptToken } from '@/lib/encryption';
 
-// GitHub webhook payload类型定义
+// GitHub webhook payload type definition
 interface GitHubWebhookPayload {
   action: string;
   repository: {
@@ -18,7 +18,7 @@ interface GitHubWebhookPayload {
   label?: Label;
 }
 
-// 验证GitHub webhook签名
+// Verify GitHub webhook signature
 function verifyGitHubWebhook(payload: string, signature: string): boolean {
   const secret = process.env.GITHUB_WEBHOOK_SECRET;
   if (!secret) {
@@ -34,7 +34,7 @@ function verifyGitHubWebhook(payload: string, signature: string): boolean {
   );
 }
 
-// 检查配置是否存在
+// Check if config exists
 async function checkConfig(deliveryId: string | null, event: string | null, owner: string, repo: string) {
   // First try environment variables
   const envConfig = {
@@ -44,7 +44,7 @@ async function checkConfig(deliveryId: string | null, event: string | null, owne
     token: process.env.GITHUB_TOKEN ? encryptToken(process.env.GITHUB_TOKEN) : ''
   };
 
-  // 如果环境变量配置完整且匹配（不区分大小写），直接使用
+  // If environment config is complete and matches (case-insensitive), use it directly
   if (envConfig.owner && envConfig.repo && envConfig.token && 
       envConfig.owner.toLowerCase() === owner.toLowerCase() && 
       envConfig.repo.toLowerCase() === repo.toLowerCase()) {
@@ -54,7 +54,7 @@ async function checkConfig(deliveryId: string | null, event: string | null, owne
 
   console.log('Environment config incomplete or mismatch, trying database');
 
-  // 如果环境变量配置不完整或不匹配，检查数据库
+  // If environment config is incomplete or doesn't match, check database
   const { data: configs, error: configError } = await supabaseServer
     .from('configs')
     .select('*');
@@ -81,7 +81,7 @@ async function checkConfig(deliveryId: string | null, event: string | null, owne
     };
   }
 
-  // 不区分大小写查找匹配的配置
+  // Case-insensitive search for matching config
   const existingConfig = configs?.find(
     config => 
       config.owner.toLowerCase() === owner.toLowerCase() && 
@@ -155,7 +155,7 @@ export async function POST(request: Request) {
 
     const payload = await request.text();
     
-    // 验证webhook
+    // Verify webhook
     if (!verifyGitHubWebhook(payload, signature)) {
       return NextResponse.json(
         { 
@@ -177,7 +177,7 @@ export async function POST(request: Request) {
     const owner = repository.owner.login;
     const repo = repository.name;
 
-    // 处理不同类型的事件
+    // Handle different event types
     try {
       switch (event) {
         case 'issues':
@@ -185,13 +185,13 @@ export async function POST(request: Request) {
             throw new Error('Missing issue data in webhook payload');
           }
 
-          // 检查配置
+          // Check configuration
           const configResult = await checkConfig(deliveryId, event, owner, repo);
           if (configResult.error) {
             return configResult.error;
           }
 
-          // 检查 issue 是否已存在
+          // Check if issue already exists
           const { data: existingIssue } = await supabaseServer
             .from('issues')
             .select('id, created_at')
@@ -202,7 +202,7 @@ export async function POST(request: Request) {
 
           const now = new Date().toISOString();
           
-          // 使用upsert保存issue
+          // Use upsert to save issue
           const { error: saveError } = await supabaseServer
             .from('issues')
             .upsert({
@@ -245,7 +245,7 @@ export async function POST(request: Request) {
             );
           }
 
-          // 记录同步历史
+          // Record sync history
           try {
             const { error: syncError } = await supabaseServer
               .from('sync_history')
@@ -262,7 +262,7 @@ export async function POST(request: Request) {
               console.error('Failed to record sync history:', syncError);
             }
 
-            // 清理旧记录
+            // Clean up old records
             const { data: allRecords } = await supabaseServer
               .from('sync_history')
               .select('id, last_sync_at')
@@ -322,13 +322,13 @@ export async function POST(request: Request) {
             );
           }
 
-          // 检查配置
+          // Check configuration
           const labelConfigResult = await checkConfig(deliveryId, event, owner, repo);
           if (labelConfigResult.error) {
             return labelConfigResult.error;
           }
 
-          // 保存label
+          // Save label
           const { error: labelError } = await supabaseServer
             .from('labels')
             .upsert({
@@ -366,7 +366,7 @@ export async function POST(request: Request) {
             );
           }
 
-          // 更新包含该label的issue
+          // Update issues containing the label
           const { data: affectedIssues, error: fetchError } = await supabaseServer
             .from('issues')
             .select('*')
@@ -397,7 +397,7 @@ export async function POST(request: Request) {
             );
           }
 
-          // 批量更新受影响的issues
+          // Batch update affected issues
           if (affectedIssues && affectedIssues.length > 0) {
             const now = new Date().toISOString();
             const { error: updateError } = await supabaseServer
@@ -445,7 +445,7 @@ export async function POST(request: Request) {
             }
           }
 
-          // 记录同步历史
+          // Record sync history
           try {
             const { error: syncError } = await supabaseServer
               .from('sync_history')

@@ -5,7 +5,7 @@
 @layer base {
   :root {
     color-scheme: light;
-    /* 基础颜色 */
+    /* Base colors */
     --color-primary: 9 112 84;
     --color-secondary: 88 137 223;
     --color-accent: 111 66 193;
@@ -13,7 +13,7 @@
     --color-warning: 251 202 4;
     --color-error: 182 2 5;
     
-    /* 语义化颜色 */
+    /* Semantic colors */
     --color-bg-primary: 255 255 255;
     --color-bg-secondary: 246 248 250;
     --color-bg-tertiary: 234 238 242;
@@ -30,7 +30,7 @@
  
   :root.dark {
     color-scheme: dark;
-    /* 暗色主题颜色 */
+    /* Dark theme colors */
     --color-bg-primary: 34 40 47;
     --color-bg-secondary: 45 51 59;
     --color-bg-tertiary: 55 62 71;
@@ -79,7 +79,7 @@
   scrollbar-color: #444c56 transparent;
 }
 
-/* 改善暗色模式下编辑器的文本选择颜色 */
+/* Improve text selection color in dark mode editor */
 .dark [data-color-mode="dark"] {
   --md-editor-selection-background: rgba(56, 139, 253, 0.4);
 }

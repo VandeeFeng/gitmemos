@@ -56,12 +56,12 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       throw new Error('GitHub configuration is missing. Please configure your settings first.');
     }
 
-    // 检查是否正在同步
+    // Check if sync is in progress
     if (syncInProgress) {
       throw new Error('Sync already in progress. Please wait for it to complete.');
     }
 
-    // 检查冷却时间
+    // Check cooldown time
     const now = Date.now();
     const timeSinceLastSync = now - lastSyncAttempt;
     if (timeSinceLastSync < SYNC_COOLDOWN) {
@@ -75,7 +75,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
     try {
       const config = configRef.current;
 
-      // 首先同步标签
+      // First sync labels
       infoLog('Syncing labels from GitHub...');
       const labelsResponse = await fetch('/api/github/labels');
       if (!labelsResponse.ok) {
@@ -84,7 +84,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
 
       const labels = await labelsResponse.json();
 
-      // 保存标签到数据库
+      // Save labels to database
       let savedLabels = 0;
       let failedLabels = 0;
       for (const label of labels) {
@@ -106,14 +106,14 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         infoLog(`Successfully synced ${labels.length} labels`);
       }
 
-      // 获取同步状态
+      // Get sync status
       const syncStatus = await checkSyncStatus(config.owner, config.repo);
       const isFullSync = !syncStatus?.lastSyncAt;
 
-      // 同步 issues
+      // Sync issues
       infoLog(isFullSync ? 'Performing full sync...' : `Performing incremental sync since ${syncStatus.lastSyncAt}`);
       
-      // 调用 API 进行同步
+      // Call API for sync
       const issuesResponse = await fetch(`/api/github/issues?owner=${config.owner}&repo=${config.repo}&forceSync=${isFullSync}`);
       if (!issuesResponse.ok) {
         throw new Error('Failed to fetch issues from GitHub');
@@ -121,10 +121,10 @@ export function IssueProvider({ children }: { children: ReactNode }) {
 
       const { issues, syncStatus: newSyncStatus } = await issuesResponse.json();
 
-      // 如果是增量同步且没有更新，直接返回
+      // If incremental sync and no updates, return immediately
       if (!isFullSync && (!issues || issues.length === 0)) {
         infoLog('No updates found since last sync');
-        // 记录同步历史
+        // Record sync history
         await recordSync(
           config.owner,
           config.repo,
@@ -144,7 +144,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       setState(prev => {
         if (!prev.config) return prev;
 
-        // 如果是增量同步，合并现有issues和新issues
+        // For incremental sync, merge existing and new issues
         let updatedIssues = issues || [];
         if (!isFullSync && prev.issues) {
           const existingIssues = new Map(prev.issues.map((issue: Issue) => [issue.number, issue]));
@@ -152,7 +152,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           updatedIssues = Array.from(existingIssues.values());
         }
 
-        // 清理所有相关缓存
+        // Clear all related caches
         debugLog('Clearing all related caches after sync...');
         const currentConfig = configRef.current;
         if (currentConfig) {
@@ -167,7 +167,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // 设置新的缓存
+        // Set new cache
         const newState = {
           issues: updatedIssues,
           config: prev.config,
@@ -189,7 +189,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
 
       infoLog(`Synced ${issues?.length || 0} issues from GitHub to database`);
       
-      // 记录同步历史
+      // Record sync history
       await recordSync(
         config.owner,
         config.repo,
@@ -263,7 +263,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       initializingRef.current = true;
 
       try {
-        // 获取配置
+        // Get configuration
         const config = await getGitHubConfig();
         configRef.current = config;
         
@@ -281,7 +281,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // 检查同步状态
+        // Check sync status
         const syncStatus = await checkSyncStatus(config.owner, config.repo);
         const needsSync = !syncStatus?.lastSyncAt;
 
@@ -289,7 +289,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           debugLog(`Last sync time: ${new Date(syncStatus.lastSyncAt).toLocaleString()}`);
         }
 
-        // 从缓存或数据库获取数据
+        // Get data from cache or database
         const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');
         const cached = cacheManager?.get<{ issues: Issue[] }>(cacheKey);
 
@@ -308,7 +308,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
             }));
           }
         } else {
-          // 如果没有缓存，从数据库获取
+          // If no cache, get from database
           const result = await getIssuesFromApi(config.owner, config.repo);
           const issues = result?.issues || [];
           debugLog('Loaded issues from database:', { count: issues.length });
@@ -325,7 +325,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
               refreshIssues
             }));
 
-            // 更新缓存
+            // Update cache
             if (issues.length > 0) {
               debugLog('Updating cache with issues');
               cacheManager?.set(
@@ -336,7 +336,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
             }
           }
 
-          // 如果需要同步，自动触发同步
+          // If sync needed, trigger automatic sync
           if (needsSync) {
             debugLog('No previous sync found, triggering initial sync...');
             try {

@@ -1,5 +1,5 @@
 export const componentStates = {
-  // 交互状态
+  // Interactive states
   interactive: {
     base: "transition-colors duration-200",
     hover: "hover:bg-bg-secondary",
@@ -7,27 +7,27 @@ export const componentStates = {
     disabled: "opacity-50 cursor-not-allowed",
   },
 
-  // 焦点状态
+  // Focus states
   focus: {
     base: "focus:outline-none",
     ring: "focus:ring-2 focus:ring-secondary focus:ring-offset-2",
     within: "focus-within:ring-2 focus-within:ring-secondary",
   },
 
-  // 加载状态
+  // Loading states
   loading: {
     base: "cursor-wait opacity-70",
     spinner: "animate-spin",
   },
 
-  // 错误状态
+  // Error states
   error: {
     base: "border-error",
     text: "text-error",
     bg: "bg-error/10",
   },
 
-  // 成功状态
+  // Success states
   success: {
     base: "border-success",
     text: "text-success",
@@ -35,7 +35,7 @@ export const componentStates = {
   },
 } as const
 
-// 组件尺寸
+// Component sizes
 export const sizes = {
   sm: {
     text: "text-sm",
@@ -54,7 +54,7 @@ export const sizes = {
   },
 } as const
 
-// 圆角大小
+// Border radius sizes
 export const radius = {
   none: "rounded-none",
   sm: "rounded-sm",

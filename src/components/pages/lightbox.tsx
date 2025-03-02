@@ -71,7 +71,7 @@ export function Lightbox({ src, alt = '', className = '', width, height }: Light
     e.stopPropagation();
     if (scale === 1) {
       setScale(1.5);
-      // 计算图片中心点相对于视口的位置
+      // Calculate image center position relative to viewport
       if (imageRef.current) {
         const bounds = imageRef.current.getBoundingClientRect();
         const viewportCenterX = window.innerWidth / 2;
@@ -79,7 +79,7 @@ export function Lightbox({ src, alt = '', className = '', width, height }: Light
         const imageCenterX = bounds.left + bounds.width / 2;
         const imageCenterY = bounds.top + bounds.height / 2;
         
-        // 计算需要的偏移量以使图片居中
+        // Calculate required offset to center the image
         setPosition({
           x: (viewportCenterX - imageCenterX) / 1.5,
           y: (viewportCenterY - imageCenterY) / 1.5

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { generateImage } from "./image-generator";
 import { useRef, useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
+import { errorLog } from '@/lib/debug';
 
 interface DialogProps {
   open?: boolean;
@@ -231,15 +232,8 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
         toastIdRef.current = null;
       }
     } catch (error) {
-      // 如果不是取消操作导致的错误，才显示错误提示
-      if (!(error instanceof DOMException && error.name === 'AbortError')) {
-        console.error('Failed to generate image:', error);
-        if (toastIdRef.current !== null) {
-          toast.dismiss(toastIdRef.current);
-          toastIdRef.current = null;
-        }
-        toast.error("Failed to generate image");
-      }
+      errorLog('Failed to generate image:', error);
+      toast.error('Failed to generate image');
     } finally {
       abortControllerRef.current = null;
     }
@@ -270,10 +264,8 @@ export function ShareDialog({ isOpen, onClose, issue }: ShareDialogProps) {
         toast.success("Image saved successfully");
       }
     } catch (err) {
-      console.error('Failed to download image:', err);
-      // 如果下载失败，提供备选方案
-      window.open(imageUrl, '_blank');
-      toast.error("Failed to save image. Please try long pressing the image instead.");
+      errorLog('Failed to download image:', err);
+      toast.error('Failed to download image');
     }
   };
 

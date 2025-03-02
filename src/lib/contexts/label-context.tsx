@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useCallback, ReactNode, useEffect 
 import { Label } from '@/types/github';
 import { getLabels } from '@/lib/github';
 import { useIssues } from './issue-context';
+import { errorLog } from '@/lib/debug';
 
 interface LabelContextType {
   labels: Label[];
@@ -38,7 +39,7 @@ export function LabelProvider({ children }: { children: ReactNode }) {
       const labelsData = await getLabels();
       setLabels(labelsData || []);
     } catch (error) {
-      console.error('Error syncing labels:', error);
+      errorLog('Error syncing labels:', error);
       setError(error instanceof Error ? error.message : 'Failed to sync labels');
     } finally {
       setLoading(false);
@@ -70,7 +71,7 @@ export function LabelProvider({ children }: { children: ReactNode }) {
         const labelsData = await getLabels();
         setLabels(labelsData || []);
       } catch (error) {
-        console.error('Error initializing labels:', error);
+        errorLog('Error initializing labels:', error);
         setError(error instanceof Error ? error.message : 'Failed to initialize labels');
       } finally {
         setLoading(false);

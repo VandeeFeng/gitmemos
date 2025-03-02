@@ -1,194 +1,153 @@
 import { NextResponse } from 'next/server';
 import { getGitHubConfig } from '@/lib/github';
 import { Issue, UpdateIssueInput } from '@/types/github';
-import { getIssues, saveIssue, checkSyncStatus, recordSync } from '@/lib/supabase-client';
+import { getIssues, saveIssue, saveIssues, checkSyncStatus, recordSync } from '@/lib/supabase-client';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
-import { fetchIssues, fetchIssue, createGitHubIssue, updateGitHubIssue } from '@/lib/github-api';
-
-// Helper function to check if sync is needed
-async function checkNeedsSync(owner: string, repo: string, forceSync: boolean): Promise<boolean> {
-  // If force sync is requested, return true
-  if (forceSync) return true;
-
-  // Check sync status from the database
-  const syncStatus = await checkSyncStatus(owner, repo);
-  return syncStatus?.needsSync ?? true;
-}
+import { fetchIssues, createGitHubIssue, updateGitHubIssue } from '@/lib/github-api';
+import { debugLog, warnLog, errorLog } from '@/lib/debug';
 
 // GET /api/github/issues
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const labels = searchParams.get('labels');
-    const issueNumber = searchParams.get('number');
-    const forceSync = searchParams.get('forceSync') === 'true';
     const owner = searchParams.get('owner');
     const repo = searchParams.get('repo');
+    const forceSync = searchParams.get('forceSync') === 'true';
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const labels = searchParams.get('labels');
 
-    // 如果提供了 owner 和 repo，使用它们，否则从配置中获取
-    const config = await getGitHubConfig();
-    const effectiveOwner = owner || config.owner;
-    const effectiveRepo = repo || config.repo;
-
-    console.log('GitHub config:', { owner: effectiveOwner, repo: effectiveRepo });
-
-    if (!effectiveOwner || !effectiveRepo) {
-      console.error('Missing owner or repo');
+    if (!owner || !repo) {
       return NextResponse.json(
-        { error: 'Missing owner or repo' },
+        { error: 'Missing owner or repo parameter' },
         { status: 400 }
       );
     }
 
-    if (issueNumber) {
-      const issueNum = parseInt(issueNumber);
-      // Get single issue
-      const singleIssueCacheKey = CACHE_KEYS.SINGLE_ISSUE(effectiveOwner, effectiveRepo, issueNum);
-      const cached = cacheManager?.get<Issue>(singleIssueCacheKey);
-      if (cached && !forceSync) {
-        console.log('Using cached single issue');
-        return NextResponse.json(cached);
-      }
+    // 获取同步状态
+    const syncStatus = await checkSyncStatus(owner, repo);
+    const lastSyncAt = syncStatus?.lastSyncAt;
+    const isFullSync = forceSync || !lastSyncAt;
 
-      try {
-        console.log('Fetching single issue from GitHub API...');
-        const issue = await fetchIssue(effectiveOwner, effectiveRepo, issueNum);
-
-        // Update cache
-        cacheManager?.set(singleIssueCacheKey, issue, { expiry: CACHE_EXPIRY.ISSUES });
-
-        // Sync to database
-        await saveIssue(effectiveOwner, effectiveRepo, issue);
-
-        return NextResponse.json(issue);
-      } catch (err) {
-        console.error('GitHub API error (single issue):', err);
-        return NextResponse.json(
-          { error: err instanceof Error ? err.message : 'Failed to fetch issue from GitHub' },
-          { status: 500 }
-        );
-      }
-    }
-
-    // Get issues list
-    try {
-      // Check if sync is needed
-      const needsSync = await checkNeedsSync(effectiveOwner, effectiveRepo, forceSync);
-      
-      // If not force sync and doesn't need sync, try cache first
-      if (!forceSync && !needsSync) {
-        const cacheKey = CACHE_KEYS.ISSUES(effectiveOwner, effectiveRepo, page, labels || '');
-        const cached = cacheManager?.get<{ issues: Issue[] }>(cacheKey);
-        if (cached?.issues) {
-          console.log('Using cached issues');
-          return NextResponse.json({
-            issues: cached.issues,
-            syncStatus: null
-          });
-        }
-
-        // Try database if not in cache
-        try {
-          console.log('Trying to find issues in database...');
-          const response = await getIssues(effectiveOwner, effectiveRepo);
-          const dbIssues = response?.issues || [];
-          if (dbIssues.length > 0) {
-            console.log('Found issues in database');
-            // Update cache
-            cacheManager?.set(cacheKey, { issues: dbIssues }, { expiry: CACHE_EXPIRY.ISSUES });
-            return NextResponse.json({
-              issues: dbIssues,
-              syncStatus: null
-            });
+    // 如果不是强制同步，先尝试从缓存获取
+    if (!isFullSync) {
+      const cacheKey = CACHE_KEYS.ISSUES(owner, repo, page, labels || '');
+      const cached = cacheManager?.get<{ issues: Issue[] }>(cacheKey);
+      if (cached?.issues) {
+        debugLog('Using cached issues');
+        // 记录同步状态（即使使用缓存也要记录）
+        const now = new Date().toISOString();
+        await recordSync(owner, repo, 'success', 0, undefined, 'add');
+        return NextResponse.json({
+          issues: cached.issues,
+          syncStatus: {
+            success: true,
+            totalSynced: 0,
+            lastSyncAt: now
           }
-        } catch (err) {
-          console.warn('Failed to check database for issues:', err);
-        }
+        });
       }
 
-      // Get sync status for incremental sync
-      const syncStatus = await checkSyncStatus(effectiveOwner, effectiveRepo);
-      const lastSyncAt = syncStatus?.lastSyncAt;
-
-      console.log('Fetching issues from GitHub API...');
+      // 如果没有缓存，尝试从数据库获取
       try {
-        const issues = await fetchIssues(
-          effectiveOwner,
-          effectiveRepo,
-          page,
-          labels || undefined,
-          forceSync,
-          lastSyncAt || undefined
-        );
-
-        // For incremental sync, if no updates found
-        const isIncrementalSync = !forceSync && lastSyncAt && !labels;
-        if (isIncrementalSync && issues.length === 0) {
-          console.log('No updates found since last sync');
-          await recordSync(
-            effectiveOwner,
-            effectiveRepo,
-            'success',
-            0,
-            undefined,
-            'add'
-          );
+        debugLog('Trying to find issues in database...');
+        const response = await getIssues(owner, repo);
+        const dbIssues = response?.issues || [];
+        if (dbIssues.length > 0) {
+          debugLog('Found issues in database');
+          // 更新缓存
+          cacheManager?.set(cacheKey, { issues: dbIssues }, { expiry: CACHE_EXPIRY.ISSUES });
+          // 记录同步状态（即使使用数据库数据也要记录）
+          const now = new Date().toISOString();
+          await recordSync(owner, repo, 'success', 0, undefined, 'add');
           return NextResponse.json({
-            issues: [],
+            issues: dbIssues,
             syncStatus: {
               success: true,
               totalSynced: 0,
-              lastSyncAt: new Date().toISOString()
+              lastSyncAt: now
             }
           });
         }
-
-        // Update cache
-        const cacheKey = CACHE_KEYS.ISSUES(effectiveOwner, effectiveRepo, page, labels || '');
-        cacheManager?.set(cacheKey, { issues }, { expiry: CACHE_EXPIRY.ISSUES });
-
-        // Sync to database
-        for (const issue of issues) {
-          await saveIssue(effectiveOwner, effectiveRepo, issue);
-        }
-
-        // Record sync status
-        await recordSync(
-          effectiveOwner,
-          effectiveRepo,
-          'success',
-          issues.length,
-          undefined,
-          forceSync ? 'full' : 'add'
-        );
-
-        return NextResponse.json({
-          issues,
-          syncStatus: {
-            success: true,
-            totalSynced: issues.length,
-            lastSyncAt: new Date().toISOString()
-          }
-        });
       } catch (err) {
-        console.error('GitHub API error:', err);
-        return NextResponse.json(
-          { error: err instanceof Error ? err.message : 'Failed to fetch issues from GitHub' },
-          { status: 500 }
-        );
+        warnLog('Failed to check database for issues:', err);
       }
-    } catch (err) {
-      console.error('GitHub API error (issues list):', err);
-      return NextResponse.json(
-        { error: err instanceof Error ? err.message : 'Failed to fetch issues from GitHub' },
-        { status: 500 }
+    }
+
+    // 从 GitHub API 获取数据
+    debugLog(isFullSync ? 'Performing full sync...' : `Performing incremental sync since ${lastSyncAt}`);
+    const issues = await fetchIssues(
+      owner,
+      repo,
+      page,
+      labels || undefined,
+      isFullSync,
+      lastSyncAt || undefined
+    );
+
+    // 增量同步时，如果没有更新的内容
+    if (!isFullSync && issues.length === 0) {
+      debugLog('No updates found since last sync');
+      const now = new Date().toISOString();
+      // 记录同步状态（即使没有更新也要记录）
+      await recordSync(owner, repo, 'success', 0, undefined, 'add');
+      return NextResponse.json({
+        issues: [],
+        syncStatus: {
+          success: true,
+          totalSynced: 0,
+          lastSyncAt: now
+        }
+      });
+    }
+
+    // 保存到数据库
+    const saveResult = await saveIssues(owner, repo, issues);
+    if (!saveResult) {
+      throw new Error('Failed to save issues to database');
+    }
+
+    // 更新缓存
+    const cacheKey = CACHE_KEYS.ISSUES(owner, repo, page, labels || '');
+    cacheManager?.set(cacheKey, { issues }, { expiry: CACHE_EXPIRY.ISSUES });
+
+    // 记录同步状态
+    const now = new Date().toISOString();
+    await recordSync(
+      owner,
+      repo,
+      'success',
+      issues.length,
+      undefined,
+      isFullSync ? 'full' : 'add'
+    );
+
+    return NextResponse.json({
+      issues,
+      syncStatus: {
+        success: true,
+        totalSynced: issues.length,
+        lastSyncAt: now
+      }
+    });
+  } catch (error) {
+    errorLog('Error in GET /api/github/issues:', error);
+    
+    // 记录同步失败
+    const owner = new URL(request.url).searchParams.get('owner');
+    const repo = new URL(request.url).searchParams.get('repo');
+    if (owner && repo) {
+      await recordSync(
+        owner,
+        repo,
+        'failed',
+        0,
+        error instanceof Error ? error.message : 'Unknown error',
+        'full'
       );
     }
-  } catch (error) {
-    console.error('Error in issues route:', error);
+
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to process request' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch issues' },
       { status: 500 }
     );
   }
@@ -228,14 +187,14 @@ export async function POST(request: Request) {
 
       return NextResponse.json(createdIssue);
     } catch (err) {
-      console.error('GitHub API error:', err);
+      errorLog('GitHub API error:', err);
       return NextResponse.json(
         { error: err instanceof Error ? err.message : 'Failed to create issue on GitHub' },
         { status: 500 }
       );
     }
   } catch (err) {
-    console.error('Error in create issue route:', err);
+    errorLog('Error in create issue route:', err);
     return NextResponse.json(
       { error: 'Failed to create issue' },
       { status: 500 }
@@ -248,10 +207,10 @@ export async function PATCH(request: Request) {
   try {
     const body: UpdateIssueInput = await request.json();
     const config = await getGitHubConfig();
-    console.log('Update issue - GitHub config:', { owner: config.owner, repo: config.repo });
+    debugLog('Update issue - GitHub config:', { owner: config.owner, repo: config.repo });
 
     if (!config.owner || !config.repo) {
-      console.error('Missing owner or repo in config');
+      errorLog('Missing owner or repo in config');
       return NextResponse.json(
         { error: 'Missing owner or repo in config' },
         { status: 400 }
@@ -273,14 +232,14 @@ export async function PATCH(request: Request) {
 
       return NextResponse.json(issue);
     } catch (err) {
-      console.error('GitHub API error:', err);
+      errorLog('GitHub API error:', err);
       return NextResponse.json(
         { error: 'Failed to update issue on GitHub' },
         { status: 500 }
       );
     }
   } catch (err) {
-    console.error('Error in update issue route:', err);
+    errorLog('Error in update issue route:', err);
     return NextResponse.json(
       { error: 'Failed to update issue' },
       { status: 500 }

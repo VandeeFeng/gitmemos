@@ -12,6 +12,7 @@ import { useIssues } from '@/lib/contexts/issue-context';
 import { useTheme } from 'next-themes';
 import { isPasswordVerified } from '@/lib/supabase-client';
 import { toast } from 'sonner';
+import { errorLog } from '@/lib/debug';
 
 interface IssueEditorProps {
   issue?: EditableIssue;
@@ -55,7 +56,7 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
         const githubConfig = await getGitHubConfig();
         configRef.current = githubConfig;
       } catch (error) {
-        console.error('Error getting GitHub config:', error);
+        errorLog('Error getting GitHub config:', error);
         toast.error('Failed to get GitHub configuration');
       }
     }
@@ -88,7 +89,7 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
 
       const token = await getToken();
       if (!token) {
-        toast.error('GitHub token not found');
+        toast.error('GitHub token not found or invalid. Please check your configuration.');
         return;
       }
 
@@ -118,7 +119,7 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
       await refreshIssues();
       onSave();
     } catch (error) {
-      console.error('Error saving issue:', error);
+      errorLog('Error saving issue:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to save issue');
     } finally {
       setSaving(false);
@@ -176,7 +177,7 @@ export function IssueEditor({ issue, onSave, onCancel }: IssueEditorProps) {
         toast.error('Failed to create label');
       }
     } catch (error) {
-      console.error('Error creating label:', error);
+      errorLog('Error creating label:', error);
       toast.error('Failed to create label');
     } finally {
       setCreatingLabel(false);

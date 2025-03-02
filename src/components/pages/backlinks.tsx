@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Issue } from '@/types/github';
 import { getIssues } from '@/lib/supabase-client';
 import { useIssues } from '@/lib/contexts/issue-context';
+import { errorLog } from '@/lib/debug';
 
 interface BacklinksProps {
   currentIssueNumber: number;
@@ -35,7 +36,7 @@ export function Backlinks({ currentIssueNumber }: BacklinksProps) {
       
       setBacklinks(linkedIssues);
     } catch (error) {
-      console.error('Error fetching backlinks:', error);
+      errorLog('Error fetching backlinks:', error);
     } finally {
       setLoading(false);
     }

@@ -1,4 +1,5 @@
 import { CacheManager, CacheOptions, CacheItem } from './types';
+import { debugLog, errorLog } from '@/lib/debug';
 
 const DEFAULT_EXPIRY = 15 * 60 * 1000; // 15 minutes
 const DEFAULT_VERSION = '1.0';
@@ -13,7 +14,7 @@ export class StorageCache implements CacheManager {
     this.storage = storage;
     this.removalCounts = new Map();
     this.logTimeout = null;
-    console.log('StorageCache initialized');
+    debugLog('StorageCache initialized');
   }
 
   private getFullKey(key: string): string {
@@ -30,7 +31,7 @@ export class StorageCache implements CacheManager {
         const baseKey = key.split(':').slice(0, -1).join(':');
         return `${baseKey} (${count} items)`;
       });
-      console.log('Cache removals:', logs.join(', '));
+      debugLog('Cache removals:', logs.join(', '));
       this.removalCounts.clear();
     }
   }
@@ -57,13 +58,13 @@ export class StorageCache implements CacheManager {
     try {
       const serializedData = JSON.stringify(cacheItem);
       this.storage.setItem(fullKey, serializedData);
-      console.log(`Cache set successfully: ${key}`, {
+      debugLog(`Cache set successfully: ${key}`, {
         size: new Blob([serializedData]).size,
         version: cacheItem.version,
         expiry: cacheItem.expiry
       });
     } catch (error) {
-      console.error(`Failed to set cache for key ${key}:`, {
+      errorLog(`Failed to set cache for key ${key}:`, {
         error,
         dataSize: new Blob([JSON.stringify(data)]).size,
         storageUsage: this.getStorageUsage()
@@ -74,13 +75,13 @@ export class StorageCache implements CacheManager {
       try {
         const serializedData = JSON.stringify(cacheItem);
         this.storage.setItem(fullKey, serializedData);
-        console.log(`Cache set successfully after cleanup: ${key}`, {
+        debugLog(`Cache set successfully after cleanup: ${key}`, {
           size: new Blob([serializedData]).size,
           version: cacheItem.version,
           expiry: cacheItem.expiry
         });
       } catch (retryError) {
-        console.error(`Failed to set cache after cleanup for key ${key}:`, {
+        errorLog(`Failed to set cache after cleanup for key ${key}:`, {
           error: retryError,
           dataSize: new Blob([JSON.stringify(data)]).size,
           storageUsage: this.getStorageUsage()
@@ -94,7 +95,7 @@ export class StorageCache implements CacheManager {
     const item = this.storage.getItem(fullKey);
 
     if (!item) {
-      console.log(`Cache miss: ${key}`);
+      debugLog(`Cache miss: ${key}`);
       return null;
     }
 
@@ -104,7 +105,7 @@ export class StorageCache implements CacheManager {
       const age = Date.now() - cacheItem.timestamp;
 
       if (age > expiry) {
-        console.log(`Cache expired: ${key}`, {
+        debugLog(`Cache expired: ${key}`, {
           timestamp: new Date(cacheItem.timestamp).toISOString(),
           expiry,
           age
@@ -113,7 +114,7 @@ export class StorageCache implements CacheManager {
         return null;
       }
 
-      console.log(`Cache hit: ${key}`, {
+      debugLog(`Cache hit: ${key}`, {
         version: cacheItem.version,
         age,
         expiry,
@@ -121,7 +122,7 @@ export class StorageCache implements CacheManager {
       });
       return cacheItem.data;
     } catch (error) {
-      console.error(`Failed to parse cache for key ${key}:`, {
+      errorLog(`Failed to parse cache for key ${key}:`, {
         error,
         rawData: item
       });
@@ -139,25 +140,25 @@ export class StorageCache implements CacheManager {
       this.removalCounts.set(baseKey, (this.removalCounts.get(baseKey) || 0) + 1);
       this.scheduleLogRemovals();
     } catch (error) {
-      console.error(`Failed to remove cache for key ${key}:`, error);
+      errorLog(`Failed to remove cache for key ${key}:`, error);
     }
   }
 
   clear(): void {
     const keys = this.getAllKeys();
-    console.log(`Clearing all cache entries (${keys.length} items)`);
+    debugLog(`Clearing all cache entries (${keys.length} items)`);
     keys.forEach(key => {
       try {
         this.storage.removeItem(key);
       } catch (error) {
-        console.error(`Failed to remove cache entry: ${key}`, error);
+        errorLog(`Failed to remove cache entry: ${key}`, error);
       }
     });
   }
 
   has(key: string): boolean {
     const result = this.get(key) !== null;
-    console.log(`Cache check (has): ${key} = ${result}`);
+    debugLog(`Cache check (has): ${key} = ${result}`);
     return result;
   }
 
@@ -176,10 +177,10 @@ export class StorageCache implements CacheManager {
         return total + (item ? new Blob([item]).size : 0);
       }, 0);
     } catch (error) {
-      console.error('Failed to calculate total cache size:', error);
+      errorLog('Failed to calculate total cache size:', error);
     }
 
-    console.log('Cache stats:', stats);
+    debugLog('Cache stats:', stats);
     return {
       size: stats.size,
       keys: stats.keys
@@ -192,7 +193,7 @@ export class StorageCache implements CacheManager {
 
   private cleanup(): void {
     const keys = this.getAllKeys();
-    console.log(`Starting cache cleanup (${keys.length} items)`);
+    debugLog(`Starting cache cleanup (${keys.length} items)`);
     let cleaned = 0;
 
     keys.forEach(key => {
@@ -204,7 +205,7 @@ export class StorageCache implements CacheManager {
           if (Date.now() - cacheItem.timestamp > expiry) {
             this.storage.removeItem(key);
             cleaned++;
-            console.log(`Cleaned up expired cache: ${key.replace(CACHE_PREFIX, '')}`, {
+            debugLog(`Cleaned up expired cache: ${key.replace(CACHE_PREFIX, '')}`, {
               age: Date.now() - cacheItem.timestamp,
               expiry
             });
@@ -213,12 +214,12 @@ export class StorageCache implements CacheManager {
           // 如果解析失，直接删除
           this.storage.removeItem(key);
           cleaned++;
-          console.log(`Cleaned up invalid cache: ${key.replace(CACHE_PREFIX, '')}`);
+          debugLog(`Cleaned up invalid cache: ${key.replace(CACHE_PREFIX, '')}`);
         }
       }
     });
 
-    console.log(`Cache cleanup completed: removed ${cleaned} items`);
+    debugLog(`Cache cleanup completed: removed ${cleaned} items`);
   }
 
   private getStorageUsage(): { used: number; total: number; percentage: number } {
@@ -246,7 +247,7 @@ export class StorageCache implements CacheManager {
         percentage: (used / total) * 100
       };
     } catch (error) {
-      console.error('Failed to calculate storage usage:', error);
+      errorLog('Failed to calculate storage usage:', error);
       return { used: 0, total: 0, percentage: 0 };
     }
   }

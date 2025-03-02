@@ -3,6 +3,7 @@ import { supabaseServer } from '@/lib/supabase/server';
 import { headers } from 'next/headers';
 import crypto from 'crypto';
 import { Issue, Label } from '@/types/github';
+import { encryptToken } from '@/lib/encryption';
 
 // GitHub webhook payload类型定义
 interface GitHubWebhookPayload {
@@ -35,12 +36,12 @@ function verifyGitHubWebhook(payload: string, signature: string): boolean {
 
 // 检查配置是否存在
 async function checkConfig(deliveryId: string | null, event: string | null, owner: string, repo: string) {
-  // 先检查环境变量配置
+  // First try environment variables
   const envConfig = {
     owner: process.env.GITHUB_OWNER || '',
     repo: process.env.GITHUB_REPO || '',
-    token: process.env.GITHUB_TOKEN || '',
-    issues_per_page: 10
+    issues_per_page: 10,
+    token: process.env.GITHUB_TOKEN ? encryptToken(process.env.GITHUB_TOKEN) : ''
   };
 
   // 如果环境变量配置完整且匹配（不区分大小写），直接使用
@@ -113,10 +114,12 @@ async function checkConfig(deliveryId: string | null, event: string | null, owne
     };
   }
 
-  // 如果有环境变量token，优先使用环境变量token
+  // Update or create config
   const config = {
-    ...existingConfig,
-    token: process.env.GITHUB_TOKEN || existingConfig.token
+    owner: process.env.GITHUB_OWNER || existingConfig.owner,
+    repo: process.env.GITHUB_REPO || existingConfig.repo,
+    issues_per_page: existingConfig.issues_per_page || 10,
+    token: process.env.GITHUB_TOKEN ? encryptToken(process.env.GITHUB_TOKEN) : existingConfig.token
   };
 
   console.log('Using database config for webhook');

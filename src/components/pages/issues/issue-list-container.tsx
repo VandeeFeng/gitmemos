@@ -7,6 +7,7 @@ import { GitHubConfig, Issue } from '@/types/github';
 import { ConfigDialog } from '@/components/pages/config-dialog';
 import { setConfig } from '@/lib/github';
 import { toast } from 'sonner';
+import { errorLog } from '@/lib/debug';
 
 interface IssueListContainerProps {
   initialIssues: Issue[];
@@ -74,7 +75,7 @@ export function IssueListContainer({ initialIssues, onSync }: IssueListContainer
         toast.error('Failed to sync with GitHub');
       }
     } catch (error) {
-      console.error('Sync failed:', error);
+      errorLog('Sync failed:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to sync with GitHub');
     } finally {
       setLoading(false);
@@ -153,7 +154,7 @@ export function IssueListContainer({ initialIssues, onSync }: IssueListContainer
             setShowConfig(false);
             toast.success('Configuration saved successfully');
           } catch (error) {
-            console.error('Failed to save config:', error);
+            errorLog('Failed to save config:', error);
             toast.error('Failed to save configuration');
           }
         }}

@@ -1,21 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Octokit } from 'octokit';
-
-// Helper function to verify request origin
-async function isValidOrigin(request: Request) {
-  const origin = request.headers.get('origin');
-  const referer = request.headers.get('referer');
-  
-  // Allow only requests from our own domain
-  const allowedOrigins = [
-    process.env.NEXT_PUBLIC_APP_URL,
-    'http://localhost:3000',
-  ].filter(Boolean);
-
-  return allowedOrigins.some(allowed => 
-    origin === allowed || referer?.startsWith(allowed || '')
-  );
-}
+import { getServerConfig } from '@/lib/supabase-client';
+import { errorLog } from '@/lib/debug';
 
 // Helper function to validate GitHub token
 async function validateGitHubToken(token: string): Promise<boolean> {
@@ -25,25 +11,17 @@ async function validateGitHubToken(token: string): Promise<boolean> {
     await octokit.rest.users.getAuthenticated();
     return true;
   } catch (error) {
-    console.error('Token validation failed:', error);
+    errorLog('Token validation failed:', error);
     return false;
   }
 }
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    // Verify request origin
-    if (!await isValidOrigin(request)) {
-      console.error('Invalid request origin');
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const token = process.env.GITHUB_TOKEN;
-    if (!token) {
-      console.error('GitHub token not found in environment variables');
+    // Get config from database or environment
+    const config = await getServerConfig();
+    if (!config || !config.token) {
+      errorLog('GitHub token not found in configuration');
       return NextResponse.json(
         { error: 'GitHub token not configured' },
         { status: 500 }
@@ -51,30 +29,21 @@ export async function GET(request: Request) {
     }
 
     // Validate the token
-    const isValid = await validateGitHubToken(token);
+    const isValid = await validateGitHubToken(config.token);
     if (!isValid) {
-      console.error('Invalid GitHub token');
+      errorLog('Invalid GitHub token');
       return NextResponse.json(
         { error: 'Invalid GitHub token' },
         { status: 401 }
       );
     }
 
-    // Only return a masked version of the token for verification purposes
-    const maskedToken = `${token.substring(0, 4)}...${token.substring(token.length - 4)}`;
-
-    return NextResponse.json({ 
-      masked: maskedToken,
-      // Add additional security-related information
-      expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
-      scope: 'repo',
-      type: 'bearer',
-      isValid: true
-    });
+    // Return success
+    return NextResponse.json({ isValid: true });
   } catch (error) {
-    console.error('Error getting GitHub token:', error);
+    errorLog('Error validating token:', error);
     return NextResponse.json(
-      { error: 'Failed to get GitHub token' },
+      { error: 'Failed to validate token' },
       { status: 500 }
     );
   }

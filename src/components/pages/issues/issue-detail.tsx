@@ -16,6 +16,7 @@ import { PageLayout } from '@/components/layouts/page-layout';
 import { Loading } from '@/components/ui/loading';
 import { ShareDialog } from '@/components/ui/share/share-dialog';
 import { getLabelStyles } from '@/lib/colors';
+import { errorLog } from '@/lib/debug';
 
 interface IssueDetailProps {
   issueNumber: number;
@@ -38,7 +39,7 @@ export function IssueDetail({ issueNumber }: IssueDetailProps) {
           setIsLoading(false);
         }
       } catch (error) {
-        console.error('Error fetching issue:', error);
+        errorLog('Error fetching issue:', error);
         if (mounted) {
           setIsLoading(false);
         }

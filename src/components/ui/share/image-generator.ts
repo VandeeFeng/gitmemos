@@ -1,3 +1,5 @@
+import { warnLog, errorLog } from '@/lib/debug';
+
 interface ImageGeneratorOptions {
   element: HTMLElement;
   backgroundColor: string;
@@ -72,7 +74,7 @@ export async function generateImage({
             reject(new Error('Image load timeout'));
           }, 30000); // 30秒超时
         }).catch(error => {
-          console.error('Image load failed:', img.src, error);
+          errorLog('Image load failed:', img.src, error);
           // 即使图片加载失败也继续处理
           return Promise.resolve();
         });
@@ -92,13 +94,13 @@ export async function generateImage({
   const allImagesLoaded = images.every(img => {
     const isLoaded = img.complete && img.naturalWidth > 0;
     if (!isLoaded) {
-      console.warn('Image not properly loaded:', img.src);
+      warnLog('Image not properly loaded:', img.src);
     }
     return isLoaded;
   });
 
   if (!allImagesLoaded) {
-    console.warn('Some images failed to load properly');
+    warnLog('Some images failed to load properly');
   }
 
   // 检查是否已经被取消
@@ -248,7 +250,7 @@ async function convertImageToBase64(imgUrl: string, signal?: AbortSignal): Promi
 
       retryCount++;
       if (retryCount === maxRetries) {
-        console.error('Failed to convert image after retries:', error);
+        errorLog('Failed to convert image after retries:', error);
         // 返回一个占位图片的 base64
         return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
       }
@@ -310,7 +312,7 @@ async function preloadImages(element: HTMLElement, signal?: AbortSignal): Promis
           img.addEventListener('error', handleError);
           signal?.addEventListener('abort', handleAbort);
         }).catch(error => {
-          console.error('Failed to load converted image:', error);
+          errorLog('Failed to load converted image:', error);
           // 不要让单个图片的失败影响整体流程
         });
       }
@@ -319,7 +321,7 @@ async function preloadImages(element: HTMLElement, signal?: AbortSignal): Promis
       if (error instanceof DOMException && error.name === 'AbortError') {
         throw error;
       }
-      console.error('Failed to convert image:', error);
+      errorLog('Failed to convert image:', error);
       // 不要让单个图片的失败影响整体流程
     }
   });

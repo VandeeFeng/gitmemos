@@ -6,6 +6,7 @@ import { getGitHubConfig } from '@/lib/github';
 import { verifyPassword, isPasswordVerified, setPasswordVerified as setPasswordVerifiedState } from '@/lib/supabase-client';
 import { GitHubConfig } from '@/types/github';
 import { toast } from 'sonner';
+import { errorLog } from '@/lib/debug';
 
 interface ConfigDialogProps {
   isOpen: boolean;
@@ -77,7 +78,7 @@ export function ConfigDialog({ isOpen, onClose, onSave }: ConfigDialogProps) {
       toast.success('Configuration saved');
       onClose();
     } catch (error) {
-      console.error('Failed to save config:', error);
+      errorLog('Failed to save config:', error);
       toast.error('Failed to save configuration');
     } finally {
       setSaving(false);

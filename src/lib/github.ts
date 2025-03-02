@@ -1,9 +1,11 @@
 import { GitHubConfig, Issue, Label } from '@/types/github';
 import { getConfig, getIssues as getIssuesFromApi, checkSyncStatus } from '@/lib/supabase-client';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
-import { toGitHubConfig } from '@/types/config';
 import { BaseGitHubConfig } from '@/types/config';
 import { getApiUrl } from './utils';
+import { getServerConfig } from '@/lib/supabase-client';
+import { ensureServer } from '@/lib/encryption';
+import { debugLog, errorLog } from '@/lib/debug';
 
 let config: GitHubConfig | null = null;
 
@@ -20,14 +22,14 @@ export function setConfig(newConfig: BaseGitHubConfig) {
     { expiry: CACHE_EXPIRY.CONFIG }
   );
   
-  console.log('Using runtime config:', config);
+  debugLog('Using runtime config:', config);
 }
 
 export async function getGitHubConfig(): Promise<GitHubConfig> {
   try {
     // 1. Use runtime config first
     if (config) {
-      console.log('Using runtime config:', { 
+      debugLog('Using runtime config:', { 
         owner: config.owner, 
         repo: config.repo,
         issuesPerPage: config.issuesPerPage 
@@ -37,17 +39,6 @@ export async function getGitHubConfig(): Promise<GitHubConfig> {
 
     // 2. Get from cache/API
     const dbConfig = await getConfig();
-    if (dbConfig) {
-      const safeConfig = toGitHubConfig(dbConfig);
-      console.log('Got config from API:', { 
-        owner: safeConfig.owner, 
-        repo: safeConfig.repo,
-        issuesPerPage: safeConfig.issuesPerPage 
-      });
-    } else {
-      console.log('Got config from API: null');
-    }
-    
     if (!dbConfig) {
       throw new Error('Failed to get GitHub configuration');
     }
@@ -59,7 +50,7 @@ export async function getGitHubConfig(): Promise<GitHubConfig> {
     const cacheKey = CACHE_KEYS.CONFIG(dbConfig.owner, dbConfig.repo);
     const cached = cacheManager?.get<GitHubConfig>(cacheKey);
     if (cached) {
-      console.log('Using cached config:', { 
+      debugLog('Using cached config:', { 
         owner: cached.owner, 
         repo: cached.repo,
         issuesPerPage: cached.issuesPerPage 
@@ -68,8 +59,14 @@ export async function getGitHubConfig(): Promise<GitHubConfig> {
       return cached;
     }
     
-    const githubConfig = toGitHubConfig(dbConfig);
-    console.log('Created new GitHub config:', { 
+    // Create safe config without token
+    const githubConfig: GitHubConfig = {
+      owner: dbConfig.owner,
+      repo: dbConfig.repo,
+      issuesPerPage: dbConfig.issuesPerPage
+    };
+
+    debugLog('Created new GitHub config:', { 
       owner: githubConfig.owner, 
       repo: githubConfig.repo,
       issuesPerPage: githubConfig.issuesPerPage 
@@ -78,7 +75,7 @@ export async function getGitHubConfig(): Promise<GitHubConfig> {
     cacheManager?.set(cacheKey, githubConfig, { expiry: CACHE_EXPIRY.CONFIG });
     return githubConfig;
   } catch (error) {
-    console.error('Error in getGitHubConfig:', error);
+    errorLog('Error in getGitHubConfig:', error);
     throw error;
   }
 }
@@ -94,15 +91,22 @@ export async function checkNeedsSync(owner: string, repo: string, forceSync: boo
 
 // Helper function to verify GitHub token validity
 export async function getToken(): Promise<string | null> {
+  ensureServer(); // Ensure this function only runs on the server
   try {
     const response = await fetch(getApiUrl('/api/github/token'));
     if (!response.ok) {
-      throw new Error('Failed to fetch token');
+      throw new Error('Failed to validate token');
     }
     const data = await response.json();
-    return data.token;
+    if (!data.isValid) {
+      throw new Error('Invalid GitHub token');
+    }
+    
+    // Get token from server config
+    const config = await getServerConfig();
+    return config?.token || null;
   } catch (error) {
-    console.error('Error fetching token:', error);
+    errorLog('Error validating token:', error);
     return null;
   }
 }
@@ -120,12 +124,19 @@ export async function getIssues(owner: string, repo: string): Promise<Issue[] | 
     });
 
     if (!response.ok) {
-      throw new Error('Failed to fetch issues');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `Failed to fetch issues: ${response.statusText}${
+          errorData.error ? ` - ${errorData.error}` : ''
+        }`
+      );
     }
+
     const data = await response.json();
+    // API returns { issues: Issue[], syncStatus?: { success: boolean, totalSynced: number } }
     return data.issues || [];
   } catch (error) {
-    console.error('Error fetching issues:', error);
+    errorLog('Error fetching issues:', error);
     return null;
   }
 }
@@ -167,7 +178,7 @@ export async function getIssue(issueNumber: number, forceSync: boolean = false):
   }
 
   const requestId = getNextRequestId();
-  console.log(`[${requestId}] Getting issue #${issueNumber}`);
+  debugLog(`[${requestId}] Getting issue #${issueNumber}`);
 
   const promise = (async () => {
     try {
@@ -180,20 +191,20 @@ export async function getIssue(issueNumber: number, forceSync: boolean = false):
       }
 
       // Try to get from database first
-      console.log('Trying to find issue in database...');
+      debugLog('Trying to find issue in database...');
       const response = await getIssuesFromApi(config.owner, config.repo);
       const issues = response?.issues || [];
       const issueFromDb = issues.find((issue: Issue) => issue.number === issueNumber);
       
       if (issueFromDb) {
-        console.log('Found issue in database');
+        debugLog('Found issue in database');
         // Update cache
         cacheManager?.set(lockKey, issueFromDb, { expiry: CACHE_EXPIRY.ISSUES });
         return issueFromDb;
       }
 
       // If not in database or force sync, get from GitHub API
-      console.log('Getting issue from GitHub API...');
+      debugLog('Getting issue from GitHub API...');
       const apiResponse = await fetch(`/api/github/issues/${issueNumber}`);
       if (!apiResponse.ok) {
         const errorData = await apiResponse.json().catch(() => ({}));
@@ -211,7 +222,7 @@ export async function getIssue(issueNumber: number, forceSync: boolean = false):
       
       return issue;
     } catch (error) {
-      console.error(`[${requestId}] Failed to get issue:`, error);
+      errorLog(`[${requestId}] Failed to get issue:`, error);
       throw error;
     } finally {
       delete issueRequestLocks[lockKey];
@@ -244,7 +255,7 @@ export async function createIssue(owner: string, repo: string, issue: Partial<Is
 
     return await response.json();
   } catch (error) {
-    console.error('Error creating issue:', error);
+    errorLog('Error creating issue:', error);
     return null;
   }
 }
@@ -281,7 +292,7 @@ export async function updateIssue(
 
     return await response.json();
   } catch (error) {
-    console.error('Error updating issue:', error);
+    errorLog('Error updating issue:', error);
     throw error;
   }
 }
@@ -295,7 +306,7 @@ export async function getLabels(): Promise<Label[] | null> {
     const data = await response.json();
     return data;
   } catch (error) {
-    console.error('Error fetching labels:', error);
+    errorLog('Error fetching labels:', error);
     return null;
   }
 }
@@ -316,7 +327,7 @@ export async function createLabel(owner: string, repo: string, label: Label): Pr
 
     return true;
   } catch (error) {
-    console.error('Error creating label:', error);
+    errorLog('Error creating label:', error);
     return false;
   }
 }

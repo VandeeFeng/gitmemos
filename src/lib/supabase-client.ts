@@ -2,6 +2,8 @@ import { Issue, Label } from '@/types/github';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY, authStore } from './cache';
 import { BaseGitHubConfig, ServerGitHubConfig } from '@/types/config';
 import { getApiUrl } from './utils';
+import { decryptToken, isEncryptedToken } from '@/lib/encryption';
+import { debugLog, infoLog, errorLog } from '@/lib/debug';
 
 type SyncStatus = 'success' | 'failed';
 
@@ -26,7 +28,7 @@ export async function verifyPassword(password: string): Promise<boolean> {
     }
     return isValid;
   } catch (error) {
-    console.error('Error verifying password:', error);
+    errorLog('Error verifying password:', error);
     return false;
   }
 }
@@ -40,7 +42,7 @@ export function isPasswordVerified(): boolean {
 }
 
 // Config API
-export async function getConfig(): Promise<ServerGitHubConfig | null> {
+export async function getConfig(): Promise<BaseGitHubConfig | null> {
   try {
     // Try to get config from API
     const response = await fetch(getApiUrl('/api/supabase/config'));
@@ -50,27 +52,68 @@ export async function getConfig(): Promise<ServerGitHubConfig | null> {
 
     const data = await response.json();
     
-    // Create safe config for caching (without sensitive info)
-    const cacheConfig: BaseGitHubConfig = {
+    // Return only safe config for client-side use
+    const safeConfig: BaseGitHubConfig = {
       owner: data.owner,
       repo: data.repo,
       issuesPerPage: data.issues_per_page || 10
     };
     
-    // Cache only safe config
+    // Cache safe config
     cacheManager?.set(
-      CACHE_KEYS.CONFIG(cacheConfig.owner, cacheConfig.repo),
-      cacheConfig,
+      CACHE_KEYS.CONFIG(safeConfig.owner, safeConfig.repo),
+      safeConfig,
       { expiry: CACHE_EXPIRY.CONFIG }
     );
+
+    return safeConfig;
+  } catch (error) {
+    errorLog('Error in getConfig:', error);
+    throw error;
+  }
+}
+
+// Server-side only config retrieval
+export async function getServerConfig(): Promise<ServerGitHubConfig | null> {
+  try {
+    // Try to get config from API
+    const response = await fetch(getApiUrl('/api/supabase/config'));
+    if (!response.ok) {
+      throw new Error('Failed to fetch config from API');
+    }
+
+    const data = await response.json();
     
-    // Return full config including token (only for internal use)
+    // Handle encrypted token
+    let actualToken = data.token;
+    if (!actualToken) {
+      errorLog('No token found in config data');
+      throw new Error('GitHub token not configured');
+    }
+
+    if (isEncryptedToken(actualToken)) {
+      try {
+        actualToken = decryptToken(actualToken);
+        debugLog('Token decrypted successfully');
+      } catch (error) {
+        errorLog('Failed to decrypt token:', error);
+        throw new Error('Invalid GitHub token');
+      }
+    }
+
+    if (typeof actualToken !== 'string' || !actualToken.trim()) {
+      throw new Error('Invalid GitHub token');
+    }
+    
+    // Return full config including decrypted token
     return {
-      ...cacheConfig,
-      token: data.token
+      owner: data.owner,
+      repo: data.repo,
+      issuesPerPage: data.issues_per_page || 10,
+      token: actualToken
     };
   } catch (error) {
-    console.error('Error in getConfig:', error);
+    errorLog('Error in getServerConfig:', error);
     throw error;
   }
 }
@@ -107,7 +150,7 @@ export async function saveConfig(config: BaseGitHubConfig): Promise<boolean> {
     
     return true;
   } catch (error) {
-    console.error('Error saving config:', error);
+    errorLog('Error saving config:', error);
     return false;
   }
 }
@@ -127,7 +170,7 @@ export async function getIssues(
     const syncStatus = await checkSyncStatus(owner, repo);
     
     if (cached?.issues && Array.isArray(cached.issues)) {
-      console.log('API: Using cached issues:', { count: cached.issues.length });
+      infoLog('API: Using cached issues:', { count: cached.issues.length });
       return {
         ...cached,
         lastSyncAt: syncStatus?.lastSyncAt || undefined
@@ -144,14 +187,14 @@ export async function getIssues(
       params.set('labels', labels.join(','));
     }
 
-    console.log('API: Fetching issues from Supabase...');
+    debugLog('API: Fetching issues from Supabase...');
     const response = await fetch(getApiUrl(`/api/supabase/issues?${params}`));
     if (!response.ok) {
       throw new Error('Failed to fetch issues');
     }
 
     const data = await response.json();
-    console.log('API: Got issues from Supabase:', { count: data.issues?.length || 0 });
+    infoLog('API: Got issues from Supabase:', { count: data.issues?.length || 0 });
     
     // 确保数据格式正确
     const issues = Array.isArray(data.issues) ? data.issues : [];
@@ -159,7 +202,7 @@ export async function getIssues(
     
     // 缓存结果
     if (issues.length > 0) {
-      console.log('API: Caching issues');
+      debugLog('API: Caching issues');
       const cacheData = { issues, total };
       cacheManager?.set(cacheKey, cacheData, { expiry: CACHE_EXPIRY.ISSUES });
     }
@@ -170,7 +213,7 @@ export async function getIssues(
       lastSyncAt: syncStatus?.lastSyncAt || undefined
     };
   } catch (error) {
-    console.error('Error fetching issues:', error);
+    errorLog('Error fetching issues:', error);
     return null;
   }
 }
@@ -194,7 +237,7 @@ export async function saveIssue(owner: string, repo: string, issue: Issue): Prom
     
     return true;
   } catch (error) {
-    console.error('Error saving issue:', error);
+    errorLog('Error saving issue:', error);
     return false;
   }
 }
@@ -218,7 +261,7 @@ export async function saveIssues(owner: string, repo: string, issues: Issue[]): 
     
     return true;
   } catch (error) {
-    console.error('Error saving issues:', error);
+    errorLog('Error saving issues:', error);
     return false;
   }
 }
@@ -247,7 +290,7 @@ export async function getLabels(owner: string, repo: string): Promise<Label[] | 
     
     return data;
   } catch (error) {
-    console.error('Error fetching labels:', error);
+    errorLog('Error fetching labels:', error);
     return null;
   }
 }
@@ -264,7 +307,7 @@ export async function saveLabel(owner: string, repo: string, label: Label): Prom
 
     if (!response.ok) {
       const responseData = await response.json();
-      console.error(`Failed to save label "${label.name}":`, {
+      errorLog(`Failed to save label "${label.name}":`, {
         status: response.status,
         statusText: response.statusText,
         data: responseData
@@ -276,7 +319,12 @@ export async function saveLabel(owner: string, repo: string, label: Label): Prom
     cacheManager?.remove(CACHE_KEYS.LABELS(owner, repo));
     return true;
   } catch (error) {
-    console.error(`Error saving label "${label.name}":`, error);
+    errorLog(`Failed to save label "${label.name}":`, {
+      error,
+      label,
+      owner,
+      repo,
+    });
     return false;
   }
 }
@@ -307,13 +355,13 @@ export async function recordSync(
     });
 
     if (!response.ok) {
-      console.error('Failed to record sync:', await response.text());
+      errorLog('Failed to record sync:', await response.text());
       return false;
     }
     
     return true;
   } catch (error) {
-    console.error('Error recording sync:', error);
+    errorLog('Error recording sync:', error);
     return false;
   }
 }
@@ -333,7 +381,7 @@ export async function checkSyncStatus(owner: string, repo: string): Promise<{
     
     return response.json();
   } catch (error) {
-    console.error('Error checking sync status:', error);
+    errorLog('Error checking sync status:', error);
     return null;
   }
 }
@@ -355,7 +403,7 @@ export async function syncIssues(owner: string, repo: string): Promise<SyncStatu
     const data = await response.json();
     return data.status;
   } catch (error) {
-    console.error('Error syncing issues:', error);
-    throw error;
+    errorLog('Error syncing issues:', error);
+    return 'failed';
   }
 }

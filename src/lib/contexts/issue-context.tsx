@@ -2,11 +2,11 @@
 
 import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 import { Issue, GitHubConfig } from '@/types/github';
-import { getIssues as getGitHubIssues, getGitHubConfig, getToken } from '@/lib/github';
-import { checkSyncStatus, recordSync, saveLabel, saveIssues } from '@/lib/supabase-client';
+import { getGitHubConfig} from '@/lib/github';
+import { checkSyncStatus, recordSync, saveLabel} from '@/lib/supabase-client';
 import { cacheManager, CACHE_KEYS, CACHE_EXPIRY } from '@/lib/cache';
 import { getIssues as getIssuesFromApi } from '@/lib/supabase-client';
-import { Octokit } from 'octokit';
+import { debugLog, infoLog, errorLog } from '@/lib/debug';
 
 interface IssueContextType {
   issues: Issue[];
@@ -30,6 +30,10 @@ const IssueContext = createContext<IssueContextType>({
   refreshIssues: async () => {}
 });
 
+const SYNC_COOLDOWN = 60000; // 60 seconds
+let lastSyncAttempt = 0;
+let syncInProgress = false;
+
 export function IssueProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<IssueContextType>({
     issues: [],
@@ -45,7 +49,6 @@ export function IssueProvider({ children }: { children: ReactNode }) {
   const initializingRef = useRef(false);
   const initializePromiseRef = useRef<Promise<void>>();
   const configRef = useRef<GitHubConfig | null>(null);
-  const lastSyncTimeRef = useRef<number>(0);
 
   // Memoize these functions to prevent unnecessary re-renders
   const syncIssues = useCallback(async () => {
@@ -53,39 +56,33 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       throw new Error('GitHub configuration is missing. Please configure your settings first.');
     }
 
-    // Check if last sync was less than 1 minute ago
-    const now = Date.now();
-    const timeSinceLastSync = now - lastSyncTimeRef.current;
-    if (timeSinceLastSync < 60000) { // 60000ms = 1 minute
-      throw new Error(`Please wait ${Math.ceil((60000 - timeSinceLastSync) / 1000)} seconds before syncing again.`);
+    // 检查是否正在同步
+    if (syncInProgress) {
+      throw new Error('Sync already in progress. Please wait for it to complete.');
     }
+
+    // 检查冷却时间
+    const now = Date.now();
+    const timeSinceLastSync = now - lastSyncAttempt;
+    if (timeSinceLastSync < SYNC_COOLDOWN) {
+      throw new Error(`Please wait ${Math.ceil((SYNC_COOLDOWN - timeSinceLastSync) / 1000)} seconds before syncing again.`);
+    }
+
+    syncInProgress = true;
+    lastSyncAttempt = now;
 
     setState(prev => ({ ...prev, loading: true }));
     try {
-      // Update last sync time
-      lastSyncTimeRef.current = now;
-
-      // Get GitHub token and initialize Octokit
-      const token = await getToken();
-      if (!token) {
-        throw new Error('GitHub token not found');
-      }
-      const octokit = new Octokit({ auth: token });
       const config = configRef.current;
 
       // 首先同步标签
-      console.log('Syncing labels from GitHub...');
-      const labelsResponse = await octokit.rest.issues.listLabelsForRepo({
-        owner: config.owner,
-        repo: config.repo,
-      });
+      infoLog('Syncing labels from GitHub...');
+      const labelsResponse = await fetch('/api/github/labels');
+      if (!labelsResponse.ok) {
+        throw new Error('Failed to fetch labels from GitHub');
+      }
 
-      const labels = labelsResponse.data.map(label => ({
-        id: label.id,
-        name: label.name,
-        color: label.color,
-        description: label.description,
-      }));
+      const labels = await labelsResponse.json();
 
       // 保存标签到数据库
       let savedLabels = 0;
@@ -104,55 +101,30 @@ export function IssueProvider({ children }: { children: ReactNode }) {
       }
 
       if (failedLabels > 0) {
-        console.log(`Synced ${labels.length} labels: ${savedLabels} succeeded, ${failedLabels} failed`);
+        infoLog(`Synced ${labels.length} labels: ${savedLabels} succeeded, ${failedLabels} failed`);
       } else {
-        console.log(`Successfully synced ${labels.length} labels`);
+        infoLog(`Successfully synced ${labels.length} labels`);
       }
 
-      // 获取上次同步状态
+      // 获取同步状态
       const syncStatus = await checkSyncStatus(config.owner, config.repo);
       const isFullSync = !syncStatus?.lastSyncAt;
 
       // 同步 issues
-      console.log(isFullSync ? 'Performing full sync...' : `Performing incremental sync since ${syncStatus.lastSyncAt}`);
+      infoLog(isFullSync ? 'Performing full sync...' : `Performing incremental sync since ${syncStatus.lastSyncAt}`);
       
-      const params: Parameters<typeof octokit.rest.issues.listForRepo>[0] = {
-        owner: config.owner,
-        repo: config.repo,
-        state: 'all',
-        per_page: config.issuesPerPage || 50,
-        page: 1,
-        sort: 'updated',
-        direction: 'desc'
-      };
-
-      if (!isFullSync && syncStatus?.lastSyncAt) {
-        params.since = syncStatus.lastSyncAt;
+      // 调用 API 进行同步
+      const issuesResponse = await fetch(`/api/github/issues?owner=${config.owner}&repo=${config.repo}&forceSync=${isFullSync}`);
+      if (!issuesResponse.ok) {
+        throw new Error('Failed to fetch issues from GitHub');
       }
 
-      const { data } = await octokit.rest.issues.listForRepo(params);
+      const { issues, syncStatus: newSyncStatus } = await issuesResponse.json();
 
-      const issues = data.map(issue => ({
-        number: issue.number,
-        title: issue.title,
-        body: issue.body ?? null,
-        created_at: issue.created_at,
-        github_created_at: issue.created_at,
-        state: issue.state,
-        labels: issue.labels
-          .filter((label): label is { id: number; name: string; color: string; description: string | null } => 
-            typeof label === 'object' && label !== null)
-          .map(label => ({
-            id: label.id,
-            name: label.name,
-            color: label.color,
-            description: label.description,
-          }))
-      }));
-
-      // 增量同步时，如果没有更新的内容，直接返回
-      if (!isFullSync && issues.length === 0) {
-        console.log('No updates found since last sync');
+      // 如果是增量同步且没有更新，直接返回
+      if (!isFullSync && (!issues || issues.length === 0)) {
+        infoLog('No updates found since last sync');
+        // 记录同步历史
         await recordSync(
           config.owner,
           config.repo,
@@ -168,26 +140,20 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         };
       }
 
-      // 批量保存 issues 到数据库
-      const saveResult = await saveIssues(config.owner, config.repo, issues);
-      if (!saveResult) {
-        throw new Error('Failed to save issues to database');
-      }
-
       // Update state and cache
       setState(prev => {
         if (!prev.config) return prev;
 
         // 如果是增量同步，合并现有issues和新issues
-        let updatedIssues = issues;
+        let updatedIssues = issues || [];
         if (!isFullSync && prev.issues) {
-          const existingIssues = new Map(prev.issues.map(issue => [issue.number, issue]));
-          issues.forEach(issue => existingIssues.set(issue.number, issue));
+          const existingIssues = new Map(prev.issues.map((issue: Issue) => [issue.number, issue]));
+          issues.forEach((issue: Issue) => existingIssues.set(issue.number, issue));
           updatedIssues = Array.from(existingIssues.values());
         }
 
         // 清理所有相关缓存
-        console.log('Clearing all related caches after sync...');
+        debugLog('Clearing all related caches after sync...');
         const currentConfig = configRef.current;
         if (currentConfig) {
           const stats = cacheManager?.getStats();
@@ -195,7 +161,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
             stats.keys.forEach(key => {
               if (key.includes(`${currentConfig.owner}:${currentConfig.repo}`)) {
                 cacheManager?.remove(key);
-                console.log(`Cleared cache: ${key}`);
+                debugLog(`Cleared cache: ${key}`);
               }
             });
           }
@@ -212,7 +178,7 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           newState,
           { expiry: CACHE_EXPIRY.ISSUES }
         );
-        console.log('New cache set successfully');
+        debugLog('New cache set successfully');
 
         return { 
           ...prev,
@@ -221,50 +187,29 @@ export function IssueProvider({ children }: { children: ReactNode }) {
         };
       });
 
-      // Record successful sync
-      const currentConfig = configRef.current;
-      if (!currentConfig) {
-        throw new Error('GitHub configuration is missing');
-      }
+      infoLog(`Synced ${issues?.length || 0} issues from GitHub to database`);
+      
+      // 记录同步历史
       await recordSync(
-        currentConfig.owner,
-        currentConfig.repo,
+        config.owner,
+        config.repo,
         'success',
-        issues.length,
+        issues?.length || 0,
         undefined,
         isFullSync ? 'full' : 'add'
       );
-
-      console.log(`Synced ${issues.length} issues from GitHub to database`);
       
       return {
-        success: true,
-        totalSynced: issues.length,
+        success: newSyncStatus?.success ?? true,
+        totalSynced: newSyncStatus?.totalSynced ?? (issues?.length || 0),
         syncType: isFullSync ? 'full' as const : 'add' as const
       };
     } catch (error) {
-      console.error('Error syncing from GitHub:', error);
-      
-      // Record sync failure
-      if (configRef.current) {
-        await recordSync(
-          configRef.current.owner,
-          configRef.current.repo,
-          'failed',
-          0,
-          error instanceof Error ? error.message : 'Unknown error',
-          'full'
-        );
-      }
-      
+      errorLog('Error syncing from GitHub:', error);
+      throw error;
+    } finally {
       setState(prev => ({ ...prev, loading: false }));
-      
-      // Re-throw with more descriptive error
-      if (error instanceof Error) {
-        throw error;
-      } else {
-        throw new Error('Failed to sync with GitHub');
-      }
+      syncInProgress = false;
     }
   }, []);
 
@@ -336,45 +281,73 @@ export function IssueProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // 检查步状态
+        // 检查同步状态
         const syncStatus = await checkSyncStatus(config.owner, config.repo);
+        const needsSync = !syncStatus?.lastSyncAt;
+
         if (syncStatus?.lastSyncAt) {
-          console.log(
-            `Last sync time: ${new Date(syncStatus.lastSyncAt).toLocaleString()}`
-          );
+          debugLog(`Last sync time: ${new Date(syncStatus.lastSyncAt).toLocaleString()}`);
         }
 
-        // 从服务器获取数据
-        const issuesResult = await getGitHubIssues(config.owner, config.repo);
-        
-        if (mounted) {
-          // 确保 issues 数组存在
-          const issues = issuesResult || [];
-          console.log('Loaded issues:', { count: issues.length });
+        // 从缓存或数据库获取数据
+        const cacheKey = CACHE_KEYS.ISSUES(config.owner, config.repo, 1, '');
+        const cached = cacheManager?.get<{ issues: Issue[] }>(cacheKey);
 
-          setState(prev => ({
-            ...prev,
-            issues,
-            config,
-            loading: false,
-            initialized: true,
-            syncIssues,
-            updateIssues,
-            refreshIssues
-          }));
+        if (cached?.issues) {
+          debugLog('Using cached issues:', { count: cached.issues.length });
+          if (mounted) {
+            setState(prev => ({
+              ...prev,
+              issues: cached.issues,
+              config,
+              loading: false,
+              initialized: true,
+              syncIssues,
+              updateIssues,
+              refreshIssues
+            }));
+          }
+        } else {
+          // 如果没有缓存，从数据库获取
+          const result = await getIssuesFromApi(config.owner, config.repo);
+          const issues = result?.issues || [];
+          debugLog('Loaded issues from database:', { count: issues.length });
 
-          // 更新缓存
-          if (issues.length > 0) {
-            console.log('Updating cache with issues');
-            cacheManager?.set(
-              CACHE_KEYS.ISSUES(config.owner, config.repo, 1, ''),
-              { issues },
-              { expiry: CACHE_EXPIRY.ISSUES }
-            );
+          if (mounted) {
+            setState(prev => ({
+              ...prev,
+              issues,
+              config,
+              loading: false,
+              initialized: true,
+              syncIssues,
+              updateIssues,
+              refreshIssues
+            }));
+
+            // 更新缓存
+            if (issues.length > 0) {
+              debugLog('Updating cache with issues');
+              cacheManager?.set(
+                cacheKey,
+                { issues },
+                { expiry: CACHE_EXPIRY.ISSUES }
+              );
+            }
+          }
+
+          // 如果需要同步，自动触发同步
+          if (needsSync) {
+            debugLog('No previous sync found, triggering initial sync...');
+            try {
+              await syncIssues();
+            } catch (error) {
+              errorLog('Initial sync failed:', error);
+            }
           }
         }
       } catch (error) {
-        console.error('Error initializing data:', error);
+        errorLog('Error initializing data:', error);
         if (mounted) {
           setState(prev => ({ 
             ...prev, 

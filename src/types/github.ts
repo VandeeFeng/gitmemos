@@ -1,5 +1,37 @@
 import { BaseGitHubConfig, GitHubConfig, ServerGitHubConfig, DbConfig } from "./config";
 
+// GitHub API Response type
+export type GitHubApiResponse = {
+  data: {
+    number?: number;
+    title?: string;
+    body?: string;
+    state?: string;
+    labels?: Label[];
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+};
+
+// GitHub API Parameters type
+export type GitHubApiParams = {
+  owner?: string;
+  repo?: string;
+  issue_number?: number;
+  title?: string;
+  body?: string;
+  labels?: string[];
+  name?: string;
+  color?: string;
+  description?: string;
+  page?: number;
+  per_page?: string;
+  state?: string;
+  sort?: string;
+  direction?: string;
+  since?: string;
+};
+
 export interface Label {
   id: number;
   name: string;

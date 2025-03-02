@@ -19,10 +19,10 @@ export const LABEL_COLORS: LabelColor[] = [
 ];
 
 function hexToHSL(hex: string): { h: number; s: number; l: number } {
-  // 移除#号如果存在
+  // Remove # if present
   hex = hex.replace(/^#/, '');
 
-  // 将hex转换为RGB
+  // Convert hex to RGB
   const r = parseInt(hex.slice(0, 2), 16) / 255;
   const g = parseInt(hex.slice(2, 4), 16) / 255;
   const b = parseInt(hex.slice(4, 6), 16) / 255;
@@ -93,44 +93,44 @@ function HSLToHex(h: number, s: number, l: number): string {
 }
 
 export function getLabelStyles(color: string) {
-  // 转换为HSL
+  // Convert to HSL
   const hsl = hexToHSL(color);
   
-  // 文字颜色：降低饱和度使其偏灰，适当调整亮度
+  // Text color: reduce saturation for a grayish look and adjust brightness
   const textColor = HSLToHex(
     hsl.h,
-    Math.max(hsl.s - 25, 0), // 大幅降低饱和度使其偏灰
-    Math.min(hsl.l + 25, 100) // 稍微提高亮度
+    Math.max(hsl.s - 25, 0), // Significantly reduce saturation
+    Math.min(hsl.l + 25, 100) // Increase brightness
   );
   
-  // 边框颜色：降低亮度和饱和度
+  // Border color: reduce both brightness and saturation
   const borderColor = HSLToHex(
     hsl.h, 
-    Math.max(hsl.s - 35, 0),
-    Math.max(hsl.l - 5, 0)
+    Math.max(hsl.s - 35, 0), // Reduce saturation
+    Math.max(hsl.l - 5, 0)   // Slightly reduce brightness
   );
   
   return {
-    backgroundColor: `#${color}40`, // 背景色40%不透明度
+    backgroundColor: `#${color}40`, // Background with 40% opacity
     color: textColor,
     border: `1px solid ${borderColor}`,
   };
 }
 
 export function getTextColorForBackground(bgColor: string): string {
-  // 将十六进制颜色转换为 RGB
+  // Convert hex color to RGB
   const r = parseInt(bgColor.slice(0, 2), 16);
   const g = parseInt(bgColor.slice(2, 4), 16);
   const b = parseInt(bgColor.slice(4, 6), 16);
   
-  // 计算亮度
+  // Calculate brightness using weighted RGB values
   const brightness = (r * 299 + g * 587 + b * 114) / 1000;
   
-  // 如果亮度大于 128，返回黑色，否则返回白色
+  // Return black for light backgrounds, white for dark backgrounds
   return brightness > 128 ? 'text-black' : 'text-white';
 }
 
-// 状态颜色
+// Status colors for different states
 export const STATUS_COLORS = {
   open: {
     light: {

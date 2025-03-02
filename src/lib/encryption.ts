@@ -1,15 +1,13 @@
 import crypto from 'crypto';
 import { debugLog, errorLog } from '@/lib/debug';
 
-// 添加调试信息
+// Add debug information
 debugLog('Loading encryption module with environment variables:', {
   hasEncryptionKey: !!process.env.ENCRYPTION_KEY,
-  hasWebhookSecret: !!process.env.GITHUB_WEBHOOK_SECRET,
-  encryptionKeyLength: process.env.ENCRYPTION_KEY?.length,
-  webhookSecretLength: process.env.GITHUB_WEBHOOK_SECRET?.length
+  encryptionKeyLength: process.env.ENCRYPTION_KEY?.length
 });
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || process.env.GITHUB_WEBHOOK_SECRET || '';
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || '';
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 const AUTH_TAG_LENGTH = 16;

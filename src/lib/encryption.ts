@@ -148,4 +148,104 @@ export function isEncryptedToken(text: string): boolean {
   } catch {
     return false;
   }
+}
+
+// Password encryption functions
+export function encryptPassword(password: string): string {
+  debugLog('Starting password encryption...');
+  
+  if (!ENCRYPTION_KEY) {
+    errorLog('No encryption key found in environment variables');
+    throw new Error('Encryption key not configured');
+  }
+
+  try {
+    // Generate a random salt
+    const salt = crypto.randomBytes(SALT_LENGTH);
+    debugLog('Salt generated successfully');
+    
+    // Create a key using PBKDF2
+    const key = crypto.pbkdf2Sync(ENCRYPTION_KEY, salt, 100000, 32, 'sha256');
+    debugLog('Key derived successfully');
+    
+    // Generate a random IV
+    const iv = crypto.randomBytes(IV_LENGTH);
+    debugLog('IV generated successfully');
+    
+    // Create cipher
+    const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
+    debugLog('Cipher created successfully');
+    
+    // Encrypt the password
+    let encrypted = cipher.update(password, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    debugLog('Password encrypted successfully');
+    
+    // Get the auth tag
+    const authTag = cipher.getAuthTag();
+    debugLog('Auth tag generated successfully');
+    
+    // Combine all components
+    const result = `${salt.toString('base64')}:${iv.toString('base64')}:${authTag.toString('base64')}:${encrypted}`;
+    debugLog('Encryption completed successfully');
+    
+    return result;
+  } catch (error) {
+    errorLog('Error during password encryption:', error);
+    throw error;
+  }
+}
+
+export function decryptPassword(encryptedData: string): string {
+  debugLog('Starting password decryption...');
+  
+  if (!ENCRYPTION_KEY) {
+    errorLog('No encryption key found in environment variables');
+    throw new Error('Encryption key not configured');
+  }
+
+  try {
+    // Split the encrypted data into its components
+    const [saltBase64, ivBase64, authTagBase64, encrypted] = encryptedData.split(':');
+    debugLog('Components split successfully');
+    
+    if (!saltBase64 || !ivBase64 || !authTagBase64 || !encrypted) {
+      errorLog('Invalid encrypted data format:', { 
+        hasSalt: !!saltBase64, 
+        hasIV: !!ivBase64, 
+        hasAuthTag: !!authTagBase64, 
+        hasEncrypted: !!encrypted 
+      });
+      throw new Error('Invalid encrypted data format');
+    }
+    
+    // Convert components back to buffers
+    const salt = Buffer.from(saltBase64, 'base64');
+    const iv = Buffer.from(ivBase64, 'base64');
+    const authTag = Buffer.from(authTagBase64, 'base64');
+    debugLog('Components converted to buffers successfully');
+    
+    // Recreate the key using PBKDF2
+    const key = crypto.pbkdf2Sync(ENCRYPTION_KEY, salt, 100000, 32, 'sha256');
+    debugLog('Key derived successfully');
+    
+    // Create decipher
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    decipher.setAuthTag(authTag);
+    debugLog('Decipher created and auth tag set successfully');
+    
+    // Decrypt the password
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    debugLog('Password decrypted successfully');
+    
+    return decrypted;
+  } catch (error) {
+    errorLog('Error during password decryption:', error);
+    throw error;
+  }
+}
+
+export function isEncryptedPassword(text: string): boolean {
+  return isEncryptedToken(text); // We use the same format for both token and password
 } 

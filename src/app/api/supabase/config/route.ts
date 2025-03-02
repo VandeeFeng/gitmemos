@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
 import { DbConfig } from '@/types/github';
-import { encryptToken, decryptToken, isEncryptedToken } from '@/lib/encryption';
+import { encryptToken, decryptToken, isEncryptedToken, encryptPassword, isEncryptedPassword } from '@/lib/encryption';
 import { debugLog, errorLog } from '@/lib/debug';
 
 // Define environment variable types
@@ -10,6 +10,7 @@ interface EnvVariables {
   GITHUB_REPO: boolean;
   HAS_TOKEN: boolean;
   TOKEN_TYPE: string;
+  HAS_PASSWORD: boolean;
 }
 
 // Helper function to create a safe version of config (without token)
@@ -60,31 +61,53 @@ const handleTokenDecryption = (token: string): string => {
   }
 };
 
+// Helper function to handle password encryption
+const handlePasswordEncryption = (password: string): string => {
+  if (!password) {
+    debugLog('No password provided for encryption');
+    return '';
+  }
+  if (typeof password !== 'string') {
+    errorLog('Password is not a string:', { type: typeof password });
+    return '';
+  }
+  if (isEncryptedPassword(password)) {
+    debugLog('Password is already encrypted');
+    return password;
+  }
+  debugLog('Encrypting password...');
+  return encryptPassword(password);
+};
+
 export async function GET() {
   try {
-    // Log environment variables (without token for security)
+    // Log environment variables (without sensitive data for security)
     const envVars: EnvVariables = {
       GITHUB_OWNER: !!process.env.GITHUB_OWNER,
       GITHUB_REPO: !!process.env.GITHUB_REPO,
       HAS_TOKEN: !!process.env.GITHUB_TOKEN,
-      TOKEN_TYPE: typeof process.env.GITHUB_TOKEN
+      TOKEN_TYPE: typeof process.env.GITHUB_TOKEN,
+      HAS_PASSWORD: !!process.env.PASSWORD
     };
     debugLog('Environment variables:', envVars);
 
     // First try to get config from environment variables
     const envToken = process.env.GITHUB_TOKEN || '';
     const encryptedEnvToken = envToken ? handleTokenEncryption(envToken) : '';
+    const envPassword = process.env.PASSWORD || '';
+    const encryptedEnvPassword = envPassword ? handlePasswordEncryption(envPassword) : '';
 
     const envConfig: DbConfig = {
       owner: process.env.GITHUB_OWNER || '',
       repo: process.env.GITHUB_REPO || '',
       issues_per_page: 10,
-      token: encryptedEnvToken
+      token: encryptedEnvToken,
+      password: encryptedEnvPassword
     };
 
     if (envConfig.owner && envConfig.repo && envConfig.token) {
       debugLog('Using environment config:', createSafeConfig(envConfig));
-      // Token is already encrypted by handleTokenEncryption above
+      // Token and password are already encrypted by handle*Encryption above
       return NextResponse.json(envConfig);
     }
 
@@ -139,12 +162,13 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     
-    // Create config with encrypted token
+    // Create config with encrypted token and password
     const config: DbConfig = {
       owner: body.owner,
       repo: body.repo,
       issues_per_page: body.issues_per_page || 10,
-      token: handleTokenEncryption(process.env.GITHUB_TOKEN || '') // Use environment token when saving new config
+      token: handleTokenEncryption(process.env.GITHUB_TOKEN || ''), // Use environment token when saving new config
+      password: handlePasswordEncryption(process.env.PASSWORD || body.password || '') // Use environment password or provided password
     };
 
     const { data } = await supabaseServer
@@ -160,7 +184,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Return safe version of config (without token)
+    // Return safe version of config (without token and password)
     return NextResponse.json(createSafeConfig(data));
   } catch (err) {
     errorLog('Error in config route:', err);

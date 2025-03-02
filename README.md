@@ -65,6 +65,7 @@
      - 开发环境: `http://localhost:3000`
      - 生产环境: 实际域名（如 `https://your-app-url.com`）
    - `ENCRYPTION_KEY`: 用于加密敏感数据的密钥
+   - `PASSWORD`: 用于创建和更新 issues 的密码（可选，如果不设置则使用数据库中的密码）
    - `DEBUG_MODE`: 设置为 'true' 开启调试日志
 
 3. 启动开发服务器：
@@ -108,6 +109,8 @@ sync_history 表是用来存储同步历史的，包括 owner, repo, last_sync_a
 - 带有 `NEXT_PUBLIC_` 前缀的环境变量在浏览器中可访问
 - 请确保 `.env.local` 文件的安全，永远不要将其提交到版本控制系统中
 - 所有加密操作仅在服务器端执行，确保密钥安全
+- 密码和 GitHub Token 在数据库中以加密形式存储
+- 如果设置了环境变量中的 `PASSWORD`，它将优先于数据库中的密码
 
 ## 开发指南
 

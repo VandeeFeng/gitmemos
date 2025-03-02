@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabase/server';
-import { encryptPassword, decryptPassword, isEncryptedPassword } from '@/lib/encryption';
+import { decryptPassword, isEncryptedPassword } from '@/lib/encryption';
 import { debugLog, errorLog } from '@/lib/debug';
 
 export async function POST(request: Request) {

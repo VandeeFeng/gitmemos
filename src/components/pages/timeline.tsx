@@ -156,7 +156,7 @@ export function Timeline({ searchQuery, selectedLabel, onLabelClick, issues = []
     .slice(0, displayCount);  // Limit display count
 
   return (
-    <div className="space-y-8 h-[calc(100vh-135px)] relative">
+    <div className="space-y-8 h-[calc(100vh-140px)] relative">
       {/* Main Layout Container */}
       <div className="flex flex-col sm:flex-row h-full">
         {/* Left Sidebar Container (Calendar + Heatmap) */}

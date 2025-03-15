@@ -49,7 +49,7 @@ export function Header({
   return (
     <header className="fixed top-0 left-0 right-0 bg-white/80 dark:bg-[rgb(22,27,34)]/80 backdrop-blur-sm z-40">
       <div className="container mx-auto px-4 max-w-4xl">
-        <div className="flex flex-col md:flex-row md:items-center justify-between py-4 md:py-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between py-4 md:py-6">
           <div className="flex items-center">
             <LogoButton onClick={() => handleNavigation('/')} className="mr-3" />
             <div className="flex items-center gap-1">

@@ -1,9 +1,11 @@
+import React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { Issue } from '@/types/github';
 import { getIssues } from '@/lib/supabase-client';
 import { useIssues } from '@/lib/contexts/issue-context';
 import { errorLog } from '@/lib/debug';
+import { getLabelStyles } from '@/lib/colors';
 
 interface BacklinksProps {
   currentIssueNumber: number;
@@ -72,7 +74,7 @@ export function Backlinks({ currentIssueNumber }: BacklinksProps) {
         Backlinks
       </h3>
       <div className="space-y-1">
-        {backlinks.map(issue => (
+        {backlinks.map((issue: Issue) => (
           <Link
             key={issue.number}
             href={`/issue/${issue.number}`}
@@ -90,11 +92,7 @@ export function Backlinks({ currentIssueNumber }: BacklinksProps) {
                   <span
                     key={label.id}
                     className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full"
-                    style={{
-                      backgroundColor: `#${label.color}20`,
-                      color: `#${label.color}`,
-                      border: `1px solid #${label.color}40`
-                    }}
+                    style={getLabelStyles(label.color)}
                   >
                     {label.name}
                   </span>

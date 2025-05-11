@@ -13,6 +13,7 @@ import {
   LogoButton,
   LabelFilterButton
 } from '@/components/ui/button';
+import { useRef } from 'react';
 
 interface HeaderProps {
   onSearch?: (query: string) => void;
@@ -38,11 +39,17 @@ export function Header({
   const router = useRouter();
   const pathname = usePathname();
   const { labels, loading: labelsLoading } = useLabels();
+  const searchBarRef = useRef<HTMLInputElement>(null);
 
   // Ensure issues is always an array
   const safeIssues = Array.isArray(issues) ? issues : [];
 
   const handleNavigation = (path: string) => {
+    if (path === '/' && searchBarRef.current) {
+      // Clear search input and trigger search with empty string
+      searchBarRef.current.value = '';
+      onSearch?.('');
+    }
     router.push(path);
   };
 
@@ -71,7 +78,7 @@ export function Header({
           </div>
           {showSearchAndNew && (
             <div className="flex items-center gap-4 mt-4 md:mt-0">
-              {onSearch && <SearchBar onSearch={onSearch} issues={safeIssues} />}
+              {onSearch && <SearchBar onSearch={onSearch} issues={safeIssues} inputRef={searchBarRef} />}
               <Button 
                 onClick={() => handleNavigation('/editor')}
                 variant="success"

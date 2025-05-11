@@ -6,6 +6,7 @@ import { Issue } from '@/types/github';
 interface SearchBarProps {
   onSearch: (query: string) => void;
   issues?: Issue[];
+  inputRef?: React.RefObject<HTMLInputElement>;
 }
 
 // Helper function: Tokenize text (supports Chinese and English)
@@ -84,7 +85,7 @@ const smartTruncate = (text: string, targetLength: number, position: number): { 
   };
 };
 
-export function SearchBar({ onSearch, issues = [] }: SearchBarProps) {
+export function SearchBar({ onSearch, issues = [], inputRef }: SearchBarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [showPreview, setShowPreview] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -270,6 +271,7 @@ export function SearchBar({ onSearch, issues = [] }: SearchBarProps) {
     <div className="relative w-64" ref={previewRef}>
       <form onSubmit={handleSearch} className="relative">
         <Input
+          ref={inputRef}
           type="text"
           value={searchQuery}
           onChange={handleChange}

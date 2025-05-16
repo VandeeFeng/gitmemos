@@ -2,6 +2,7 @@
 import { useState, ChangeEvent, useEffect, useRef } from 'react';
 import { Input } from "@/components/ui/input";
 import { Issue } from '@/types/github';
+import { getLabelStyles } from '@/lib/colors';
 
 interface SearchBarProps {
   onSearch: (query: string) => void;
@@ -329,11 +330,7 @@ export function SearchBar({ onSearch, issues = [], inputRef }: SearchBarProps) {
                         <span
                           key={label.id}
                           className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full"
-                          style={{
-                            backgroundColor: `#${label.color}20`,
-                            color: `#${label.color}`,
-                            border: `1px solid #${label.color}40`
-                          }}
+                          style={getLabelStyles(label.color)}
                         >
                           {highlightText(label.name, searchQuery)}
                         </span>

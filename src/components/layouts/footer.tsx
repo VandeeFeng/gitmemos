@@ -3,7 +3,7 @@ export function Footer() {
     <footer className="w-full py-4">
       <div className="container mx-auto px-4 text-center">
         <div className="text-sm text-gray-500">
-          © {new Date().getFullYear()}{' '}
+          © 2024 - {new Date().getFullYear()}{' '}
           <a 
             href="https://github.com/vandeefeng/gitmemos" 
             target="_blank" 
